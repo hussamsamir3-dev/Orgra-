@@ -45,15 +45,25 @@
         });
         const j = await r.json().catch(() => null);
         if (r.status === 403 && j && j.error === 'banned') { this.showBan(j); return null; }
-        if (!r.ok) return null;
+        if (!r.ok) {
+          this.lastError = 'HTTP ' + r.status + (j && j.error ? ' - ' + j.error : '')
+            + (r.status === 404 ? '  (function "' + name + '" is not deployed)' : '');
+          console.error('[ogra]', name, this.lastError);
+          return null;
+        }
+        this.lastError = null;
         return j;
-      } catch (e) { return null; }
+      } catch (e) {
+        this.lastError = 'network: ' + (e && e.message || e);
+        console.error('[ogra]', name, this.lastError);
+        return null;
+      }
     },
 
     /* ---------- signed in ---------- */
     async afterAuth() {
       const p = await this.call('sync');
-      if (!p) { this.offline('could not reach the server'); return; }
+      if (!p) { this.offline(this.lastError || 'could not reach the server'); return; }
       this.online = true; this.practice = false;
       this.adopt(p.player);
       this.applyVehicles(p.vehicles, p.local);
