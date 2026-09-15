@@ -39,9 +39,14 @@
       if (!t) return null;
       try {
         const r = await fetch(FN + '/' + name, {
-          method: body === undefined ? 'GET' : 'POST',
-          headers: { 'content-type': 'application/json', authorization: 'Bearer ' + t },
-          body: body === undefined ? undefined : JSON.stringify(body)
+          method: 'POST',                       /* the functions are POST-only */
+          headers: {
+            'content-type': 'application/json',
+            /* the gateway checks apikey; the function checks the user token */
+            apikey: SUPABASE_KEY,
+            authorization: 'Bearer ' + t
+          },
+          body: JSON.stringify(body === undefined ? {} : body)
         });
         const j = await r.json().catch(() => null);
         if (r.status === 403 && j && j.error === 'banned') { this.showBan(j); return null; }
@@ -65,7 +70,7 @@
 
     /* ---------- signed in ---------- */
     async afterAuth() {
-      const p = await this.call('sync');
+      const p = await this.call('sync', { local: {} });
       if (!p) { this.offline(this.lastError || 'could not reach the server'); return; }
       this.online = true; this.practice = false;
       /* the local watchdog is irrelevant now the server is in charge, and a
