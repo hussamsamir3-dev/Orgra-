@@ -3784,7 +3784,7 @@ Object.assign(L, {hand:['Handbrake','فرامل اليد'], hand_on:['Handbrake 
 /* ---------- handbrake ---------- */
 AU.ratchet = function(on){ if (!this.ok) return; for (let i = 0; i < (on ? 6 : 2); i++) this.tone(on ? 2400 : 1600, .015, 'square', .02, null, null, i*.035); this.burst('brown', .08, 'lowpass', 300, 1, .12, null, on ? .22 : .05); };
 { const _h = UI.hudAct; UI.hudAct = function(a, p){ if (a === 'hand') { const G = GAME.G; if (!G) return; G.car.hand = !G.car.hand; AU.ratchet(G.car.hand); AU.haptic(20); G.feedAdd(G.car.hand ? 'hand_set' : 'hand_off', {}, 'info'); return; } return _h(a, p); }; }
-addEventListener('keydown', e => { if (e.key.toLowerCase() === 'b' && GAME.state === 'play' && !e.repeat && e.target.tagName !== 'INPUT') UI.hudAct('hand'); });
+addEventListener('keydown', e => { if (!e.key) return; if (e.key.toLowerCase() === 'b' && GAME.state === 'play' && !e.repeat && e.target.tagName !== 'INPUT') UI.hudAct('hand'); });
 { const _bh = UI.buildHud; UI.buildHud = function(G){ _bh(G); const row = document.querySelector('.h-bl .ctlrow'); if (row) row.insertAdjacentHTML('beforeend', `<button class="pn hb" data-a="hand" id="bHand" title="${t('hand')}" style="font-family:Rajdhani,sans-serif;font-weight:800">(P)</button>`); }; }
 { const _hd = UI.hud; UI.hud = function(G, dt){ _hd(G, dt); const b = document.getElementById('bHand'); if (b) { b.classList.toggle('on', !!G.car.hand); b.style.color = G.car.hand ? '#ff4d5e' : ''; b.style.borderColor = G.car.hand ? '#ff4d5e' : ''; } }; }
 /* ---------- round fuel & temperature gauges + (P) lamp ---------- */
@@ -4005,14 +4005,18 @@ function ensureMissions(){ const s = GAME.save, day = todayStr(); if (s.missions
 
 /* =================== INPUT =================== */
 const KEYS = {}; const INP = {gas:0, brake:0, horn:false};
-addEventListener('keydown', e => { if (e.target.tagName === 'INPUT') return; const k = e.key.toLowerCase(); if (KEYS[k]) return; KEYS[k] = true;
+addEventListener('keydown', e => { if (!e.key) return;
+  if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+  const k = e.key.toLowerCase(); if (KEYS[k]) return; KEYS[k] = true;
   if (GAME.state !== 'play') return; const G = GAME.G; if (!G) return; AU.init();
   const m = {e:['engine'], r:['gear','R'], n:['gear','N'], d:['gear','D'], c:['gup'], z:['gdn'], l:['lights'], k:['hazard'], o:['door']}[k];
   if (m) UI.hudAct(m[0], m[1]);
   if (k === 'q') G.car.laneT = 1; if (k === 'a') G.car.laneT = 0;
   if (k === 'p' || k === 'escape') { if (GAME.paused && !$('#modal').classList.contains('hidden')) UI.act('resume'); else if (!GAME.paused) UI.hudAct('pause'); }
   if ([' ', 'arrowup', 'arrowdown'].includes(k)) e.preventDefault(); });
-addEventListener('keyup', e => { KEYS[e.key.toLowerCase()] = false; });
+addEventListener('keyup', e => { if (!e.key) return;
+  if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+  KEYS[e.key.toLowerCase()] = false; });
 function readInput(){ INP.gas = Math.max(KEYS['arrowup'] || KEYS['w'] ? 1 : 0, UI.pedal.gas); INP.brake = Math.max(KEYS['arrowdown'] || KEYS['s'] || KEYS[' '] ? 1 : 0, UI.pedal.brake); INP.horn = !!(KEYS['h'] || UI.hornDown); }
 const HUD_ACTS = ['engine','gear','gup','gdn','lights','hazard','door','lane','laneUp','laneDn','volpop','hand','pause','act'];
 function bindUI(){ const del = (root) => root.addEventListener('click', e => { const el = e.target.closest('[data-a]'); if (!el || el.dataset.a === 'noop') return; if (root.id === 'hud' && HUD_ACTS.includes(el.dataset.a)) UI.hudAct(el.dataset.a, el.dataset.p); else UI.act(el.dataset.a, el.dataset.p, el); });
