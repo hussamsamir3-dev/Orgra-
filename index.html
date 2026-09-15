@@ -7112,7 +7112,10 @@ function netDone(r){
           rating:    t.rating || 0,
           fines:     t.fineKeys || [],
           overBy:    t.overBy || 0,
-          litresUsed: Math.max(0, t.fuelUsed || 0)
+          litresUsed: Math.max(0, t.fuelUsed || 0),
+          /* how far was actually driven, so an abandoned run is judged on what
+             happened rather than on the full length of the route */
+          distanceKm: Math.max(0, Math.round(((G.car && G.car.x || 0) - (G.startX || 0)) / 125))
         }).then(res => {
           if (res && res.breakdown) {
             const b = res.breakdown;
