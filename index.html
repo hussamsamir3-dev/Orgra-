@@ -2875,7 +2875,12 @@ document.head.insertAdjacentHTML('beforeend', `<style>
   for (const id in s.owned) { const o = s.owned[id]; if (!o.stk) o.stk = []; o.parts = Object.assign({}, PARTS_DEF, o.parts || {}); o.dirt = o.dirt || 0; delete o.sticker; } }; }
 function dressOwn(o, sp, own){ own = own || {}; o.paint = own.paint || sp.paint; o.paint2 = own.paint2 || null; o.stripe = own.stripe || 'none'; o.stripeCol = own.stripeCol || '#c8202b';
   o.rim = {t:own.rimT || sp.rim.t, c:own.rimC || sp.rim.c}; o.tint = own.tint ?? 1; o.stk = own.stk || []; o.skinKey = sp.id; return o; }
-function spendLive(amt){ const G = GAME.G, s = S(); if (G && GAME.state === 'play') { if (s.cash + tripNet(G) < amt) { UI.toast(t('need_cash')); AU.ui('no'); return false; } G.trip.svc = (G.trip.svc || 0) + amt; } else { if (s.cash < amt) { UI.toast(t('need_cash')); AU.ui('no'); return false; } s.cash -= amt; } AU.cash(); return true; }
+function spendLive(amt){ const G = GAME.G, s = S();
+  /* online, only the server may move money; a local deduction would be
+     undone by the next sync and look like a glitch to the player */
+  if (typeof ogOnline === 'function' && ogOnline() && !(G && GAME.state === 'play')) {
+    UI.toast(LANG.cur === 'ar' ? 'بيتم التأكيد من الخادم…' : 'confirming with the server…');
+    return false; } if (G && GAME.state === 'play') { if (s.cash + tripNet(G) < amt) { UI.toast(t('need_cash')); AU.ui('no'); return false; } G.trip.svc = (G.trip.svc || 0) + amt; } else { if (s.cash < amt) { UI.toast(t('need_cash')); AU.ui('no'); return false; } s.cash -= amt; } AU.cash(); return true; }
 
 /* ---------- hub ---------- */
 UI.scr.hub = function(){ const s = S(), need = xpFor(s.lvl), pct = Math.round(s.xp/need*100), mis = s.missions.list, claimable = mis.some(m => m.p >= m.goal && !m.c), dailyOk = s.daily.last !== todayStr() || s.daily.spin !== todayStr();
@@ -7063,6 +7068,17 @@ document.head.insertAdjacentHTML('beforeend', `<style>
    With a server present, money and progress are its business. Locally we
    only keep what the server sends back, plus cosmetic state. */
 function ogOnline(){ return !!(window.OGRA_NET && OGRA_NET.online && !OGRA_NET.practice); }
+/* show what the server decided, and refresh from its figures */
+function netDone(r){
+  try {
+    if (!r) { UI.toast(LANG.cur === 'ar' ? 'الخادم مش مستجيب' : 'server did not respond'); return; }
+    if (r.error === 'insufficient funds') {
+      UI.toast(LANG.cur === 'ar' ? 'الفلوس مش مكفية' : 'not enough money'); return;
+    }
+    if (r.error) { UI.toast(String(r.error)); return; }
+    UI.refresh();
+  } catch(e) {}
+}
 
 /* a finished run is reported, not self-paid */
 { const _fs = (typeof finishSession === 'function') ? finishSession : null;
@@ -7098,8 +7114,17 @@ function ogOnline(){ return !!(window.OGRA_NET && OGRA_NET.online && !OGRA_NET.p
   UI.act = function(a, p, el){
     if (ogOnline()) {
       try {
-        if (a === 'buy' || a === 'buyVeh')  { OGRA_NET.buy('vehicle', {id:p}).then(r => r && r.ok && UI.refresh()); return; }
-        if (a === 'licBuy')                 { OGRA_NET.buy('licence', {id:p}).then(r => r && r.ok && UI.refresh()); return; }
+        if (a === 'buy' || a === 'buyVeh')  { OGRA_NET.buy('vehicle', {id:p}).then(r => netDone(r)); return; }
+        /* the traffic-unit screen uses dmvBuy, the licence card uses licBuy */
+        if (a === 'licBuy' || a === 'dmvBuy'){ OGRA_NET.buy('licence', {id:p}).then(r => netDone(r)); return; }
+        /* repairs at the workshop */
+        if (a === 'hamFix' || a === 'hamPatch') {
+          const s2 = S(), vid = UI.sel.wvid || s2.cur.line, own = s2.owned[vid];
+          const part = p || 'body';
+          const wear = own && own.cond ? Math.max(0, 100 - (own.cond[part] ?? 100)) : 50;
+          OGRA_NET.buy('repair', {vehicleId:vid, part, wear, patch:a === 'hamPatch'})
+            .then(r => netDone(r)); return;
+        }
         if (a === 'gasBuy') {
           const s = S(), u = UI.sel, vid = u.tab === 'go' ? (u.gvid || s.cur.go) : (u.vid || s.cur.line);
           const sp = vehById(vid), own = s.owned[vid];
