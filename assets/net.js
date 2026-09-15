@@ -190,6 +190,9 @@
     gate(show, note) {
       let el = document.getElementById('ogGate');
       if (!show) { if (el) el.remove(); return; }
+      /* Once dismissed it must never come back mid-session: it covers the
+         whole screen and silently swallows every click underneath. */
+      try { if (sessionStorage.getItem('ogra_gate_dismissed')) return; } catch (e) {}
       if (el) return;
       const ar = (typeof LANG !== 'undefined' && LANG.cur === 'ar');
       el = document.createElement('div');
@@ -221,7 +224,9 @@
         const b = e.target.closest('[data-go]'); if (!b) return;
         const email = (document.getElementById('ogEmail') || {}).value || '';
         const pass  = (document.getElementById('ogPass')  || {}).value || '';
-        if (b.dataset.go === 'practice') { this.practice = true; el.remove(); return; }
+        if (b.dataset.go === 'practice') { this.practice = true; el.remove();
+          try { sessionStorage.setItem('ogra_gate_dismissed', '1'); } catch (e) {}
+          return; }
         if (!email || !pass) return note2(ar ? 'اكتب الإيميل وكلمة السر' : 'Enter email and password');
         if (b.dataset.go === 'in') this.signIn(email, pass, note2);
         else this.signUp(email, pass, note2);
@@ -267,6 +272,11 @@
 
   /* online mode only when actually served over http(s) */
   if (location.protocol === 'http:' || location.protocol === 'https:') {
+    /* Put the gate up at once so a new player signs in before the menu is
+       ever visible, rather than seeing it and being interrupted. */
+    document.addEventListener('DOMContentLoaded', () => {
+      try { if (!NET.user) NET.gate(true); } catch (e) {}
+    });
     window.addEventListener('load', () => NET.init());
   } else {
     console.log('[ogra] file:// — offline practice mode');
