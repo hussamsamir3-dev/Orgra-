@@ -5937,6 +5937,9 @@ Object.assign(L, {
 });
 const AC = {
   KEY:'ogra_ac',
+  clear(){ try { localStorage.removeItem(this.KEY); } catch(e) {}
+    const el = document.getElementById('acWrap'); if (el) el.remove();
+    clearInterval(this._t); console.log('[ogra] local ban cleared'); },
   read(){ try { return JSON.parse(localStorage.getItem(this.KEY) || '{}'); } catch(e) { return {}; } },
   write(o){ try { localStorage.setItem(this.KEY, JSON.stringify(o)); } catch(e) {} },
   banned(){ const o = this.read(); return o.until && Date.now() < o.until ? o.until : 0; },
@@ -5968,11 +5971,16 @@ const AC = {
   /* the watchdog: cash must only ever change through the game's own accounting */
   expect(n){ this.allow = Math.max(this.allow || 0, n*1.1 + 5000); },
   start(){
+    if (typeof ogOnline === 'function' && ogOnline()) return;   /* server-side bans only */
     const b = this.banned();
     if (b) { this.screen(b); return; }
     let last = null, lastT = performance.now();
     setInterval(() => {
       try {
+        /* When signed in, the server owns the balance. Anything the dashboard
+           or an Edge Function changes would look like a jump from here, so the
+           local watchdog has no business running at all. */
+        if (typeof ogOnline === 'function' && ogOnline()) { last = null; return; }
         const s = S(); if (!s) return;
         const now = performance.now(), dt = (now - lastT)/1000; lastT = now;
         if (last == null) { last = s.cash; return; }
@@ -7158,6 +7166,68 @@ document.head.insertAdjacentHTML('beforeend', `<style>
 #ogMode.on{color:#7ce0b0} #ogMode.off{color:#8e9bb0}
 </style>`);
 setInterval(() => { try { ogBadge(); } catch(e) {} }, 2000);
+
+
+/* ================= every economy action goes to the server =================
+   Intercepting action names one at a time proved fragile, so this does two
+   things: it routes the remaining money actions to the server, and it seals
+   cash / xp / level against any local write while online, logging whatever
+   tried so nothing can slip through unnoticed. */
+{ const _a = UI.act;
+  UI.act = function(a, p, el){
+    if (!(typeof ogOnline === 'function' && ogOnline())) return _a.apply(this, arguments);
+    const s = S(), u = UI.sel;
+    const vid = () => u.wvid || u.vid || s.cur.line;
+    try {
+      switch (a) {
+        case 'paint':
+          OGRA_NET.buy('paint', {vehicleId:vid(), paint:u.paint, paint2:u.paint2,
+            stripe:u.stripe}).then(netDone); return;
+        case 'upg':
+          OGRA_NET.buy('upgrade', {vehicleId:vid(), part:p,
+            tier:((s.owned[vid()] || {}).up || {})[p] ? (s.owned[vid()].up[p] + 1) : 1})
+            .then(netDone); return;
+        case 'claimM': {
+          const m = s.missions && s.missions.list && s.missions.list[+p];
+          if (!m) return;
+          OGRA_NET.buy('claimMission', {missionId:m.id}).then(netDone); return;
+        }
+        case 'spin':
+          OGRA_NET.buy('spin', {}).then(r => {
+            if (r && r.spin) { try { UI.spinTo && UI.spinTo(r.spin.index); } catch(e) {}
+              UI.toast((LANG.cur === 'ar' ? 'كسبت ' : 'You won ') + fmt(r.spin.won)); }
+            netDone(r);
+          }); return;
+        case 'daily': case 'claimDaily':
+          OGRA_NET.buy('daily', {}).then(netDone); return;
+      }
+    } catch(e) { console.warn('[ogra] action', a, e); }
+    return _a.apply(this, arguments);
+  }; }
+
+/* the seal: while online, nothing on the device may move money */
+function sealEconomy(){
+  try {
+    const s = S(); if (!s || s.__sealed) return;
+    ['cash','xp','lvl'].forEach(key => {
+      let v = s[key];
+      Object.defineProperty(s, key, {
+        configurable: true, enumerable: true,
+        get(){ return v; },
+        set(nv){
+          if (typeof ogOnline === 'function' && ogOnline() && !OGRA_NET.adopting) {
+            console.warn('[ogra] blocked local write to ' + key + ':', v, '->', nv,
+                         '\n' + (new Error().stack || '').split('\n').slice(2, 4).join('\n'));
+            return;                       /* the server is the only authority */
+          }
+          v = nv;
+        }
+      });
+    });
+    Object.defineProperty(s, '__sealed', {value:true, enumerable:false});
+  } catch(e) { console.warn('[ogra] seal', e); }
+}
+setInterval(() => { try { if (ogOnline()) sealEconomy(); } catch(e) {} }, 1500);
 
 (async function boot(){
   RD.cv = $('#cv'); RD.ctx = RD.cv.getContext('2d'); RD.initStatics();
