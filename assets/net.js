@@ -68,6 +68,9 @@
       const p = await this.call('sync');
       if (!p) { this.offline(this.lastError || 'could not reach the server'); return; }
       this.online = true; this.practice = false;
+      /* the local watchdog is irrelevant now the server is in charge, and a
+         ban it recorded earlier should not follow the player around */
+      try { if (typeof AC !== 'undefined' && AC.clear) AC.clear(); } catch (e) {}
       this.adopt(p.player);
       this.applyVehicles(p.vehicles, p.local);
       this.gate(false);
