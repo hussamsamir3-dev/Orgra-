@@ -49,6 +49,9 @@
           this.lastError = 'HTTP ' + r.status + (j && j.error ? ' - ' + j.error : '')
             + (r.status === 404 ? '  (function "' + name + '" is not deployed)' : '');
           console.error('[ogra]', name, this.lastError);
+          /* 400-499 means the server answered and said no. Hand that reason
+             back so the player sees the real message, not "no response". */
+          if (r.status >= 400 && r.status < 500 && j && j.error) return j;
           return null;
         }
         this.lastError = null;
@@ -75,6 +78,7 @@
     adopt(sp) {
       if (!sp) return;
       this.lastServer = sp;
+      this.adopting = true;            /* the seal lets the server's own figures through */
       try {
         const s = S();
         s.cash = sp.cash; s.xp = sp.xp; s.lvl = sp.level;
@@ -85,6 +89,7 @@
         };
         if (typeof UI !== 'undefined' && UI.refresh) UI.refresh();
       } catch (e) {}
+      this.adopting = false;
     },
 
     applyVehicles(list, local) {
@@ -117,8 +122,14 @@
     async buy(kind, data) {
       if (this.practice) return { error: 'practice' };
       const res = await this.call('purchase', Object.assign({ kind }, data));
-      if (res && res.cash != null)
-        this.adopt(Object.assign({}, this.lastServer, { cash: res.cash }));
+      if (res && res.ok) {
+        /* a purchase can change the licence, the vehicle list or its fuel -
+           not just the balance - so pull the whole picture back */
+        const full = await this.call('sync', { local: {} });
+        if (full) { this.adopt(full.player); this.applyVehicles(full.vehicles, full.local); }
+        else if (res.cash != null) this.adopt(Object.assign({}, this.lastServer, { cash: res.cash }));
+        try { if (typeof UI !== 'undefined' && UI.refresh) UI.refresh(); } catch (e) {}
+      }
       return res;
     },
 
