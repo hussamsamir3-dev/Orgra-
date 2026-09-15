@@ -5971,7 +5971,15 @@ const AC = {
   /* the watchdog: cash must only ever change through the game's own accounting */
   expect(n){ this.allow = Math.max(this.allow || 0, n*1.1 + 5000); },
   start(){
-    if (typeof ogOnline === 'function' && ogOnline()) return;   /* server-side bans only */
+    /* Served over http(s) means the Supabase build, where the server is the
+       only authority on money. The local watchdog would double-judge every
+       legitimate change, so it never arms here - and any ban it recorded
+       earlier is discarded. */
+    if (location.protocol === 'http:' || location.protocol === 'https:') {
+      try { localStorage.removeItem(this.KEY); } catch(e) {}
+      const el = document.getElementById('acWrap'); if (el) el.remove();
+      return;
+    }
     const b = this.banned();
     if (b) { this.screen(b); return; }
     let last = null, lastT = performance.now();
