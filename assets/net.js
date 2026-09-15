@@ -29,14 +29,28 @@
       });
     },
 
-    async token() {
-      const { data } = await this.sb.auth.getSession();
-      return data && data.session ? data.session.access_token : null;
+    async token(waitMs) {
+      /* Supabase refreshes the session in the background. Asking for the token
+         mid-refresh returns null, so give it a moment before giving up. */
+      const deadline = Date.now() + (waitMs == null ? 4000 : waitMs);
+      for (;;) {
+        try {
+          const { data } = await this.sb.auth.getSession();
+          if (data && data.session && data.session.access_token)
+            return data.session.access_token;
+        } catch (e) {}
+        if (Date.now() > deadline) return null;
+        await new Promise(r => setTimeout(r, 250));
+      }
     },
 
     async call(name, body) {
       const t = await this.token();
-      if (!t) return null;
+      if (!t) {
+        this.lastError = 'not signed in (no session token)';
+        console.error('[ogra]', name, this.lastError);
+        return null;
+      }
       try {
         const r = await fetch(FN + '/' + name, {
           method: 'POST',                       /* the functions are POST-only */
