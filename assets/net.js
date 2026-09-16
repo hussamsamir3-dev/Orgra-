@@ -246,16 +246,65 @@
     },
 
     showBan(j) {
-      const mins = j.until ? Math.max(0, Math.ceil((new Date(j.until) - Date.now()) / 60000)) : 60;
-      let el = document.getElementById('ogBan');
-      if (!el) { el = document.createElement('div'); el.id = 'ogBan'; document.body.appendChild(el); }
+      /* A ban stops play immediately: the reason is shown, then the app
+         closes on a ten second count. Lifting it is a manual change to
+         banned_until in the database - nothing here can undo it. */
+      if (document.getElementById('ogBan')) return;
+      this.online = false; this.practice = true;
+      try { clearInterval(this._t); } catch (e) {}
+      try { if (typeof GAME !== 'undefined') { GAME.paused = true; } } catch (e) {}
+      try { if (typeof MUSIC !== 'undefined') MUSIC.want(false); } catch (e) {}
+      try { if (typeof AU !== 'undefined' && AU.ctx) AU.ctx.suspend(); } catch (e) {}
+
+      const ar = (typeof LANG !== 'undefined' && LANG.cur === 'ar');
+      const reason = j && j.reason ? String(j.reason) : 'irregular activity';
+      const REASON_AR = {
+        'edited save data': 'تم تعديل بيانات الحفظ',
+        'claimed a trip in a vehicle that is not owned': 'رحلة بمركبة غير مملوكة',
+        'reported a payout above the maximum possible': 'أرباح أعلى من الحد الممكن',
+        'repeated trips faster than physically possible': 'رحلات أسرع من الممكن فعلياً'
+      };
+      const reasonAr = REASON_AR[reason] || 'نشاط غير طبيعي';
+
+      const el = document.createElement('div');
+      el.id = 'ogBan';
       el.innerHTML = `<div class="gateCard">
-        <div class="gateLogo" style="color:#ff6b6b">⛔ الحساب موقوف</div>
-        <p class="gateMsg">${j.reason || 'نشاط غير طبيعي'}<br>
-          <small>Account suspended — ${j.reason || 'irregular activity'}</small></p>
-        <div class="gateNote">فاضل ${mins} دقيقة · ${mins} minutes remaining</div></div>`;
+        <div class="gateLogo" style="color:#ff6b6b">⛔ ${ar ? 'الحساب موقوف' : 'Account suspended'}</div>
+        <p class="gateMsg"><b>${ar ? reasonAr : reason}</b><br>
+          <small>${ar ? reason : reasonAr}</small></p>
+        <div class="gateNote">${ar ? 'اللعبة هتقفل خلال' : 'Closing in'}
+          <b id="ogBanN" style="color:#ffd98a;font-size:22px">10</b>
+          ${ar ? 'ثانية' : 'seconds'}</div>
+        <div class="gateNote small">${ar
+          ? 'لرفع الإيقاف، عدّل banned_until في قاعدة البيانات.'
+          : 'To lift this, clear banned_until in the database.'}</div></div>`;
+      document.body.appendChild(el);
+
+      let n = 10;
+      const tick = setInterval(() => {
+        n--;
+        const box = document.getElementById('ogBanN');
+        if (box) box.textContent = String(Math.max(0, n));
+        if (n <= 0) {
+          clearInterval(tick);
+          try { window.close(); } catch (e) {}
+          /* window.close() only works for script-opened windows, so leave a
+             dead screen behind rather than a playable game */
+          setTimeout(() => {
+            try {
+              document.body.innerHTML =
+                '<div style="position:fixed;inset:0;background:#05080d;color:#ff6b6b;'
+                + 'display:grid;place-items:center;font:800 18px Cairo,system-ui,sans-serif;'
+                + 'text-align:center;padding:8vw">'
+                + (ar ? 'الحساب موقوف<br><small style="color:#8e9bb0">'
+                      : 'Account suspended<br><small style="color:#8e9bb0">')
+                + (ar ? reasonAr : reason) + '</small></div>';
+            } catch (e) {}
+          }, 250);
+        }
+      }, 1000);
     }
-  };
+  };;
 
   document.head.insertAdjacentHTML('beforeend', `<style>
   #ogGate,#ogBan{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;
