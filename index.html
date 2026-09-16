@@ -2149,7 +2149,11 @@ function updateGame(G, dt, inp){
   if (car.temp > 112 && Math.random() < dt*8) G.parts.push({k:'steam', x:car.x + sp.L/2*.8, y:car.y + .5, vx:-v*.2, vy:1.2, t:0, life:1.5, r:.2, g:.6, d:laneLp(car.lane)*DEP.lane1});
   if (car.on && car.thr > .6 && sp.fuel === 'diesel' && Math.random() < dt*4*car.thr) G.parts.push({k:'smoke', x:car.x - sp.L/2, y:car.y - car.hc + .35, vx:-1 - v*.1, vy:.3, t:0, life:.9, r:.08, g:.3, c:own.cond.engine < 50 ? '30,30,30' : '110,110,110', d:laneLp(car.lane)*DEP.lane1});
   // comfort from longitudinal accel
-  const ax = car.ax || 0; if (G.onboard.length || (G.ride && G.ride.state === 'trip')) { const harsh = Math.max(0, Math.abs(ax) - 3.2); if (harsh > 0) { G.trip.disc += harsh*dt*4; G.onboard.forEach(p => p.mood -= harsh*dt*6); if (G.ride && G.ride.state === 'trip') G.ride.disc += harsh*dt*4; if (Math.random() < dt*harsh*.6) G.bubble(pickLine('brake')); } }
+  const ax = car.ax || 0; if (G.onboard.length || (G.ride && G.ride.state === 'trip')) { let harsh = Math.max(0, Math.abs(ax) - 3.2);
+      /* a sharp stop is ordinary driving here. Only sustained heavy braking -
+         more than four seconds of it - actually annoys anyone. */
+      if (harsh > 0 && !G._brkAngry) harsh = 0;
+      if (harsh > 0) { G.trip.disc += harsh*dt*4; G.onboard.forEach(p => p.mood -= harsh*dt*6); if (G.ride && G.ride.state === 'trip') G.ride.disc += harsh*dt*4; if (Math.random() < dt*harsh*.6) G.bubble(pickLine('brake')); } }
   G.onboard.forEach(p => { p.bv += (-p.bob*60 - p.bv*6 + (car.vy - (G.lastVy || 0))/dt*.01)*dt; p.bob += p.bv*dt; p.bob = clamp(p.bob, -.12, .12); });
   G.lastVy = car.vy;
   // blinkers & horn
@@ -4196,7 +4200,8 @@ function renderScene(G, dt){ const c = RD.ctx, W = G.world, car = G.car, set = G
   if (G.fade > 0) { c.fillStyle = `rgba(0,0,0,${G.fade})`; c.fillRect(0, 0, Ws, Hs); }
   RD.W = Ws; RD.H = Hs; RD.ROADY = RD.RYs; }
 function mkHeads(o){ const n = o.type === 'citybus' ? 12 : o.type === 'micro' ? 3 + (o.id % 8) : o.type === 'coach' ? 10 : 1 + (o.id % 2); const R = rng(o.id*7); return Array.from({length:n}, () => { const l = mkLook(R); return {skin:l.skin, hair:l.type === 'f' ? l.scarf : l.hair, bob:0}; }); }
-function drawPlayer(G){ const car = G.car, sp = car.spec, own = G.own || {}, ca = Math.cos(car.a), sa = Math.sin(car.a), hd = car.hc - car.s0 - (car.d0 || 0) - RIDE_LIFT(sp);
+function drawPlayer(G){ if (G && G.car && G.car.hidden) return;   /* parked at the rest house */
+  const car = G.car, sp = car.spec, own = G.own || {}, ca = Math.cos(car.a), sa = Math.sin(car.a), hd = car.hc - car.s0 - (car.d0 || 0) - RIDE_LIFT(sp);
   const Ox = car.x + hd*sa, Oy = car.y - hd*ca, d = laneLp(car.lane)*DEP.lane1, sc = 1 + car.lane*.06, sx = RD.sx(Ox), sy = RD.sy(Oy, d);
   const vib = 0   /* idle shake removed - it read as a rendering fault, not an engine */;
   const o = dressOwn({style:sp.style, L:sp.L, H:sp.H, wb:sp.wb, wr:sp.wr, roofRack:car.rack ? car.rack.filter(b => !b.lost) : null, sign:G.route ? tn(G.route.st[G.route.st.length - 1].n) : '', appSign:G.mode === 'go'}, sp, own);
@@ -8769,11 +8774,7 @@ function rhClose(G){
       G._brkAngry = G.brkT > 4;
     } catch(e) {}
   }; }
-{ const _pm = (typeof paxMood === 'function') ? paxMood : null;
-  if (_pm) paxMood = function(G, amt, why){
-    if (why === 'brake' && !(G && G._brkAngry)) return;     /* let it go */
-    return _pm.apply(this, arguments);
-  }; }
+/* the brake rule is applied at the real mood drain above */
 
 /* ---------- an intercity coach leaves full and takes nobody on the way ---------- */
 function rhIsLong(G){ return !!(G && G.route && G.route.len === 'long'); }
@@ -8792,9 +8793,10 @@ function rhIsLong(G){ return !!(G && G.route && G.route.len === 'long'); }
     } catch(e) {}
   }; }
 /* refuse roadside pickups on a long run */
-{ const _bo = (typeof boardPax === 'function') ? boardPax : null;
-  if (_bo) boardPax = function(G){
-    if (G && G.noPickup) return false;
+{ const _bo = board;
+  board = function(G, p, st){
+    /* an intercity coach takes nobody off the roadside */
+    if (G && G.noPickup) return;
     return _bo.apply(this, arguments);
   }; }
 
