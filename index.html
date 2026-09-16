@@ -19,6 +19,15 @@
       +'\n\n'+((e.error&&e.error.stack)||'')+'\n\nUA: '+navigator.userAgent);
   },true);
   window.addEventListener('unhandledrejection',function(e){
+    var m = String((e.reason&&(e.reason.message||e.reason))||'');
+    var st = String((e.reason&&e.reason.stack)||'');
+    if (/Failed to fetch|NetworkError|Load failed/i.test(m)
+        || /chrome-extension:|moz-extension:|safari-extension:/i.test(st)
+        || /Storage set failed/i.test(m)) {
+      console.warn('[ogra] ignored a blocked request:', m);
+      if (e.preventDefault) e.preventDefault();
+      return;
+    }
     box('OGRA - PROMISE ERROR\n\nstage: '+window.__ogStage+'\n\n'+((e.reason&&(e.reason.stack||e.reason.message))||e.reason));
   });
   window.addEventListener('load',function(){
