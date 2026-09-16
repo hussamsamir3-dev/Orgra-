@@ -231,6 +231,19 @@ input[type=text]{font-family:inherit;font-size:calc(var(--u)*2.2);padding:.5em .
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 <script src="assets/supabase.js"></script>
+<script>
+/* Some browser extensions replace window.fetch and reject with "Failed to
+   fetch" on requests they dislike. Those rejections are not the game's and
+   must never reach the fatal error screen. */
+addEventListener('unhandledrejection', e => {
+  const m = String((e && e.reason && (e.reason.message || e.reason)) || '');
+  const st = String((e && e.reason && e.reason.stack) || '');
+  if (/Failed to fetch/i.test(m) || /chrome-extension:|moz-extension:/i.test(st)) {
+    console.warn('[ogra] ignored an extension-blocked request:', m);
+    e.preventDefault();
+  }
+}, true);
+</script>
 <script src="assets/net.js" defer></script>
 </head>
 <body>
@@ -1469,6 +1482,10 @@ RD.drawSites = function(world, G){
     if (e.t === 'cone') { const y = this.sy(world.h(e.x), e.d || 0); c.fillStyle = '#ff6a13'; c.beginPath(); c.moveTo(x - .2*P, y); c.lineTo(x, y - .7*P); c.lineTo(x + .2*P, y); c.fill(); c.fillStyle = '#fff'; c.fillRect(x - .1*P, y - .42*P, .2*P, .1*P); }
     else if (e.t === 'barrier') { const y = this.sy(world.h(e.x), e.d || 0); for (let k = 0; k < 5; k++) { c.fillStyle = k % 2 ? '#fff' : '#e0302a'; c.fillRect(x + k*.4*P, y - 1*P, .4*P, .3*P); } c.fillStyle = '#666'; c.fillRect(x, y - .7*P, .08*P, .7*P); c.fillRect(x + 1.9*P, y - .7*P, .08*P, .7*P); if (Math.floor(performance.now()/400) % 2) this.lights.push(['glow', x + 1*P, y - 1.1*P, .8*P, '#ffae00', 1]); }
     else if (e.t === 'officer') { const y = this.sy(world.h(e.x), e.d || -.4); this.person(e.look, x, y, 1, performance.now()/300, false, e.wave, -1); c.fillStyle = '#fff'; c.fillRect(x - .5*P, y - 1.3*P, .25*P, .08*P); }
+    else if (e.t === 'copimg') {
+      const y = this.sy(world.h(e.x), DEP.walk);
+      drawCop(c, e, x, y, P);
+    }
     else if (e.t === 'stopsign') { const y = this.sy(world.h(e.x), DEP.bld + .4); c.fillStyle = '#888'; c.fillRect(x - .05*P, y - 2.6*P, .1*P, 2.6*P); c.fillStyle = '#d6322c'; c.beginPath(); for (let k = 0; k < 8; k++) { const a = k*Math.PI/4 + Math.PI/8; c.lineTo(x + Math.cos(a)*.55*P, y - 2.9*P + Math.sin(a)*.55*P); } c.fill(); txt(LANG.cur === 'ar' ? 'قف' : 'STOP', x, y - 2.9*P, .32*P, '#fff', 900); }
     else if (e.t === 'worker') { const y = this.sy(world.h(e.x), e.d || 0); this.person(e.look, x, y, 1, performance.now()/250, false, true, -1); c.fillStyle = '#ff6a13'; c.fillRect(x - .17*P, y - 1.3*P, .34*P, .15*P); }
   }
@@ -6925,11 +6942,16 @@ Object.assign(L, {
   cp_stopped:['Officer is checking the vehicle in front','الظابط بيفحص اللي قدامك'],
   cp_lic:['Licence, please','الرخصة لو سمحت'],
   cp_ok:['All in order. Drive safe.','تمام. خد بالك من نفسك.'],
-  cp_title:['Traffic checkpoint','كمين مرور']
+  cp_title:['Traffic checkpoint','كمين مرور'],
+  cp_pass:['He waves you through','بيعدّيك']
 });
 /* what the officer says, and what the driver can answer */
 const CP_TALK = {
   open:[
+    ["Where are you coming from?","جاي منين؟"],
+    ["Papers. And open the back.","الورق. وافتح ورا."],
+    ["Long day, ya rayyes? Licence.","اليوم طويل يا ريس؟ الرخصة."],
+    ["How many on board?","كام واحد معاك؟"],
     ["Evening. Licence and registration.","مساء الخير. الرخصة والرخصة المرورية."],
     ["Pull over to the side. Papers.","على جنب. الورق."],
     ["Where are you heading, ya rayyes?","رايح فين يا ريس؟"],
@@ -6937,12 +6959,14 @@ const CP_TALK = {
   ],
   reply:[
     {k:'papers', en:'Here you go, officer.',   ar:'اتفضل يا باشا.',            mood:+1},
+    {k:'polite', en:'Whatever you need, ya basha.', ar:'تحت أمرك يا باشا.',   mood:+1},
     {k:'where',  en:'Maadi, then back on the line.', ar:'المعادي، وراجع على الخط.', mood:0},
     {k:'rush',   en:'I have passengers waiting.', ar:'معايا ركاب مستنيين.',    mood:-1},
     {k:'joke',   en:'All clean, ya basha, I swear.', ar:'كله سليم يا باشا، والله.', mood:0}
   ],
   back:{
     papers:[["Good. One moment.","تمام. لحظة واحدة."],["A driver who keeps his papers. Rare.","سواق بيحافظ على ورقه. نادر."]],
+    polite:[["Allah keep you. Won't be long.","ربنا يخليك. مش هطول عليك."],["That is how it should be.","كده الأصول."]],
     where:[["Watch the speed on the corniche.","خد بالك من السرعة على الكورنيش."],["Fine. Stay right.","ماشي. خليك يمين."]],
     rush:[["Everyone has passengers waiting.","كله معاه ركاب مستنيين."],["Two minutes won't kill you.","دقيقتين مش هيموتوك."]],
     joke:[["We'll be the judge of that.","إحنا اللي هنحكم على كده."],["Everyone says that.","كله بيقول كده."]]
@@ -6964,17 +6988,40 @@ function makeCheckpoint(G, x){
   /* cones taper traffic into a single file on this lane */
   for (let i = 0; i < 5; i++) G.props.push({x:x - 16 + i*3, t:'cone', d:.06 + i*.05});
   for (let i = 0; i < 4; i++) G.props.push({x:x + 4 + i*3,  t:'cone', d:.26 - i*.06});
-  G.props.push({x:x - 3.5, t:'officer', look:mkLook(Math.random), wave:true, d:-.42});
+  G.props.push({x:x - 3.5, t:'copimg', state:'idle', t2:0, d:-.42});
   /* the patrol car parked on the shoulder, lights on */
   try { const p = mkSpr(G, 'poltraffic', x + 7, 0, 0);
     p.v = 0; p.v0 = 0; p.parked = true; p.lp = -.55; p.lightbar = true; G.traffic.push(p); } catch(e) {}
-  G.cp = {x, lane, queue:[], busy:null, t:0, playerDone:false, warned:false};
+  /* He does not stop everyone. A worn vehicle, no licence or a heavy load
+     makes it far more likely - the rest is his discretion. */
+  let odds = 0.34;
+  try {
+    const st = licState(S());
+    if (st.cls === 'none' || st.expired) odds += 0.45;
+    const own = G.own;
+    if (own && own.cond && own.cond.body < 50) odds += 0.15;
+    if (G.onboard && G.onboard.length > (G.car.spec.seats || 14)) odds += 0.20;
+  } catch(e) {}
+  G.cp = {x, lane, queue:[], busy:null, t:0, playerDone:false, warned:false,
+          wantPlayer: Math.random() < Math.min(0.92, odds)};
   G.feedAdd('cp_ahead', {}, 'warn');
 }
 
 /* ---- traffic behaviour: queue on the checkpoint lane, two seconds each ---- */
 function cpTraffic(G, dt){
   const cp = G.cp; if (!cp) return;
+  /* keep the officer's animation in step with what he is doing */
+  const cop = G.props.find(q => q.t === 'copimg');
+  if (cop) {
+    cop.t = (cop.t || 0) + dt;
+    const car = G.car, dist = cp.x - car.x;
+    if (cp.open) cop.state = 'holding';                  /* player is at the window */
+    else if (cp.playerDone && dist < 6) cop.state = 'pass';
+    else if (dist > 0 && dist < 30 && cp.wantPlayer) cop.state = 'waving';
+    else if (cp.busy) cop.state = 'holding';
+    else if (cp.lastWave && G.clock - cp.lastWave < 1.4) cop.state = 'waving';
+    else cop.state = 'idle';
+  }
   const stopX = cp.x - 2;
   for (const o of G.traffic) {
     if (o.parked || o.lp > .5) continue;            /* other lane carries on */
@@ -6982,7 +7029,7 @@ function cpTraffic(G, dt){
     if (d < -6 || d > 60) { o.cpHold = 0; continue; }
     if (o.cpDone) continue;
     if (cp.busy == null && d < 2.2) {               /* its turn */
-      cp.busy = o; o.cpHold = 0;
+      cp.busy = o; o.cpHold = 0; cp.lastWave = G.clock;   /* he waves it in */
     }
     if (cp.busy === o) {
       o.cpCap = 0;                                  /* held at the line */
@@ -7010,6 +7057,12 @@ function cpPlayer(G, dt){
   const car = G.car, d = cp.x - car.x;
   if (d < -12) { cp.playerDone = true; return; }
   if (d < 26 && d > 0 && !cp.warned) { cp.warned = true; G.feedAdd('cp_wait', {}, 'info'); }
+  if (!cp.wantPlayer) {                       /* waved through */
+    if (d < 4 && !cp.passTold) { cp.passTold = true;
+      G.feedAdd('cp_pass', {}, 'ok'); }
+    if (d < -6) cp.playerDone = true;
+    return;
+  }
   if (d < 3.2 && d > -3 && Math.abs(car.vx) < .5 && !cp.open) {
     cp.open = true;
     GAME.paused = true;
@@ -8304,6 +8357,38 @@ const NEWVEH = {
   console.log('artwork: ' + Object.keys(NEWVEH).length + ' AI vehicles registered');
 })();
 
+
+
+/* ================= the officer at a checkpoint =================
+   Eight frames, mirrored so he faces oncoming traffic on the left. He stands
+   still until he picks a vehicle, then raises a hand through the wave cycle.
+   Whoever he waves at stops - AI or the player. */
+const COP_N = 8;
+const COP = { idle:0, walk:1, raise:2, out:3, stop:4, wave1:5, wave2:6, hold:7 };
+const COPIMG = [];
+(function(){ for (let i = 0; i < COP_N; i++) {
+  const im = new Image(); im.src = 'assets/new/cop_' + String(i).padStart(2,'0') + '.webp';
+  COPIMG.push(im);
+} })();
+
+/* which frame to show, from what he is doing */
+function copFrame(o, t){
+  if (o.state === 'waving') {
+    const seq = [COP.raise, COP.out, COP.stop, COP.wave1, COP.wave2, COP.stop];
+    return seq[Math.floor(t * 6) % seq.length];
+  }
+  if (o.state === 'holding') return COP.stop;      /* hand out, vehicle stopped */
+  if (o.state === 'pass')    return COP.wave2;     /* waving them through */
+  return COP.idle;                                  /* standing still */
+}
+
+function drawCop(c, o, x, y, P){
+  const f = copFrame(o, o.t || 0);
+  const im = COPIMG[f] || COPIMG[0];
+  if (!im || !im.complete || !im.naturalWidth) return;
+  const h = 1.78 * P, w = h * (im.naturalWidth / im.naturalHeight);
+  c.drawImage(im, x - w/2, y - h, w, h);
+}
 
 (async function boot(){
   RD.cv = $('#cv'); RD.ctx = RD.cv.getContext('2d'); RD.initStatics();
