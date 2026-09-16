@@ -4169,7 +4169,7 @@ function renderScene(G, dt){ const c = RD.ctx, W = G.world, car = G.car, set = G
 function mkHeads(o){ const n = o.type === 'citybus' ? 12 : o.type === 'micro' ? 3 + (o.id % 8) : o.type === 'coach' ? 10 : 1 + (o.id % 2); const R = rng(o.id*7); return Array.from({length:n}, () => { const l = mkLook(R); return {skin:l.skin, hair:l.type === 'f' ? l.scarf : l.hair, bob:0}; }); }
 function drawPlayer(G){ const car = G.car, sp = car.spec, own = G.own || {}, ca = Math.cos(car.a), sa = Math.sin(car.a), hd = car.hc - car.s0 - (car.d0 || 0) - RIDE_LIFT(sp);
   const Ox = car.x + hd*sa, Oy = car.y - hd*ca, d = laneLp(car.lane)*DEP.lane1, sc = 1 + car.lane*.06, sx = RD.sx(Ox), sy = RD.sy(Oy, d);
-  const vib = car.on && Math.abs(car.vx) < 2 ? Math.sin(performance.now()/1000*car.rpm/60*3.14)*.0022*(sp.fuel === 'diesel' ? 1.6 : .5) : 0;
+  const vib = 0   /* idle shake removed - it read as a rendering fault, not an engine */;
   const o = dressOwn({style:sp.style, L:sp.L, H:sp.H, wb:sp.wb, wr:sp.wr, roofRack:car.rack ? car.rack.filter(b => !b.lost) : null, sign:G.route ? tn(G.route.st[G.route.st.length - 1].n) : '', appSign:G.mode === 'go'}, sp, own);
   const heads = G.mode === 'go' ? (G.ride && G.ride.state === 'trip' ? [{skin:G.ride.offer.look.skin, hair:G.ride.offer.look.type === 'f' ? G.ride.offer.look.scarf : G.ride.offer.look.hair, bob:0}] : []) : G.onboard;
   const st = {sqF:car.axles[0].sq, sqR:car.axles[1].sq, pitch:car.a + vib, lift:0, wa:car.axles[1].wa || 0, wav:car.axles[1].om, brake:car.brk > .08, lights:car.lights, blink:car.blink ? 1 : 0, rev:car.gear < 0, pax:heads, dmgF:car.dmgF || 0, dmgR:car.dmgR || 0, scr:car.scr || 0, interior:(own.up || {}).lights >= 2 ? '#ff4fd8' : (heads.length ? '#ffe2a8' : null), beam:car.E.beam, hubLost:car.hubLost,
@@ -4320,7 +4320,7 @@ function pvBar(){
   host.appendChild(el);
 }
 document.head.insertAdjacentHTML('beforeend', `<style>
-.pvbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--u)*2.4);z-index:2147483200;pointer-events:auto;
+.pvbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--u)*1.2);z-index:2147483200;pointer-events:auto;
  display:flex;align-items:center;gap:calc(var(--u)*1.2);padding:calc(var(--u)*1.1) calc(var(--u)*1.8);
  border-radius:calc(var(--u)*2);background:linear-gradient(180deg,rgba(20,25,38,.96),rgba(8,11,18,.97));
  border:1px solid rgba(255,182,39,.55);box-shadow:0 10px 34px rgba(0,0,0,.6),0 0 26px rgba(255,182,39,.14)}
@@ -5825,8 +5825,12 @@ function roadsideTick(G, dt){
     E.susTravel = (E.susTravel || 1) * (0.72 * k);    /* long wheel travel on the big ones */
     E.susZ      = (E.susZ || .3)     * (0.85 * k);    /* body movement */
     /* heavier bodies oscillate slower and settle later */
-    E.susRate   = 1 / (0.55 + 0.75 * k);              /* springs per second */
-    E.susDamp   = Math.max(0.55, 0.92 - 0.16 * k);
+    /* softer springs that carry the motion further and settle slowly, so the
+       body floats rather than twitches. Damping stays under 1 so it bounces. */
+    E.susRate   = 1 / (0.95 + 1.15 * k);              /* slower oscillation */
+    E.susDamp   = Math.max(0.32, 0.62 - 0.12 * k);    /* well under critical */
+    E.susTravel = (E.susTravel || 1) * 1.45;          /* more room to move */
+    E.susZ      = (E.susZ || .3) * 1.30;
     E.rollK     = 0.6 * k;                            /* body roll under braking */
     return E; }; }
 
@@ -5856,11 +5860,13 @@ function smartAI(G, dt){
     }
     const pd = (o.lp > .5 ? (o.x - car.x) : (car.x - o.x));
     if (pd > 0 && pd < gap && Math.abs(o.lp - laneLp(car.lane)) < .4) gap = pd;
-    const safe = o.L * 1.6 + Math.abs(o.v || 0) * 0.55;
+    /* a following AI needs room to stop, not just a body length: reaction time
+       plus braking distance, so it does not rear-end you every time you slow */
+    const safe = o.L * 1.2 + Math.abs(o.v || 0) * 1.35 + 4;
     if (gap < safe) cap = Math.min(cap, cruise * Math.max(0, gap / safe));
 
     /* never park a car in the road: if the way is clear, get moving again */
-    if (gap > safe * 2.2) cap = cruise;
+    if (gap > safe * 1.5) cap = cruise;        /* get moving again sooner */
 
     const v = o.v == null ? cruise : o.v;
     const accel = 4.5 * dt, brake = 9 * dt;
@@ -7424,6 +7430,12 @@ function dmgApply(G, other, kmh, side){
 }
 
 
+document.head.insertAdjacentHTML('beforeend', `<style>
+/* the floating confirm bar covered the last row of choices, so give every
+   scrolling list in the workshop room to scroll past it */
+#screens .scr .scroll, #screens .scr .grid{ padding-bottom:calc(var(--u)*10)!important }
+</style>`);
+
 /* ================= loading screen =================
    splash.html is shown in an isolated frame over the game, so its styling
    cannot collide with the game's own, and the address stays at index.html.
@@ -7470,6 +7482,177 @@ function dmgApply(G, other, kmh, side){
 
   const put = () => document.body && document.body.appendChild(host);
   if (document.body) put(); else document.addEventListener('DOMContentLoaded', put);
+})();
+
+
+/* ---------- real-world dimensions, applied last ----------
+   Lengths, heights and tyre diameters from the manufacturers, so a
+   HiAce is genuinely 5.38 m beside a 12 m coach and the wheels match
+   the vehicle carrying them. */
+const VDIM = {
+ "v_suzuki": [
+  3.4,
+  1.8,
+  0.54
+ ],
+ "v_foton": [
+  4.5,
+  1.93,
+  0.58
+ ],
+ "v_n300": [
+  4.28,
+  1.83,
+  0.56
+ ],
+ "micro_classic": [
+  5.38,
+  2.28,
+  0.68
+ ],
+ "van_euro": [
+  5.99,
+  2.29,
+  0.7
+ ],
+ "micro_hr": [
+  5.99,
+  2.51,
+  0.72
+ ],
+ "micro_jumbo": [
+  6.53,
+  2.54,
+  0.74
+ ],
+ "v_shineray": [
+  5.99,
+  2.35,
+  0.7
+ ],
+ "van_xl": [
+  6.6,
+  2.6,
+  0.76
+ ],
+ "v_joya6": [
+  6.0,
+  2.36,
+  0.7
+ ],
+ "mini_rosa": [
+  6.99,
+  2.63,
+  0.86
+ ],
+ "coaster": [
+  6.99,
+  2.64,
+  0.84
+ ],
+ "v_isuzu": [
+  7.2,
+  2.75,
+  0.9
+ ],
+ "v_higer": [
+  7.28,
+  2.9,
+  0.92
+ ],
+ "v_yutong77": [
+  7.7,
+  2.98,
+  0.94
+ ],
+ "citybus": [
+  12.0,
+  3.2,
+  1.02
+ ],
+ "v_zk6128": [
+  12.0,
+  3.25,
+  1.02
+ ],
+ "coach": [
+  12.5,
+  3.55,
+  1.04
+ ],
+ "v_tourismo": [
+  12.3,
+  3.62,
+  1.06
+ ],
+ "car_old": [
+  3.86,
+  1.36,
+  0.58
+ ],
+ "hatch_city": [
+  4.15,
+  1.44,
+  0.6
+ ],
+ "hatch": [
+  4.37,
+  1.46,
+  0.6
+ ],
+ "sedan_compact": [
+  4.24,
+  1.43,
+  0.59
+ ],
+ "sedan16": [
+  4.5,
+  1.45,
+  0.61
+ ],
+ "sedan_mid": [
+  4.63,
+  1.44,
+  0.63
+ ]
+};
+
+(function(){
+  for (const id in VDIM) {
+    const v = vehById(id); if (!v) continue;
+    const [L, H, tyre] = VDIM[id];
+    v.L = L; v.H = H;
+    v.wr = tyre / 2;                       /* radius the renderer wants */
+    if (v.spr && SPR[v.spr] && SPR[v.spr].m) {
+      const m = SPR[v.spr].m;
+      /* keep the artwork's proportions but drive them from the real length */
+      const k = L / (m.L || L);
+      m.L = L; m.H = H;
+      if (m.wb) m.wb *= k;
+      if (m.mid) m.mid *= k;
+      m.wr = tyre / 2;
+    }
+  }
+  console.log('scale: real dimensions applied to ' + Object.keys(VDIM).length + ' vehicles');
+})();
+
+
+/* ---------- long routes: intercity, not a local service ----------
+   Only the last stop before the terminus and the terminus itself take
+   passengers. The rest houses stay as service halts, and the remaining
+   waypoints become pass-through gates you drive past. */
+(function(){
+  ROUTES.forEach(r => {
+    if (r.len !== 'long' || !Array.isArray(r.st) || r.st.length < 3) return;
+    const last = r.st.length - 1;
+    r.st.forEach((stop, i) => {
+      const isRest = /rest/i.test(stop.n.en || '');
+      stop.rest = stop.rest || isRest;
+      stop.noBoard = !(i === last || i === last - 1) && !isRest;
+    });
+  });
+  const n = ROUTES.filter(r => r.len === 'long').length;
+  console.log('routes: intercity boarding applied to ' + n + ' long routes');
 })();
 
 (async function boot(){
