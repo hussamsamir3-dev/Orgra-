@@ -3757,7 +3757,7 @@ AU.voice = function(key, force){ const now = performance.now(); if (this.paused 
 { const _lg = loadGame; loadGame = async function(){ await _lg(); const s = GAME.save; if (!s.v6) { s.set.voice = false; s.v6 = 1; } }; }
 { const _ss = UI.scr.settings; UI.scr.settings = function(){ let h = _ss(); if (UI.sel.stab !== 'audio') return h;
   const cats = ['greet','drop','thanks','bump','brake','honk','angry','call'], rec = UI.recCat;
-  const block = `<div style="padding:1em 0"><b class="t1">${t('vox_t')}</b><div class="lbl" style="margin:.4em 0 .8em;line-height:1.6">${t('vox_info')}</div>${cats.map(c => `<div class="set" style="padding:.5em 0"><span>${t('vox_' + c)} <span class="tag">${t('clips', {n:(GAME.vox[c] || []).length})}</span></span><div class="row" style="gap:.35em"><button class="chip ${rec === c ? 'on' : ''}" data-a="voxRec" data-p="${c}">🎙 ${rec === c ? t('rec_stop') : t('rec')}</button><button class="chip" data-a="voxUp" data-p="${c}">⬆ ${t('upload')}</button>${(GAME.vox[c] || []).length ? `<button class="chip" data-a="voxPlay" data-p="${c}">▶</button><button class="chip" data-a="voxClr" data-p="${c}">${t('clear')}</button>` : ''}</div></div>`).join('')}</div>`;
+  const block = `<div style="padding:1em 0"><b class="t1">${t('vox_t')}</b><div class="lbl" style="margin:.4em 0 .8em;line-height:1.6">${t('vox_info')}</div>${cats.map(c => `<div class="set" style="padding:.5em 0"><span>${t('vox_' + c)} <span class="tag">${t('clips', {n:(GAME.vox[c] || []).length})}</span></span><div class="row" style="gap:.35em">${(GAME.vox[c] || []).length ? `<button class="chip" data-a="voxPlay" data-p="${c}">▶</button><button class="chip" data-a="voxClr" data-p="${c}">${t('clear')}</button>` : ''}</div></div>`).join('')}</div>`;
   const i = h.lastIndexOf('</div></div>'); return h.slice(0, i) + block + h.slice(i); }; }
 { const fi = document.createElement('input'); fi.type = 'file'; fi.accept = 'audio/*'; fi.style.display = 'none'; document.body.appendChild(fi);
   const addClip = (cat, blob) => { if (blob.size > 900000) { UI.toast('> 900 KB'); return; } const fr = new FileReader(); fr.onload = () => { (GAME.vox[cat] = GAME.vox[cat] || []).push(fr.result); if (GAME.vox[cat].length > 5) GAME.vox[cat].shift(); saveVox(); AU.ding(); UI.refresh(); }; fr.readAsDataURL(blob); };
@@ -7715,11 +7715,11 @@ const VDIM = {
          Those were measured from each sprite's own pixels; overriding them
          with a catalogue figure drops the body onto the road, because the
          renderer seats the vehicle on its wheels. */
-      const k = L / (m.L || L);
+      /* Only the catalogue length and height are applied. wb, wr and mid were
+         measured from each sprite's own pixels - rescaling them moved the
+         drawn wheels off the painted ones, which is why they looked huge or
+         out of place. */
       m.L = L; m.H = H;
-      if (m.wb) m.wb *= k;
-      if (m.mid) m.mid *= k;
-      if (m.wr) m.wr *= k;        /* keep it proportional to the same scaling */
       v.wr = m.wr;
     } else {
       v.wr = tyre / 2;
@@ -7823,8 +7823,8 @@ const NEWVEH = {
   "w": 402,
   "h": 156,
   "d": "assets/new/aiA_00.webp",
-  "wb": 2.448,
-  "wr": 0.347,
+  "wb": 0,
+  "wr": 0,
   "mid": 2.162,
   "wy": 0.01,
   "win": [
@@ -7842,8 +7842,8 @@ const NEWVEH = {
   "w": 359,
   "h": 150,
   "d": "assets/new/aiA_01.webp",
-  "wb": 2.958,
-  "wr": 0.408,
+  "wb": 0,
+  "wr": 0,
   "mid": 2.174,
   "wy": 0.012,
   "win": [
@@ -7861,8 +7861,8 @@ const NEWVEH = {
   "w": 340,
   "h": 145,
   "d": "assets/new/aiA_02.webp",
-  "wb": 3.025,
-  "wr": 0.412,
+  "wb": 0,
+  "wr": 0,
   "mid": 2.157,
   "wy": 0.013,
   "win": [
@@ -7880,8 +7880,8 @@ const NEWVEH = {
   "w": 381,
   "h": 151,
   "d": "assets/new/aiA_03.webp",
-  "wb": 2.61,
-  "wr": 0.337,
+  "wb": 0,
+  "wr": 0,
   "mid": 2.25,
   "wy": 0,
   "win": [
@@ -7899,8 +7899,8 @@ const NEWVEH = {
   "w": 417,
   "h": 192,
   "d": "assets/new/aiA_04.webp",
-  "wb": 2.204,
-  "wr": 0.285,
+  "wb": 0,
+  "wr": 0,
   "mid": 1.9,
   "wy": 0,
   "win": [
@@ -7918,8 +7918,8 @@ const NEWVEH = {
   "w": 502,
   "h": 208,
   "d": "assets/new/aiA_05.webp",
-  "wb": 2.783,
-  "wr": 0.424,
+  "wb": 0,
+  "wr": 0,
   "mid": 2.308,
   "wy": 0.009,
   "win": [
@@ -7937,8 +7937,8 @@ const NEWVEH = {
   "w": 511,
   "h": 220,
   "d": "assets/new/aiA_06.webp",
-  "wb": 2.871,
-  "wr": 0.371,
+  "wb": 0,
+  "wr": 0,
   "mid": 2.475,
   "wy": 0,
   "win": [
@@ -7956,8 +7956,8 @@ const NEWVEH = {
   "w": 455,
   "h": 223,
   "d": "assets/new/aiA_07.webp",
-  "wb": 3.19,
-  "wr": 0.412,
+  "wb": 0,
+  "wr": 0,
   "mid": 2.75,
   "wy": 0,
   "win": [
@@ -7975,8 +7975,8 @@ const NEWVEH = {
   "w": 415,
   "h": 255,
   "d": "assets/new/aiA_08.webp",
-  "wb": 3.256,
-  "wr": 0.58,
+  "wb": 0,
+  "wr": 0,
   "mid": 3.965,
   "wy": 0.015,
   "win": [
@@ -7994,8 +7994,8 @@ const NEWVEH = {
   "w": 601,
   "h": 280,
   "d": "assets/new/aiA_09.webp",
-  "wb": 5.76,
-  "wr": 1.14,
+  "wb": 0,
+  "wr": 0,
   "mid": 6.444,
   "wy": 0.02,
   "win": [
@@ -8013,8 +8013,8 @@ const NEWVEH = {
   "w": 395,
   "h": 177,
   "d": "assets/new/aiB_00.webp",
-  "wb": 2.587,
-  "wr": 0.375,
+  "wb": 0,
+  "wr": 0,
   "mid": 1.897,
   "wy": 0.017,
   "win": [
@@ -8032,8 +8032,8 @@ const NEWVEH = {
   "w": 508,
   "h": 178,
   "d": "assets/new/aiB_01.webp",
-  "wb": 2.815,
-  "wr": 0.405,
+  "wb": 0,
+  "wr": 0,
   "mid": 2.317,
   "wy": 0.018,
   "win": [
@@ -8051,8 +8051,8 @@ const NEWVEH = {
   "w": 498,
   "h": 213,
   "d": "assets/new/aiB_02.webp",
-  "wb": 2.552,
-  "wr": 0.33,
+  "wb": 0,
+  "wr": 0,
   "mid": 2.2,
   "wy": 0,
   "win": [
@@ -8070,8 +8070,8 @@ const NEWVEH = {
   "w": 609,
   "h": 218,
   "d": "assets/new/aiB_03.webp",
-  "wb": 3.173,
-  "wr": 0.506,
+  "wb": 0,
+  "wr": 0,
   "mid": 2.825,
   "wy": 0.009,
   "win": [
@@ -8089,8 +8089,8 @@ const NEWVEH = {
   "w": 270,
   "h": 177,
   "d": "assets/new/aiB_04.webp",
-  "wb": 1.312,
-  "wr": 0.257,
+  "wb": 0,
+  "wr": 0,
   "mid": 1.242,
   "wy": 0.008,
   "win": [
@@ -8108,8 +8108,8 @@ const NEWVEH = {
   "w": 205,
   "h": 158,
   "d": "assets/new/aiB_05.webp",
-  "wb": 1.189,
-  "wr": 0.154,
+  "wb": 0,
+  "wr": 0,
   "mid": 1.025,
   "wy": 0,
   "win": [
@@ -8127,8 +8127,8 @@ const NEWVEH = {
   "w": 205,
   "h": 161,
   "d": "assets/new/aiB_06.webp",
-  "wb": 1.189,
-  "wr": 0.154,
+  "wb": 0,
+  "wr": 0,
   "mid": 1.025,
   "wy": 0,
   "win": [
@@ -8146,8 +8146,8 @@ const NEWVEH = {
   "w": 449,
   "h": 225,
   "d": "assets/new/aiB_07.webp",
-  "wb": 2.814,
-  "wr": 0.385,
+  "wb": 0,
+  "wr": 0,
   "mid": 2.129,
   "wy": 0.009,
   "win": [
@@ -8165,8 +8165,8 @@ const NEWVEH = {
   "w": 508,
   "h": 268,
   "d": "assets/new/aiB_08.webp",
-  "wb": 2.88,
-  "wr": 0.57,
+  "wb": 0,
+  "wr": 0,
   "mid": 2.1,
   "wy": 0.012,
   "win": [
@@ -8184,8 +8184,8 @@ const NEWVEH = {
   "w": 462,
   "h": 167,
   "d": "assets/new/aiC_00.webp",
-  "wb": 2.773,
-  "wr": 0.412,
+  "wb": 0,
+  "wr": 0,
   "mid": 2.358,
   "wy": 0.017,
   "win": [
@@ -8203,8 +8203,8 @@ const NEWVEH = {
   "w": 485,
   "h": 158,
   "d": "assets/new/aiC_01.webp",
-  "wb": 2.813,
-  "wr": 0.364,
+  "wb": 0,
+  "wr": 0,
   "mid": 2.425,
   "wy": 0,
   "win": [
@@ -8222,8 +8222,8 @@ const NEWVEH = {
   "w": 462,
   "h": 156,
   "d": "assets/new/aiC_02.webp",
-  "wb": 2.792,
-  "wr": 0.397,
+  "wb": 0,
+  "wr": 0,
   "mid": 2.288,
   "wy": 0.008,
   "win": [
@@ -8241,8 +8241,8 @@ const NEWVEH = {
   "w": 593,
   "h": 237,
   "d": "assets/new/aiC_03.webp",
-  "wb": 2.881,
-  "wr": 0.511,
+  "wb": 0,
+  "wr": 0,
   "mid": 2.747,
   "wy": 0.009,
   "win": [
@@ -8260,8 +8260,8 @@ const NEWVEH = {
   "w": 627,
   "h": 246,
   "d": "assets/new/aiC_04.webp",
-  "wb": 4.402,
-  "wr": 0.76,
+  "wb": 0,
+  "wr": 0,
   "mid": 4.383,
   "wy": 0.013,
   "win": [
@@ -8279,8 +8279,8 @@ const NEWVEH = {
   "w": 702,
   "h": 224,
   "d": "assets/new/aiC_05.webp",
-  "wb": 6.38,
-  "wr": 0.825,
+  "wb": 0,
+  "wr": 0,
   "mid": 5.5,
   "wy": 0,
   "win": [
@@ -8298,8 +8298,8 @@ const NEWVEH = {
   "w": 718,
   "h": 218,
   "d": "assets/new/aiC_06.webp",
-  "wb": 6.67,
-  "wr": 0.862,
+  "wb": 0,
+  "wr": 0,
   "mid": 5.75,
   "wy": 0,
   "win": [
@@ -8317,8 +8317,8 @@ const NEWVEH = {
   "w": 489,
   "h": 203,
   "d": "assets/new/aiC_07.webp",
-  "wb": 3.12,
-  "wr": 0.618,
+  "wb": 0,
+  "wr": 0,
   "mid": 2.436,
   "wy": 0.027,
   "win": [
@@ -8389,6 +8389,100 @@ function drawCop(c, o, x, y, P){
   const h = 1.78 * P, w = h * (im.naturalWidth / im.naturalHeight);
   c.drawImage(im, x - w/2, y - h, w, h);
 }
+
+
+document.head.insertAdjacentHTML('beforeend', `<style>
+/* ===================== touch layout =====================
+   Audited on a 390x844 phone: nearly every chip was 31 px tall, well under
+   the 44 px that a finger reliably hits, and route cards sat under the
+   bottom panel. These rules apply only where the pointer is coarse, so the
+   desktop layout is untouched. */
+@media (pointer: coarse) {
+  /* every interactive control gets a real touch target */
+  #screens .chip, #screens [data-a="tab"], #screens [data-a="wtab"],
+  #screens [data-a="stab"], #screens [data-a="cat"], #screens [data-a="rcls"],
+  #screens [data-a="wveh"], #screens [data-a="hlen"], #screens .btn,
+  #screens button {
+    min-height: 46px !important;
+    padding-block: 10px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+  /* rows of chips wrap instead of running off the screen */
+  #screens .row, #screens .tabs, #screens .mrow {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    row-gap: 8px !important;
+  }
+  /* nothing hides behind the fixed bottom bar or the confirm bar */
+  #screens .scr { padding-bottom: calc(var(--u)*11) !important; }
+  #screens .scroll, #screens .grid { padding-bottom: calc(var(--u)*11) !important; }
+
+  /* route cards: stack full width, and keep clear of the summary panel */
+  #screens [data-a="route"] {
+    width: 100% !important;
+    min-height: 92px !important;
+    margin-bottom: 10px !important;
+    /* the summary panel carries z-index 1; without its own stacking position
+       a card that overflows the list sits underneath and cannot be tapped */
+    position: relative !important;
+    z-index: 3 !important;
+  }
+  /* the summary panel must not sit on top of the list */
+  #screens .scr > .pn:last-of-type { position: relative !important; z-index: 1 !important; }
+
+  /* the bottom navigation bar: full touch height, not 33 px */
+  #navRail button { min-height: 52px !important; padding-block: 6px !important; }
+  #navRail { height: auto !important; min-height: 60px !important; }
+  body.menuUI #screens, body.menuUI.rtlRail #screens {
+    bottom: calc(60px + env(safe-area-inset-bottom)) !important;
+  }
+  /* carousel arrows on the showroom */
+  #screens [data-a="si"] { min-width: 48px !important; }
+
+  /* the decorative scan overlay sat on top of the route cards and ate taps */
+  #screens .scan, #screens .glow, #screens .vign { pointer-events: none !important; }
+
+  /* the routes list had collapsed to 67 px while the summary took 350:
+     give the list the room and let the summary stay below it */
+  /* the screen is a column: header, then a list that takes the space, then
+     the summary. The list was 67 px tall with its cards overflowing on top
+     of the panel below, which is what swallowed the taps. */
+  #screens .scr { display: flex !important; flex-direction: column !important; }
+  #screens .scr > .grid.scroll, #screens .scr > .scroll {
+    flex: 1 1 auto !important;
+    min-height: 40vh !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+  }
+  #screens .scr > .pn { flex: 0 0 auto !important; max-height: 40vh !important;
+    overflow-y: auto !important; }
+
+  /* the routes list must end above the summary panel, not run under it */
+  #screens .scr.routes .scroll, #screens .scr.routes .grid {
+    padding-bottom: calc(var(--u)*24) !important;
+  }
+
+  /* the driving controls: bigger, and clear of the screen edges */
+  #hud .pedal { min-width: 84px !important; min-height: 84px !important; }
+  #hud .eng, #hud .gearbox button, #hud .hbtn, #hud [data-a] {
+    min-width: 48px !important; min-height: 48px !important;
+  }
+  #hud .gearbox { gap: 8px !important; }
+}
+/* the same minimum on a phone held upright, where space is tightest */
+@media (pointer: coarse) and (orientation: portrait) {
+  #screens .scr { padding-inline: 10px !important; }
+  /* One column for anything with a paragraph of text in it. Two columns on a
+     390 px screen left the route names overlapping each other. */
+  #screens .grid.scroll { grid-template-columns: 1fr !important; }
+  #screens [data-a="route"] { min-height: auto !important; height: auto !important; }
+  #screens [data-a="route"] * { white-space: normal !important; }
+  /* simple picture tiles can still sit two up */
+  #screens .tiles { grid-template-columns: 1fr 1fr !important; }
+}
+</style>`);
 
 (async function boot(){
   RD.cv = $('#cv'); RD.ctx = RD.cv.getContext('2d'); RD.initStatics();
