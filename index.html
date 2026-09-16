@@ -3329,6 +3329,18 @@ const lumHex = h => { const n = parseInt(h.slice(1), 16); return ((n >> 16)*.3 +
 const SPR_PART = {bumperF:[.955, .7, .045, .24], bumperR:[0, .7, .045, .24], headL:[.93, .5, .07, .16], tailL:[0, .42, .03, .24]};
 function sprCanvas(k, paint, paint2, variant, parts){
   const S = SPR[k]; if (!S || !S.img.complete || !S.img.naturalWidth) return null; const pk = parts ? ['bumperF','bumperR','headL','tailL','mirror'].map(q => parts[q] === 0 ? 0 : 1).join('') + ((parts.glass || 0) > .1 ? 'g' : '') : '';
+  /* Photographic sprites already carry their own colour. Tinting them makes a
+     full-size canvas per paint shade, which with 27 new AI vehicles thrashed
+     the cache and cost two thirds of the frame rate. Serve one copy instead. */
+  if (S.m && S.m.noTint) {
+    if (!S.tints.base) {
+      const cv0 = document.createElement('canvas');
+      cv0.width = S.m.w; cv0.height = S.m.h;
+      cv0.getContext('2d').drawImage(S.img, 0, 0);
+      S.tints.base = cv0;
+    }
+    return S.tints.base;
+  }
   const key = (paint || '') + '|' + (paint2 || '') + '|' + (variant || '') + '|' + pk; if (S.tints[key]) return S.tints[key];
   const m = S.m, cv = document.createElement('canvas'); cv.width = m.w; cv.height = m.h; const c = cv.getContext('2d'); c.drawImage(S.img, 0, 0);
   const tint = (col, y0, y1) => { c.save(); c.globalCompositeOperation = 'multiply'; c.fillStyle = col; c.fillRect(0, y0, m.w, y1 - y0); c.restore(); };
@@ -7744,6 +7756,554 @@ function stampGlow(c, x, y, r, hex, alpha){
   const cv = glowSprite(hex, alpha);
   c.drawImage(cv, x - r, y - r, r * 2, r * 2);
 }
+
+
+/* ================= new artwork: AI traffic =================
+   27 vehicles cut from the supplied sheets. Lengths are real-world figures;
+   wheelbase, wheel radius and centre were measured from each sprite's own
+   pixels and clamped to physical ranges, so they sit on the road correctly. */
+const NEWVEH = {
+ "nasr_saloon": {
+  "key": "nasr_saloon",
+  "L": 4.1,
+  "H": 1.44,
+  "w": 402,
+  "h": 156,
+  "d": "assets/new/aiA_00.webp",
+  "wb": 2.448,
+  "wr": 0.347,
+  "mid": 2.162,
+  "wy": 0.01,
+  "win": [
+   0.3,
+   0.66,
+   0.1,
+   0.25
+  ],
+  "noTint": true
+ },
+ "beige_saloon": {
+  "key": "beige_saloon",
+  "L": 4.3,
+  "H": 1.42,
+  "w": 359,
+  "h": 150,
+  "d": "assets/new/aiA_01.webp",
+  "wb": 2.958,
+  "wr": 0.408,
+  "mid": 2.174,
+  "wy": 0.012,
+  "win": [
+   0.3,
+   0.66,
+   0.1,
+   0.25
+  ],
+  "noTint": true
+ },
+ "verna_silver": {
+  "key": "verna_silver",
+  "L": 4.34,
+  "H": 1.43,
+  "w": 340,
+  "h": 145,
+  "d": "assets/new/aiA_02.webp",
+  "wb": 3.025,
+  "wr": 0.412,
+  "mid": 2.157,
+  "wy": 0.013,
+  "win": [
+   0.3,
+   0.66,
+   0.1,
+   0.25
+  ],
+  "noTint": true
+ },
+ "sedan_maroon": {
+  "key": "sedan_maroon",
+  "L": 4.5,
+  "H": 1.45,
+  "w": 381,
+  "h": 151,
+  "d": "assets/new/aiA_03.webp",
+  "wb": 2.61,
+  "wr": 0.337,
+  "mid": 2.25,
+  "wy": 0,
+  "win": [
+   0.3,
+   0.66,
+   0.1,
+   0.25
+  ],
+  "noTint": true
+ },
+ "hatch_teal": {
+  "key": "hatch_teal",
+  "L": 3.8,
+  "H": 1.48,
+  "w": 417,
+  "h": 192,
+  "d": "assets/new/aiA_04.webp",
+  "wb": 2.204,
+  "wr": 0.285,
+  "mid": 1.9,
+  "wy": 0,
+  "win": [
+   0.3,
+   0.66,
+   0.1,
+   0.25
+  ],
+  "noTint": true
+ },
+ "mpv_beige": {
+  "key": "mpv_beige",
+  "L": 4.58,
+  "H": 1.7,
+  "w": 502,
+  "h": 208,
+  "d": "assets/new/aiA_05.webp",
+  "wb": 2.783,
+  "wr": 0.424,
+  "mid": 2.308,
+  "wy": 0.009,
+  "win": [
+   0.3,
+   0.66,
+   0.1,
+   0.25
+  ],
+  "noTint": true
+ },
+ "suv_black": {
+  "key": "suv_black",
+  "L": 4.95,
+  "H": 1.88,
+  "w": 511,
+  "h": 220,
+  "d": "assets/new/aiA_06.webp",
+  "wb": 2.871,
+  "wr": 0.371,
+  "mid": 2.475,
+  "wy": 0,
+  "win": [
+   0.3,
+   0.66,
+   0.1,
+   0.25
+  ],
+  "noTint": true
+ },
+ "pickup_produce": {
+  "key": "pickup_produce",
+  "L": 5.5,
+  "H": 2.15,
+  "w": 455,
+  "h": 223,
+  "d": "assets/new/aiA_07.webp",
+  "wb": 3.19,
+  "wr": 0.412,
+  "mid": 2.75,
+  "wy": 0,
+  "win": [
+   0.3,
+   0.66,
+   0.1,
+   0.25
+  ],
+  "noTint": true
+ },
+ "boxtruck_fridge": {
+  "key": "boxtruck_fridge",
+  "L": 6.1,
+  "H": 2.6,
+  "w": 415,
+  "h": 255,
+  "d": "assets/new/aiA_08.webp",
+  "wb": 3.256,
+  "wr": 0.58,
+  "mid": 3.965,
+  "wy": 0.015,
+  "win": [
+   0.3,
+   0.66,
+   0.1,
+   0.25
+  ],
+  "noTint": true
+ },
+ "lorry_container": {
+  "key": "lorry_container",
+  "L": 12.0,
+  "H": 3.4,
+  "w": 601,
+  "h": 280,
+  "d": "assets/new/aiA_09.webp",
+  "wb": 5.76,
+  "wr": 1.14,
+  "mid": 6.444,
+  "wy": 0.02,
+  "win": [
+   0.3,
+   0.66,
+   0.1,
+   0.25
+  ],
+  "noTint": true
+ },
+ "hatch_silver": {
+  "key": "hatch_silver",
+  "L": 3.95,
+  "H": 1.5,
+  "w": 395,
+  "h": 177,
+  "d": "assets/new/aiB_00.webp",
+  "wb": 2.587,
+  "wr": 0.375,
+  "mid": 1.897,
+  "wy": 0.017,
+  "win": [
+   0.3,
+   0.66,
+   0.1,
+   0.25
+  ],
+  "noTint": true
+ },
+ "sedan_white2": {
+  "key": "sedan_white2",
+  "L": 4.62,
+  "H": 1.46,
+  "w": 508,
+  "h": 178,
+  "d": "assets/new/aiB_01.webp",
+  "wb": 2.815,
+  "wr": 0.405,
+  "mid": 2.317,
+  "wy": 0.018,
+  "win": [
+   0.3,
+   0.66,
+   0.1,
+   0.25
+  ],
+  "noTint": true
+ },
+ "suv_blue": {
+  "key": "suv_blue",
+  "L": 4.4,
+  "H": 1.62,
+  "w": 498,
+  "h": 213,
+  "d": "assets/new/aiB_02.webp",
+  "wb": 2.552,
+  "wr": 0.33,
+  "mid": 2.2,
+  "wy": 0,
+  "win": [
+   0.3,
+   0.66,
+   0.1,
+   0.25
+  ],
+  "noTint": true
+ },
+ "pickup_white": {
+  "key": "pickup_white",
+  "L": 5.33,
+  "H": 1.82,
+  "w": 609,
+  "h": 218,
+  "d": "assets/new/aiB_03.webp",
+  "wb": 3.173,
+  "wr": 0.506,
+  "mid": 2.825,
+  "wy": 0.009,
+  "win": [
+   0.3,
+   0.66,
+   0.1,
+   0.25
+  ],
+  "noTint": true
+ },
+ "tuktuk_ai": {
+  "key": "tuktuk_ai",
+  "L": 2.7,
+  "H": 1.75,
+  "w": 270,
+  "h": 177,
+  "d": "assets/new/aiB_04.webp",
+  "wb": 1.312,
+  "wr": 0.257,
+  "mid": 1.242,
+  "wy": 0.008,
+  "win": [
+   0.3,
+   0.66,
+   0.1,
+   0.25
+  ],
+  "noTint": true
+ },
+ "bike_delivery": {
+  "key": "bike_delivery",
+  "L": 2.05,
+  "H": 1.35,
+  "w": 205,
+  "h": 158,
+  "d": "assets/new/aiB_05.webp",
+  "wb": 1.189,
+  "wr": 0.154,
+  "mid": 1.025,
+  "wy": 0,
+  "win": [
+   0.3,
+   0.66,
+   0.1,
+   0.25
+  ],
+  "noTint": true
+ },
+ "bike_rider": {
+  "key": "bike_rider",
+  "L": 2.05,
+  "H": 1.3,
+  "w": 205,
+  "h": 161,
+  "d": "assets/new/aiB_06.webp",
+  "wb": 1.189,
+  "wr": 0.154,
+  "mid": 1.025,
+  "wy": 0,
+  "win": [
+   0.3,
+   0.66,
+   0.1,
+   0.25
+  ],
+  "noTint": true
+ },
+ "van_white": {
+  "key": "van_white",
+  "L": 4.05,
+  "H": 1.85,
+  "w": 449,
+  "h": 225,
+  "d": "assets/new/aiB_07.webp",
+  "wb": 2.814,
+  "wr": 0.385,
+  "mid": 2.129,
+  "wy": 0.009,
+  "win": [
+   0.3,
+   0.66,
+   0.1,
+   0.25
+  ],
+  "noTint": true
+ },
+ "boxtruck_white": {
+  "key": "boxtruck_white",
+  "L": 6.0,
+  "H": 2.55,
+  "w": 508,
+  "h": 268,
+  "d": "assets/new/aiB_08.webp",
+  "wb": 2.88,
+  "wr": 0.57,
+  "mid": 2.1,
+  "wy": 0.012,
+  "win": [
+   0.3,
+   0.66,
+   0.1,
+   0.25
+  ],
+  "noTint": true
+ },
+ "taxi_checker": {
+  "key": "taxi_checker",
+  "L": 4.62,
+  "H": 1.47,
+  "w": 462,
+  "h": 167,
+  "d": "assets/new/aiC_00.webp",
+  "wb": 2.773,
+  "wr": 0.412,
+  "mid": 2.358,
+  "wy": 0.017,
+  "win": [
+   0.3,
+   0.66,
+   0.1,
+   0.25
+  ],
+  "noTint": true
+ },
+ "sedan_black": {
+  "key": "sedan_black",
+  "L": 4.85,
+  "H": 1.47,
+  "w": 485,
+  "h": 158,
+  "d": "assets/new/aiC_01.webp",
+  "wb": 2.813,
+  "wr": 0.364,
+  "mid": 2.425,
+  "wy": 0,
+  "win": [
+   0.3,
+   0.66,
+   0.1,
+   0.25
+  ],
+  "noTint": true
+ },
+ "corolla_white": {
+  "key": "corolla_white",
+  "L": 4.62,
+  "H": 1.46,
+  "w": 462,
+  "h": 156,
+  "d": "assets/new/aiC_02.webp",
+  "wb": 2.792,
+  "wr": 0.397,
+  "mid": 2.288,
+  "wy": 0.008,
+  "win": [
+   0.3,
+   0.66,
+   0.1,
+   0.25
+  ],
+  "noTint": true
+ },
+ "micro_livery": {
+  "key": "micro_livery",
+  "L": 5.38,
+  "H": 2.28,
+  "w": 593,
+  "h": 237,
+  "d": "assets/new/aiC_03.webp",
+  "wb": 2.881,
+  "wr": 0.511,
+  "mid": 2.747,
+  "wy": 0.009,
+  "win": [
+   0.3,
+   0.66,
+   0.1,
+   0.25
+  ],
+  "noTint": true
+ },
+ "coach_white": {
+  "key": "coach_white",
+  "L": 8.0,
+  "H": 3.05,
+  "w": 627,
+  "h": 246,
+  "d": "assets/new/aiC_04.webp",
+  "wb": 4.402,
+  "wr": 0.76,
+  "mid": 4.383,
+  "wy": 0.013,
+  "win": [
+   0.3,
+   0.66,
+   0.1,
+   0.25
+  ],
+  "noTint": true
+ },
+ "citybus_red": {
+  "key": "citybus_red",
+  "L": 11.0,
+  "H": 3.15,
+  "w": 702,
+  "h": 224,
+  "d": "assets/new/aiC_05.webp",
+  "wb": 6.38,
+  "wr": 0.825,
+  "mid": 5.5,
+  "wy": 0,
+  "win": [
+   0.3,
+   0.66,
+   0.1,
+   0.25
+  ],
+  "noTint": true
+ },
+ "citybus_blue": {
+  "key": "citybus_blue",
+  "L": 11.5,
+  "H": 3.18,
+  "w": 718,
+  "h": 218,
+  "d": "assets/new/aiC_06.webp",
+  "wb": 6.67,
+  "wr": 0.862,
+  "mid": 5.75,
+  "wy": 0,
+  "win": [
+   0.3,
+   0.66,
+   0.1,
+   0.25
+  ],
+  "noTint": true
+ },
+ "minibus_yellow": {
+  "key": "minibus_yellow",
+  "L": 6.5,
+  "H": 2.7,
+  "w": 489,
+  "h": 203,
+  "d": "assets/new/aiC_07.webp",
+  "wb": 3.12,
+  "wr": 0.618,
+  "mid": 2.436,
+  "wy": 0.027,
+  "win": [
+   0.3,
+   0.66,
+   0.1,
+   0.25
+  ],
+  "noTint": true
+ }
+};
+(function(){
+  for (const k in NEWVEH) {
+    const m = NEWVEH[k];
+    ASSETS.veh[k] = m;
+    const img = new Image();
+    SPR[k] = { img, m, tints:{}, sil:null };
+    img.src = m.d;
+  }
+  /* mix them into the AI pools by size, so a lorry never spawns as a taxi */
+  const add = (pool, keys) => {
+    if (!AISPR[pool]) AISPR[pool] = [];
+    keys.forEach(k => { if (SPR[k] && AISPR[pool].indexOf(k) < 0) AISPR[pool].push(k); });
+  };
+  add('sedan', ['nasr_saloon','beige_saloon','verna_silver','sedan_maroon',
+                'sedan_white2','corolla_white','sedan_black']);
+  add('hatch', ['hatch_teal','hatch_silver']);
+  add('suv',   ['suv_black','suv_blue','mpv_beige']);
+  add('taxi',  ['taxi_checker']);
+  add('micro', ['micro_livery','van_white']);
+  add('truck', ['pickup_produce','pickup_white','boxtruck_fridge',
+                'boxtruck_white','lorry_container']);
+  add('citybus',['citybus_red','citybus_blue','minibus_yellow','coach_white']);
+  add('moto',  ['bike_rider','bike_delivery']);
+  add('tuktuk',['tuktuk_ai']);
+  console.log('artwork: ' + Object.keys(NEWVEH).length + ' AI vehicles registered');
+})();
+
 
 (async function boot(){
   RD.cv = $('#cv'); RD.ctx = RD.cv.getContext('2d'); RD.initStatics();
