@@ -120,8 +120,12 @@
         if (Array.isArray(list) && list.length) {
           s.owned = {};
           list.forEach(v => {
-            s.owned[v.id] = Object.assign({ id: v.id, fuel: v.fuel, cond: v.cond || {},
-              up: v.upgrades || {}, stk: [], parts: {} }, v.cosmetics || {});
+            const cos = v.cosmetics || {};
+            const row = Object.assign({ id: v.id, fuel: v.fuel, cond: v.cond || {},
+              up: v.upgrades || {}, stk: cos.stk || [], parts: {} }, cos);
+            /* rims are one object in the game, two fields on the server */
+            if (cos.rimT || cos.rimC) row.rim = { t: cos.rimT, c: cos.rimC };
+            s.owned[v.id] = row;
             if (v.current) s.cur.line = v.id;
           });
         }
