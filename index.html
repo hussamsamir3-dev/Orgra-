@@ -2069,7 +2069,9 @@ const EVENTS = {
   pax:{w:t => .9}
 };
 function schedEvent(G){
-  const th = G.world.themeAt(G.car.x + 150), ks = Object.keys(EVENTS).filter(k => !(G.mode === 'go' && k === 'pax'));
+  const th = G.world.themeAt(G.car.x + 150), ks = Object.keys(EVENTS).filter(k =>
+    !(G.mode === 'go' && k === 'pax')
+    && k !== 'works');            /* blocks the lane with no way past it */
   const tot = ks.reduce((s, k) => s + EVENTS[k].w(th), 0); let r = Math.random()*tot, pick = ks[0];
   for (const k of ks) { r -= EVENTS[k].w(th); if (r <= 0) { pick = k; break; } }
   startEvent(G, pick);
