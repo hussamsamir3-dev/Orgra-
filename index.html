@@ -3593,7 +3593,8 @@ for (const k in THEMES) THEMES[k].lights = 0;
 AU.ui = function(k){ if (!this.ok) return; const b = this.buses.ui; if (k === 'hover') this.tone(1800, .03, 'sine', .005, b);
   else if (k === 'ok') { this.tone(660, .12, 'sine', .028, b); this.tone(990, .18, 'sine', .02, b, null, .07); } else if (k === 'no') this.tone(260, .16, 'sine', .028, b, 200);
   else if (k === 'open') this.burst('pink', .3, 'bandpass', 900, .8, .016, b, 0, 1800); else this.tone(980, .06, 'sine', .026, b, 760); };
-{ const _et = AU.engineTick; AU.engineTick = function(p){ if (p && p.running && isFinite(p.rpm)) { this._r = this._r == null ? p.rpm : lerp(this._r, p.rpm, .1); this._l = this._l == null ? p.load : lerp(this._l, p.load, .07); p = Object.assign({}, p, {rpm:this._r, load:this._l, limiter:false}); } else { this._r = null; }
+{ const _et = AU.engineTick; AU.engineTick = function(p){ if (p && p.running && isFinite(p.rpm)) { this._r = this._r == null ? p.rpm : lerp(this._r, p.rpm, .055);   /* gentler pitch */
+    this._l = this._l == null ? p.load : lerp(this._l, p.load, .09); p = Object.assign({}, p, {rpm:this._r, load:this._l, limiter:false}); } else { this._r = null; }
   _et.call(this, p); if (!this.ok || !p || !p.running) return; const e = this.eng, t = this.ctx.currentTime; e.nam.gain.setTargetAtTime(.03 + p.load*.05, t, .12); e.modG.gain.setTargetAtTime(.04, t, .15); e.cmodG.gain.setTargetAtTime((e.P.cl || 0)*.45, t, .15); }; }
 AU.pauseGame = function(p){ this.paused = p; if (!this.ok) return; const t = this.ctx.currentTime; for (const b of ['engine','fx','amb']) this.buses[b].gain.setTargetAtTime(p ? 0 : this.vol[b]*(b === 'engine' ? 1.5 : 1), t, .06); if (p) { this.hornOff(); this.sirenSet(false); try { speechSynthesis.cancel(); } catch(e) {} } };
 { const _sv = AU.setVol; AU.setVol = function(){ _sv.call(this); if (this.ok && this.paused) for (const b of ['engine','fx','amb']) this.buses[b].gain.value = 0; }; }
@@ -3794,7 +3795,7 @@ AU.engineType = function(sp){ if (!this.ok || !sp) return; const e = this.eng; i
 AU.engineTick = function(p){ if (!this.ok) return; const e = this.eng, t = this.ctx.currentTime;
   if (!p || !p.running || !isFinite(p.rpm) || !e.P) { e.out.gain.setTargetAtTime(0, t, .25); e.lfoG.gain.setTargetAtTime(0, t, .2); this._r = null; return; }
   this._r = this._r == null ? p.rpm : lerp(this._r, p.rpm, .09); this._l = this._l == null ? p.load : lerp(this._l, p.load, .06); const rpm = this._r, load = this._l, P = e.P, n = Math.min(1, rpm/p.rpmMax), f1 = Math.max(6, rpm/60*(e.cyl/2)*P.pitch);
-  ORD.forEach((o, i) => { e.osc[i].frequency.setTargetAtTime(f1*o, t, .07); const hi = o >= 3; e.g[i].gain.setTargetAtTime(P.w[i]*(hi ? (1.3 + 1.2*load)*(.7 + .5*n) : 1)/(1 + i*.05)*.3, t, .12); });
+  ORD.forEach((o, i) => { e.osc[i].frequency.setTargetAtTime(f1*o, t, .14); const hi = o >= 3; e.g[i].gain.setTargetAtTime(P.w[i]*(hi ? (1.3 + 1.2*load)*(.7 + .5*n) : 1)/(1 + i*.05)*.3, t, .12); });
   e.ch[0].os.frequency.setTargetAtTime(f1*(1 + P.det), t, .07); e.ch[0].g.gain.setTargetAtTime(P.w[1]*.05, t, .15); e.ch[1].os.frequency.setTargetAtTime(f1*2*(1 - P.det), t, .07); e.ch[1].g.gain.setTargetAtTime(P.w[3]*.04, t, .15);
   const ex = p.noExhaust ? 1 : 0; e.lp.frequency.setTargetAtTime((P.lp*(.55 + .7*n) + load*P.lp*.8)*(1 + ex*.8), t, .12); e.ng.gain.setTargetAtTime(P.air*(.3 + .7*load)*Math.min(1, n*2)*(1 + ex*2), t, .15); e.nf.frequency.setTargetAtTime(500 + rpm*.25, t, .15);
   e.boost += ((p.turbo ? p.thr*Math.min(1, n/.55) : 0) - e.boost)*.05; e.tb.frequency.setTargetAtTime(2600 + e.boost*2600, t, .08); e.tg.gain.setTargetAtTime(e.boost*.004*(p.turbo || 0), t, .08);
@@ -7020,7 +7021,8 @@ Object.assign(L, {
   cp_ok:['All in order. Drive safe.','تمام. خد بالك من نفسك.'],
   cp_title:['Traffic checkpoint','كمين مرور'],
   cp_pass:['He waves you through','بيعدّيك'],
-  hb_off:['Handbrake released','الفرامل اليدوي اتشال']
+  hb_off:['Handbrake released','الفرامل اليدوي اتشال'],
+  pax_queue:['{n} passengers waiting to board','{n} راكب مستنيين يركبوا']
 });
 /* what the officer says, and what the driver can answer */
 const CP_TALK = {
@@ -8764,19 +8766,23 @@ function rhIsLong(G){ return !!(G && G.route && G.route.len === 'long'); }
       const target = Math.round(seats * (0.90 + Math.random() * 0.10));
       G.noPickup = true;
       G.maxLoad = target;
+      /* They queue at the departure terminal and you pick them up there,
+         rather than appearing on board. The queue is sized so a full load
+         is 90-100% of the seats. */
       G.onboard = G.onboard || [];
-      while (G.onboard.length > target) G.onboard.pop();
-      while (G.onboard.length < target) {
-        try {
-          const look = mkLook(Math.random);
-          const last = (G.route.st || []).length - 1;
-          G.onboard.push({ mood: 88 + Math.random()*12, look,
-                           skin: look.skin, hair: look.hair || look.scarf || '#2b2b2b',
-                           bob: Math.random()*0.02,
-                           dest: last, paid: true, ox: 0 });
-        } catch(e) { break; }
+      const first = (G.route.st || [])[0];
+      if (first) {
+        first.pax = first.pax || [];
+        /* the long-route rule marks early stops as skipped; the departure
+           terminal is where everyone gets on, so it stays open */
+        first.term = false; first.skip = false; first.noBoard = false;
+        first.hidden = false; first.noStop = false;
+        let guard = 0;
+        while (first.pax.length < target && guard++ < 80) {
+          try { first.pax.push(mkPax(G, 0, Math.random)); } catch(e) { break; }
+        }
       }
-      try { G.feedAdd('pax_full', {n:target}, 'ok'); } catch(e) {}
+      try { G.feedAdd('pax_queue', {n:target}, 'pax'); } catch(e) {}
     } catch(e) {}
   }; }
 /* refuse roadside pickups on a long run */
@@ -8932,11 +8938,22 @@ document.head.insertAdjacentHTML('beforeend', `<style>
     catch (e) {
       bad++;
       if (bad <= 3) console.error('[ogra] render frame failed:', e && e.stack || e);
-      if (!told && bad > 30) {
+      if (!told && bad > 20) {
         told = true;
-        try { UI.toast(LANG.cur === 'ar'
-          ? 'في مشكلة في الرسم — كمّل عادي'
-          : 'A drawing fault was skipped', 2600); } catch(x) {}
+        try {
+          const where = String((e && e.stack) || e).split('\n').slice(0, 3).join('\n');
+          const box = document.createElement('div');
+          box.id = 'ogDrawErr';
+          box.setAttribute('style',
+            'position:fixed;left:8px;right:8px;top:8px;z-index:2147483600;'
+            + 'background:rgba(20,6,8,.95);border:1px solid #ff6b6b;border-radius:10px;'
+            + 'color:#ffd7d7;font:600 12px/1.45 monospace;padding:10px 12px;'
+            + 'white-space:pre-wrap;max-height:40vh;overflow:auto');
+          box.textContent = 'OGRA — drawing stopped\n\n' + where
+            + '\n\nTap to dismiss. Send this to fix it.';
+          box.addEventListener('click', () => box.remove());
+          document.body.appendChild(box);
+        } catch(x) {}
       }
       return null;                       /* next frame gets a clean attempt */
     }
@@ -9042,6 +9059,16 @@ document.head.insertAdjacentHTML('beforeend', `<style>
   setInterval(sync, 1000);
   setTimeout(sync, 600);
 })();
+
+document.head.insertAdjacentHTML('beforeend', `<style>
+/* the start/stop button was outsized next to the other controls */
+#hud .h-bc .auxrow .eng,
+#hud .h-bc .auxrow [data-a="engine"]{
+  transform:scale(.70) !important;
+  transform-origin:center bottom !important;
+  margin-inline:calc(var(--u)*-.8) !important;
+}
+</style>`);
 
 (async function boot(){
   RD.cv = $('#cv'); RD.ctx = RD.cv.getContext('2d'); RD.initStatics();
