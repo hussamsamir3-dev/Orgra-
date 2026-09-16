@@ -238,7 +238,9 @@ input[type=text]{font-family:inherit;font-size:calc(var(--u)*2.2);padding:.5em .
 addEventListener('unhandledrejection', e => {
   const m = String((e && e.reason && (e.reason.message || e.reason)) || '');
   const st = String((e && e.reason && e.reason.stack) || '');
-  if (/Failed to fetch/i.test(m) || /chrome-extension:|moz-extension:/i.test(st)) {
+  if (/Failed to fetch/i.test(m) || /Storage set failed/i.test(m)
+      || /about:srcdoc/i.test(st)
+      || /chrome-extension:|moz-extension:/i.test(st)) {
     console.warn('[ogra] ignored an extension-blocked request:', m);
     e.preventDefault();
   }
@@ -1276,7 +1278,7 @@ RD.vehicle = function(o, s, sx, sy, sc){
   c.save(); c.translate(0, -lift); c.rotate(-(s.pitch || 0));
   const paintG = y0 => { const g = c.createLinearGradient(0, y0, 0, 0); g.addColorStop(0, dim(shade(body, .18))); g.addColorStop(.55, dim(body)); g.addColorStop(1, dim(shade(body, -.22))); return g; };
   const glass = (x0, y0, w, h) => { const g = c.createLinearGradient(x0, y0, x0 + w, y0 + h); g.addColorStop(0, dim('#4a5a6c')); g.addColorStop(1, dim('#1a222c')); c.fillStyle = g; rr(c, x0, y0, w, h, .07); c.fill(); };
-  const heads = (slots, yHead) => { if (!s.pax) return; s.pax.forEach((p, i) => { if (i >= slots.length) return; const x = slots[i], b = p.bob || 0; c.fillStyle = dim(p.skin); circ(c, x, yHead + b, .12); c.fillStyle = dim(p.hair); c.beginPath(); c.arc(x, yHead - .01 + b, .126, Math.PI, 0); c.fill(); }); };
+  const heads = (slots, yHead) => { if (!s.pax || s.ai || (s.o && s.o.aiOnly)) return; s.pax.forEach((p, i) => { if (i >= slots.length) return; const x = slots[i], b = p.bob || 0; c.fillStyle = dim(p.skin); circ(c, x, yHead + b, .12); c.fillStyle = dim(p.hair); c.beginPath(); c.arc(x, yHead - .01 + b, .126, Math.PI, 0); c.fill(); }); };
   let front = [hl, -1.0], rear = [-hl, -1.0], wsTop = null;
   if (k === 'van' || k === 'bus') {
     const H = o.H || sty.H, gc = sty.gc;
@@ -1660,7 +1662,7 @@ RD.vehicle = function(o, s, sx, sy, sc){
   c.strokeStyle = 'rgba(0,0,0,.45)'; c.lineWidth = .012; tp(c, pr.body); c.stroke(); c.save(); tp(c, pr.body); c.clip(); c.strokeStyle = 'rgba(255,255,255,' + (.35*(1 - N*.7)) + ')'; c.lineWidth = .025; c.beginPath(); c.moveTo(-hl + .2, -H + .025); c.lineTo(hl - .8, -H + .025); c.stroke(); c.restore();
   // ----- glass -----
   const gl = (cmds) => { tp(c, cmds); const b = c.createLinearGradient(0, -H, 0, pr.belt); const t0 = ['#9db3c6','#5d7082','#2a333d'][tint], tm = ['#3e5163','#1f2a36','#0e1318'][tint], t1 = ['#1d2833','#0d131a','#050709'][tint]; b.addColorStop(0, dim(t0)); b.addColorStop(.45, dim(tm)); b.addColorStop(1, dim(t1)); c.fillStyle = b; c.fill(); c.strokeStyle = '#08090b'; c.lineWidth = .035; c.stroke(); c.strokeStyle = 'rgba(255,255,255,' + (.12*(1 - N*.8)) + ')'; c.lineWidth = .01; c.stroke(); };
-  const heads = (slots, yH) => { if (!s.pax) return; s.pax.forEach((p, i) => { if (i >= slots.length) return; const x = slots[i], b = p.bob || 0; c.fillStyle = dim(p.skin); circ(c, x, yH + b, .115); c.fillStyle = dim(p.hair); c.beginPath(); c.arc(x, yH - .01 + b, .122, Math.PI, 0); c.fill(); }); };
+  const heads = (slots, yH) => { if (!s.pax || s.ai || (s.o && s.o.aiOnly)) return; s.pax.forEach((p, i) => { if (i >= slots.length) return; const x = slots[i], b = p.bob || 0; c.fillStyle = dim(p.skin); circ(c, x, yH + b, .115); c.fillStyle = dim(p.hair); c.beginPath(); c.arc(x, yH - .01 + b, .122, Math.PI, 0); c.fill(); }); };
   const slots = [];
   if (pr.band) { gl(pr.band); for (let x = -hl + .5; x < hl - 2.4; x += .55) slots.push(x); heads(slots, pr.yHead); c.save(); tp(c, pr.band); c.clip(); c.strokeStyle = dim('#0c0f13'); c.lineWidth = .06; for (let x = -hl + 1.55; x < hl - 2.6; x += 1.5) { c.beginPath(); c.moveTo(x, -H); c.lineTo(x, 0); c.stroke(); } c.restore();
     c.strokeStyle = dim(body); c.lineWidth = .14; tp(c, pr.swoosh); c.stroke(); }
@@ -7294,7 +7296,10 @@ function ensureSprite(o){
   return o;
 }
 { const _ma = mkAI;
-  mkAI = function(G, type, x, lane, v){ return ensureSprite(_ma.apply(this, arguments)); }; }
+  mkAI = function(G, type, x, lane, v){
+    const o = ensureSprite(_ma.apply(this, arguments));
+    if (o) { o.aiOnly = true; o.pax = 0; }   /* no drawn occupants */
+    return o; }; }
 /* and sweep anything already on the road that slipped through */
 { const _up = updPeople; updPeople = function(G, dt){ _up(G, dt);
     try { if (GAME.state === 'play' && G.traffic) {
@@ -7804,11 +7809,15 @@ const VDIM = {
       /* only the last stop before the terminus and the terminus itself
          take passengers; the rest houses remain service halts */
       stop.noBoard = !(i === last || i === last - 1) && !isRest;
-      stop.skip = stop.noBoard;            /* and they are not even called */
+      stop.skip = stop.noBoard;
+      /* an intercity coach does not call at them at all: hide them from
+         the route bar and from the stop logic */
+      if (stop.skip) { stop.hidden = true; stop.noStop = true; }
     });
     /* promote the last ordinary stop before the terminus back to a real stop */
     for (let i = r.st.length - 2; i >= 0; i--) {
-      if (!r.st[i].rest) { r.st[i].noBoard = false; r.st[i].skip = false; break; }
+      if (!r.st[i].rest) { r.st[i].noBoard = false; r.st[i].skip = false;
+        r.st[i].hidden = false; r.st[i].noStop = false; break; }
     }
     r.st.forEach(() => {
     });
@@ -8638,17 +8647,34 @@ document.head.insertAdjacentHTML('beforeend', `<style>
    centre as the gear selector and buttons changed width. Pin the cluster to
    the exact middle of the screen and hang the gear selector to its left. */
 #hud .h-bc{
-  left:50% !important;
-  transform:translateX(-50%) !important;
+  left:0 !important;
+  right:0 !important;
+  transform:none !important;
+  justify-content:center !important;
+  margin-inline:auto !important;
   display:grid !important;
-  grid-template-columns:1fr auto 1fr !important;
+  grid-template-columns:1fr minmax(calc(var(--u)*30), auto) 1fr !important;
   align-items:end !important;
   width:min(96vw, calc(var(--u)*78)) !important;
   gap:calc(var(--u)*1.2) !important;
   justify-items:center !important;
 }
-/* the cluster occupies the centre cell, so it is centred on the screen */
-#hud .h-bc .clpn{ grid-column:2 !important; justify-self:center !important; }
+/* Pin the cluster to the screen itself rather than to a grid cell: inside the
+   row it was sitting 81 px above the bottom edge because the row is taller
+   than the cluster and the other controls set the baseline. */
+#hud .clpn{
+  position:fixed !important;
+  left:50% !important;
+  bottom:0 !important;
+  transform:translateX(-50%) scale(.92) !important;
+  transform-origin:bottom center !important;
+  margin:0 !important;
+  z-index:6 !important;
+}
+/* the middle cell is a spacer: the cluster itself is pinned to the screen */
+#hud .h-bc .clpn{ grid-column:2 !important; visibility:visible !important; }
+#hud .h-bc .gearbox{ margin-inline-end:calc(var(--u)*1.5) !important; }
+#hud .h-bc .auxrow{ margin-inline-start:calc(var(--u)*1.5) !important; }
 /* the gear selector takes the left cell, pushed up against the cluster */
 #hud .h-bc .gearbox{ grid-column:1 !important; justify-self:end !important; }
 /* everything else - engine, horn, park - goes to the right cell */
