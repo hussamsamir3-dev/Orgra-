@@ -8788,8 +8788,14 @@ function rhIsLong(G){ return !!(G && G.route && G.route.len === 'long'); }
 /* refuse roadside pickups on a long run */
 { const _bo = board;
   board = function(G, p, st){
-    /* an intercity coach takes nobody off the roadside */
-    if (G && G.noPickup) return;
+    /* An intercity coach takes nobody off the roadside - but everyone gets on
+       at the departure terminal, which is the one place boarding must work. */
+    if (G && G.noPickup) {
+      const first = (G.route && G.route.st || [])[0];
+      const atStart = st && first && (st === first
+        || (st.x != null && first.x != null && Math.abs(st.x - first.x) < 1));
+      if (!atStart) return;
+    }
     return _bo.apply(this, arguments);
   }; }
 
