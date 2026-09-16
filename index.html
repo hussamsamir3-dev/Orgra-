@@ -8770,15 +8770,15 @@ function rhIsLong(G){ return !!(G && G.route && G.route.len === 'long'); }
          rather than appearing on board. The queue is sized so a full load
          is 90-100% of the seats. */
       G.onboard = G.onboard || [];
-      const first = (G.route.st || [])[0];
+      /* Boarding reads from the WORLD's station list, not the route's stop
+         list - filling route.st looked right and did nothing. */
+      const stn = (G.world && G.world.stations) || [];
+      const first = stn[0];
       if (first) {
         first.pax = first.pax || [];
-        /* the long-route rule marks early stops as skipped; the departure
-           terminal is where everyone gets on, so it stays open */
-        first.term = false; first.skip = false; first.noBoard = false;
-        first.hidden = false; first.noStop = false;
+        first.term = false;                    /* the departure terminal boards */
         let guard = 0;
-        while (first.pax.length < target && guard++ < 80) {
+        while (first.pax.length < target && guard++ < 120) {
           try { first.pax.push(mkPax(G, 0, Math.random)); } catch(e) { break; }
         }
       }
@@ -8791,7 +8791,7 @@ function rhIsLong(G){ return !!(G && G.route && G.route.len === 'long'); }
     /* An intercity coach takes nobody off the roadside - but everyone gets on
        at the departure terminal, which is the one place boarding must work. */
     if (G && G.noPickup) {
-      const first = (G.route && G.route.st || [])[0];
+      const first = ((G.world && G.world.stations) || [])[0];
       const atStart = st && first && (st === first
         || (st.x != null && first.x != null && Math.abs(st.x - first.x) < 1));
       if (!atStart) return;
