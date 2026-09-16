@@ -76,8 +76,13 @@
         this.lastError = null;
         return j;
       } catch (e) {
-        this.lastError = 'network: ' + (e && e.message || e);
-        console.error('[ogra]', name, this.lastError);
+        /* Some browser extensions wrap window.fetch and throw "Failed to
+           fetch" on requests they dislike. That is not our failure and must
+           never surface as a fatal error, so swallow it and carry on. */
+        const msg = (e && e.message) || String(e);
+        this.lastError = 'network: ' + msg;
+        if (/Failed to fetch/i.test(msg)) this.lastError += ' (a browser extension may be blocking requests)';
+        console.warn('[ogra]', name, this.lastError);
         return null;
       }
     },
@@ -125,6 +130,9 @@
               up: v.upgrades || {}, stk: cos.stk || [], parts: {} }, cos);
             /* rims are one object in the game, two fields on the server */
             if (cos.rimT || cos.rimC) row.rim = { t: cos.rimT, c: cos.rimC };
+            /* the lists of what has been BOUGHT, separate from what is fitted */
+            if (Array.isArray(cos.rims)) row.rims = cos.rims;
+            if (Array.isArray(cos.stk))  row.stk  = cos.stk;
             s.owned[v.id] = row;
             if (v.current) s.cur.line = v.id;
           });
