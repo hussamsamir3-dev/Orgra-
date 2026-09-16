@@ -1486,6 +1486,26 @@ RD.drawSites = function(world, G){
       const y = this.sy(world.h(e.x), DEP.walk);
       drawCop(c, e, x, y, this.PPM);
     }
+    else if (e.t === 'artB' || e.t === 'artP' || e.t === 'artW') {
+      /* skip anything the camera cannot see: without this every placed prop
+         was composited each frame whether on screen or not */
+      if (x < -260 || x > this.Ws + 260) return;
+      const P2 = this.PPM, y2 = this.sy(world.h(e.x), DEP.bld + .4);
+      let im = null, hM = 1.75;
+      if (e.t === 'artB') { im = ARTIMG[e.k]; hM = null; }
+      else if (e.t === 'artP') im = ARTIMG[e.k];
+      else { const idx = e.who * 8 + (Math.floor(e.ph) % 8);
+             im = ARTIMG[NEWART[e.set][idx]]; }
+      if (im && im.complete && im.naturalWidth) {
+        let w, h;
+        if (hM === null) { w = (BLDG_W[e.k] || 6) * P2; h = w * (im.naturalHeight / im.naturalWidth); }
+        else { h = hM * P2; w = h * (im.naturalWidth / im.naturalHeight); }
+        c.save();
+        if (e.flip) { c.translate(x, 0); c.scale(-1, 1); c.translate(-x, 0); }
+        c.drawImage(im, x - w/2, y2 - h, w, h);
+        c.restore();
+      }
+    }
     else if (e.t === 'stopsign') { const y = this.sy(world.h(e.x), DEP.bld + .4); c.fillStyle = '#888'; c.fillRect(x - .05*P, y - 2.6*P, .1*P, 2.6*P); c.fillStyle = '#d6322c'; c.beginPath(); for (let k = 0; k < 8; k++) { const a = k*Math.PI/4 + Math.PI/8; c.lineTo(x + Math.cos(a)*.55*P, y - 2.9*P + Math.sin(a)*.55*P); } c.fill(); txt(LANG.cur === 'ar' ? 'قف' : 'STOP', x, y - 2.9*P, .32*P, '#fff', 900); }
     else if (e.t === 'worker') { const y = this.sy(world.h(e.x), e.d || 0); this.person(e.look, x, y, 1, performance.now()/250, false, true, -1); c.fillStyle = '#ff6a13'; c.fillRect(x - .17*P, y - 1.3*P, .34*P, .15*P); }
   }
@@ -1951,7 +1971,10 @@ function updTraffic(G, dt){
     if (o.wait > 0) { o.wait -= dt; o.v = Math.max(0, o.v - 6*dt); o.brake = true; if (o.wait <= 0 && o.atSt) { o.atSt.aiTook = true; o.atSt = null; } continue; }
     const dir = o.lane ? -1 : 1;
     // lane position smoothing (overtakers)
-    { const tg = (o.over ? 1 : o.lane) + ((o.over || o.lane) ? .34 : .166); o.lp += (tg - o.lp)*Math.min(1, dt*2.2); }
+    { /* lane changing is switched off: everything holds the lane it spawned in */
+      o.over = false;
+      const tg = o.lane + (o.lane ? .34 : .166);
+      o.lp += (tg - o.lp)*Math.min(1, dt*2.2); }
     const myLane = o.lp > .5 ? 1 : 0;
     // find leader
     let gap = 999, lv = 0, ld = null;
@@ -2649,7 +2672,7 @@ UI.scr.settings = function(){ const s = S(), st = s.set, tg = (k) => `<button cl
   const keys = [['k_gas','↑ / W'],['k_brake','↓ / S / Space'],['k_engine','E'],['k_gears','R / N / D'],['k_manual','C / Z'],['k_lane','Q / A'],['k_horn','H'],['k_door','O'],['k_lights','L / K'],['k_pause','P / Esc']];
   return `<div class="scr dim"><div class="hdr"><button class="back" data-a="nav" data-p="hub">${ic('back')}</button><h2>${t('settings')}</h2></div><div class="scroll pn" style="flex:1;min-height:0;padding:0 calc(var(--u)*2.4)">
    <div class="set"><b>${t('language')}</b><div class="row"><button class="chip ${LANG.cur === 'en' ? 'on' : ''}" data-a="setlang" data-p="en">English</button><button class="chip ${LANG.cur === 'ar' ? 'on' : ''}" data-a="setlang" data-p="ar">العربية</button></div></div>
-   ${['master','engine','fx','amb'].map(k => `<div class="set"><b>${t('vol_' + k)}</b>${sl(k)}</div>`).join('')}
+   ${['master','engine','fx','amb','music'].map(k => `<div class="set"><b>${t('vol_' + k)}</b>${sl(k)}</div>`).join('')}
    <div class="set"><b>${t('manual_gb')}</b>${tg('manual')}</div>
    <div class="set"><b>${t('traffic')}</b><div class="row">${[.5, 1, 1.5].map(v => `<button class="chip ${st.traffic === v ? 'on' : ''}" data-a="traffic" data-p="${v}">×${v}</button>`).join('')}</div></div>
    <div class="set"><b>${t('quality')}</b><div class="row"><button class="chip ${st.q === 'low' ? 'on' : ''}" data-a="qual" data-p="low">${t('low')}</button><button class="chip ${st.q === 'high' ? 'on' : ''}" data-a="qual" data-p="high">${t('high')}</button></div></div>
@@ -2751,7 +2774,8 @@ UI.hudAct = function(a, p){ const G = GAME.G, car = G && G.car; if (!car) return
    case 'hazard': car.hazard = !car.hazard; AU.ui(); break;
    case 'door': car.door = !car.door; AU.door(car.spec.cat === 'bus' || car.spec.cat === 'minibus' ? 'bus' : 'van'); break;
    case 'lane': car.laneT = car.laneT ? 0 : 1; break;
-   case 'pause': GAME.paused = true; UI.modalShow(`<div class="mtitle">${t('paused')}</div><div class="lbl">${G.route ? tn(G.route.n) : tn(G.region.n)}</div><div class="mrow"><button class="btn" data-a="resume">${t('resume')}</button><button class="btn cy" data-a="endShift">${t('end_shift')}</button><button class="btn gh" data-a="quit">${t('quit')}</button></div>`); break;
+   case 'pause': GAME.paused = true; UI.modalShow(`<div class="mtitle">${t('paused')}</div><div class="lbl">${G.route ? tn(G.route.n) : tn(G.region.n)}</div>`
+      + `<div class="mrow"><button class="btn" data-a="resume">${t('resume')}</button><button class="btn cy" data-a="endShift">${t('end_shift')}</button><button class="btn gh" data-a="quit">${t('quit')}</button></div>`); break;
    case 'act': { const k = UI.actK; if (k === 'fuel') { GAME.paused = true; UI.fuelModal(G); } else if (k === 'tire') {} else if (k === 'door') UI.hudAct('door'); else if (k === 'eng') UI.hudAct('engine'); break; }
   } };
 UI.feed = function(G){ const f = $('#hFeed'); if (!f) return; f.innerHTML = G.feed.filter(x => x.t < 7).map(x => `<div class="fi ${x.type}">${esc(t(x.k, x.v))}</div>`).join(''); };
@@ -3049,7 +3073,7 @@ UI.buildHud = function(G){ const h = $('#hud'), line = G.mode === 'line', s = S(
   const hb = $('#bHorn'); hb.addEventListener('pointerdown', e => { e.preventDefault(); UI.hornDown = true; }); const hu = () => UI.hornDown = false; hb.addEventListener('pointerup', hu); hb.addEventListener('pointerleave', hu); hb.addEventListener('pointercancel', hu);
   UI.hudCache = {}; UI.actK2 = null; UI.feed(G); if (!line) UI.goOffer(G); UI.sizeCl(); };
 UI.sizeCl = function(){ const cl = $('#cl'); if (!cl) return; const r = cl.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1); cl.width = Math.max(10, r.width*dpr); cl.height = Math.max(10, r.height*dpr); UI.clDpr = dpr; };
-UI.volHtml = () => `${['master','engine','fx','amb'].map(k => `<div class="set" style="padding:.4em 0"><span class="lbl">${t('vol_' + k)}</span><input type="range" min="0" max="1" step=".05" value="${S().set.vol[k]}" data-v="${k}" style="max-width:55%"></div>`).join('')}<button class="chip ${AU.muted ? 'on' : ''}" data-a="mute" style="margin-top:.5em">🔇 ${t('mute')}</button>`;
+UI.volHtml = () => `${['master','engine','fx','amb','music'].map(k => `<div class="set" style="padding:.4em 0"><span class="lbl">${t('vol_' + k)}</span><input type="range" min="0" max="1" step=".05" value="${S().set.vol[k]}" data-v="${k}" style="max-width:55%"></div>`).join('')}<button class="chip ${AU.muted ? 'on' : ''}" data-a="mute" style="margin-top:.5em">🔇 ${t('mute')}</button>`;
 UI.bindVol = root => root.querySelectorAll('input[data-v]').forEach(i => i.addEventListener('input', () => { S().set.vol[i.dataset.v] = +i.value; Object.assign(AU.vol, S().set.vol); if (AU.muted) AU.vol.master = 0; AU.setVol(); saveGame(); }));
 
 UI.hud = function(G, dt){ const car = G.car, c = UI.hudCache, sp = car.spec, S0 = S(); if (!$('#hCash')) return;
@@ -6040,7 +6064,7 @@ document.head.insertAdjacentHTML('beforeend', `<style>
 #hud .pedal{margin:0;width:calc(var(--pedal)*.86);height:var(--pedal);
   border-radius:calc(var(--u)*2.2)}
 
-#hud .h-bc{position:absolute;bottom:var(--padb);left:50%;transform:translateX(-50%);z-index:5;
+#hud .h-bc{position:absolute;bottom:0;left:50%;transform:translateX(-50%);z-index:5;
   pointer-events:auto;display:flex;flex-direction:row;align-items:flex-end;justify-content:center;
   gap:calc(var(--u)*.9);width:auto;
   max-width:calc(100vw - (var(--pedal)*.86 + var(--u)*2)*2)}
@@ -6993,7 +7017,7 @@ function makeCheckpoint(G, x){
   /* cones taper traffic into a single file on this lane */
   for (let i = 0; i < 5; i++) G.props.push({x:x - 16 + i*3, t:'cone', d:.06 + i*.05});
   for (let i = 0; i < 4; i++) G.props.push({x:x + 4 + i*3,  t:'cone', d:.26 - i*.06});
-  G.props.push({x:x - 3.5, t:'copimg', state:'idle', t2:0, d:-.42});
+  G.props.push({x:x - 3.5, t:'officer', cop:true, state:'idle', t2:0, d:.06});
   /* the patrol car parked on the shoulder, lights on */
   try { const p = mkSpr(G, 'poltraffic', x + 7, 0, 0);
     p.v = 0; p.v0 = 0; p.parked = true; p.lp = -.55; p.lightbar = true; G.traffic.push(p); } catch(e) {}
@@ -7750,7 +7774,16 @@ const VDIM = {
     r.st.forEach((stop, i) => {
       const isRest = /rest/i.test(stop.n.en || '');
       stop.rest = stop.rest || isRest;
+      /* only the last stop before the terminus and the terminus itself
+         take passengers; the rest houses remain service halts */
       stop.noBoard = !(i === last || i === last - 1) && !isRest;
+      stop.skip = stop.noBoard;            /* and they are not even called */
+    });
+    /* promote the last ordinary stop before the terminus back to a real stop */
+    for (let i = r.st.length - 2; i >= 0; i--) {
+      if (!r.st[i].rest) { r.st[i].noBoard = false; r.st[i].skip = false; break; }
+    }
+    r.st.forEach(() => {
     });
   });
   const n = ROUTES.filter(r => r.len === 'long').length;
@@ -8786,10 +8819,22 @@ function rhIsLong(G){ return !!(G && G.route && G.route.len === 'long'); }
       G._loadSet = true;
       const seats = (G.car && G.car.spec && G.car.spec.seats) || 14;
       /* leaves the terminal between 90% and full, never empty */
+      /* An intercity coach leaves the terminal loaded: between 90% and full,
+         randomised, and it takes nobody else until the destination. */
       const target = Math.round(seats * (0.90 + Math.random() * 0.10));
-      G.noPickup = true;                        /* no hailing on the motorway */
+      G.noPickup = true;
       G.maxLoad = target;
-      while (G.onboard && G.onboard.length > target) G.onboard.pop();
+      G.onboard = G.onboard || [];
+      while (G.onboard.length > target) G.onboard.pop();
+      while (G.onboard.length < target) {
+        try {
+          const look = mkLook(Math.random);
+          const last = (G.route.st || []).length - 1;
+          G.onboard.push({ mood: 88 + Math.random()*12, look,
+                           dest: last, paid: true, ox: 0 });
+        } catch(e) { break; }
+      }
+      try { G.feedAdd('pax_full', {n:target}, 'ok'); } catch(e) {}
     } catch(e) {}
   }; }
 /* refuse roadside pickups on a long run */
@@ -8815,6 +8860,61 @@ function rhIsLong(G){ return !!(G && G.route && G.route.len === 'long'); }
       }
     } catch(e) {}
   }; }
+
+
+/* ================= roadside artwork =================
+   Placed at DEP.bld + .4, the depth the stop sign uses - that one is proven
+   to render, unlike DEP.walk which sits behind the road surface.
+   Everything is pre-scaled once into an offscreen canvas so the per-frame
+   cost is a single drawImage, which is what made the earlier attempt slow. */
+const NEWART = {
+  bldg: ['bldg_00','bldg_01','bldg_02','bldg_03','bldg_04'],
+  ped:  ['ped_00','ped_01','ped_02','ped_03','ped_04','ped_05'],
+  walkA:[], walkB:[]
+};
+for (let i = 0; i < 32; i++) {
+  NEWART.walkA.push('walkA_' + String(i).padStart(2,'0'));
+  NEWART.walkB.push('walkB_' + String(i).padStart(2,'0'));
+}
+/* real widths in metres, so a workshop dwarfs a kiosk */
+const BLDG_W = { bldg_00:12.0, bldg_01:5.0, bldg_02:8.5, bldg_03:5.0, bldg_04:6.0 };
+const ARTIMG = {};
+(function(){
+  const all = [].concat(NEWART.bldg, NEWART.ped, NEWART.walkA, NEWART.walkB);
+  all.forEach(k => { const im = new Image(); im.src = 'assets/new/' + k + '.webp'; ARTIMG[k] = im; });
+})();
+
+/* seed once per world, spaced so nothing crowds */
+function seedArt(G){
+  if (!G || G._art) return; G._art = true;
+  const R = Math.random;
+  const len = Math.min(G.world.len === Infinity ? 3500 : G.world.len, 24000);
+  let last = -999;
+  for (let x = 90; x < len - 40; x += 55 + R()*120) {
+    if (x - last < 48) continue;
+    const roll = R();
+    if (roll < 0.34) {
+      const k = NEWART.bldg[Math.floor(R()*NEWART.bldg.length)];
+      G.props.push({x, t:'artB', k, flip:R() < .5});
+    } else if (roll < 0.72) {
+      const k = NEWART.ped[Math.floor(R()*NEWART.ped.length)];
+      G.props.push({x, t:'artP', k});
+    } else {
+      /* a walker: which character, and where in his cycle */
+      const set = R() < .5 ? 'walkA' : 'walkB';
+      const who = Math.floor(R()*4);              /* four people per sheet */
+      G.props.push({x, t:'artW', set, who, ph:R()*8, sp:0.7 + R()*0.6, dir:R() < .5 ? 1 : -1});
+    }
+    last = x;
+  }
+}
+{ const _up = updPeople; updPeople = function(G, dt){ _up(G, dt);
+    try { if (GAME.state === 'play') { seedArt(G);
+      /* advance the walkers */
+      for (const q of G.props) if (q.t === 'artW') {
+        q.ph = (q.ph + dt * q.sp * 6) % 8;
+        q.x += q.dir * dt * q.sp * 1.1;
+      } } } catch(e) {} }; }
 
 (async function boot(){
   RD.cv = $('#cv'); RD.ctx = RD.cv.getContext('2d'); RD.initStatics();
