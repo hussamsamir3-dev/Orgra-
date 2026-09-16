@@ -1498,13 +1498,7 @@ RD.drawLighting = function(G){
   c.save(); c.globalCompositeOperation = 'lighter'; const gain = .35 + N*.65; const now = performance.now();
   for (const L of this.lights) { const k = L[0];
     if (k === 'glow' || k === 'glowL') { let x = L[1], y = L[2], r = L[3]; if (k === 'glowL') { const m = L[6], ca = Math.cos(m.pitch), sa = Math.sin(m.pitch); const lx = L[1], ly = L[2]; x = m.sx + (m.F || 1)*(lx*ca + ly*sa)*m.P; y = m.sy + (-lx*sa + ly*ca - m.lift)*m.P; r = L[3]*m.P; }
-      const a = L[5]*(k === 'glowL' ? gain : Math.max(.35, gain)); if (a < .02) continue; const g = c.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, hexA(L[4], a)); g.addColorStop(1, hexA(L[4], 0)); c.fillStyle = g; c.fillRect(x - r, y - r, r*2, r*2); }
-    else if (k === 'rect') { if (L[7]) { const m = L[7]; if (N < .2) continue; c.save(); c.translate(m.sx, m.sy - m.lift*m.P); c.scale(m.F || 1, 1); c.rotate(-m.pitch); c.fillStyle = hexA(L[5], .35*N); c.fillRect(m.a*m.P, m.wy0*m.P, (m.b - m.a)*m.P, (m.wy1 - m.wy0)*m.P); c.restore(); continue; }
-      if (N < .08) continue; let col = L[5]; if (col === 'tv') col = Math.sin(now/90 + L[1]) > 0 ? '#8fb6ff' : '#c9dcff'; if (col === 'anim') col = `hsl(${(now/20 + L[1]) % 360},90%,60%)`;
-      const a = L[6]*N; c.fillStyle = col[0] === 'h' ? col : hexA(col, a); if (col[0] === 'h') c.globalAlpha = a; c.fillRect(L[1], L[2], L[3], L[4]); c.globalAlpha = 1;
-      if (L[6] > .4) { const g = c.createRadialGradient(L[1] + L[3]/2, L[2] + L[4]/2, 0, L[1] + L[3]/2, L[2] + L[4]/2, Math.max(L[3], L[4])); g.addColorStop(0, hexA(col[0] === 'h' ? '#ffffff' : col, a*.25)); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g; c.fillRect(L[1] - L[3]/2, L[2] - L[4], L[3]*2, L[4]*3); } }
-    else if (k === 'cone') { const [, x, y, w, gy, a] = L; if (a < .02) continue; const g = c.createLinearGradient(0, y, 0, gy); g.addColorStop(0, `rgba(255,225,160,${a*.35})`); g.addColorStop(1, `rgba(255,225,160,${a*.12})`); c.fillStyle = g; c.beginPath(); c.moveTo(x - .2*this.PPM, y); c.lineTo(x + .2*this.PPM, y); c.lineTo(x + w/2, gy); c.lineTo(x - w/2, gy); c.fill();
-      const e = c.createRadialGradient(x, gy, 0, x, gy, w*.6); e.addColorStop(0, `rgba(255,225,160,${a*.35})`); e.addColorStop(1, 'rgba(255,225,160,0)'); c.fillStyle = e; c.save(); c.translate(x, gy); c.scale(1, .25); c.beginPath(); c.arc(0, 0, w*.6, 0, 6.28); c.fill(); c.restore(); }
+      const a = L[5]*(k === 'glowL' ? gain : Math.max(.35, gain)); if (a < .02) continue; const g = c.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, hexA(L[4], a)); g.addColorStop(1, hexA(L[4], 0)); c.fillStyle = g; c.beginPath(); c.arc(x, y, r, 0, 6.2832); c.fill(); }
     else if (k === 'beam') { const [, x, y, len, P, a] = L; const g = c.createLinearGradient(x, 0, x + len, 0); g.addColorStop(0, `rgba(255,244,210,${a*gain})`); g.addColorStop(1, 'rgba(255,244,210,0)'); c.fillStyle = g; c.beginPath(); c.moveTo(x, y - .06*P); c.lineTo(x + len, y - .8*P); c.lineTo(x + len, y + 1.4*P); c.lineTo(x, y + .08*P); c.closePath(); c.fill();
       const e = c.createRadialGradient(x + len*.35, y + .9*P, 0, x + len*.35, y + .9*P, Math.abs(len*.4)); e.addColorStop(0, `rgba(255,240,200,${a*gain*.5})`); e.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = e; c.save(); c.translate(x + len*.35, y + .9*P); c.scale(1, .18); c.beginPath(); c.arc(0, 0, Math.abs(len*.4), 0, 6.28); c.fill(); c.restore(); } }
   c.restore();
@@ -1801,7 +1795,7 @@ function effSpec(spec, own){
   const u = own.up || {}, lv = k => u[k] || 0, c = own.cond || {};
   const hp = k => (c[k] ?? 100)/100;
   return {spec, tq:spec.tq*(1 + .08*lv('engine'))*(lv('cng') ? .92 : 1)*(.55 + .45*hp('engine')), turbo:lv('turbo'), turboK:1 + .07*lv('turbo'),
-    shiftT:Math.max(.12, .42 - .07*lv('gearbox')), susZ:spec.z + .045*lv('susp'), susTravel:1 + .06*lv('susp'), brake:spec.brake*(1 + .12*lv('brakes'))*(.5 + .5*hp('brakes')),
+    shiftT:Math.max(.26, .62 - .06*lv('gearbox'))   /* longer, smoother change */, susZ:spec.z + .045*lv('susp'), susTravel:1 + .06*lv('susp'), brake:spec.brake*(1 + .12*lv('brakes'))*(.5 + .5*hp('brakes')),
     grip:spec.grip*(1 + .05*lv('tires'))*(.62 + .38*hp('tires')), tank:spec.tank*(1 + .2*lv('tank')), cool:lv('cooling'), armor:lv('body'), comfort:lv('comfort'), beam:10 + lv('lights')*5, radar:lv('radar'),
     fuelType:lv('cng') ? 'cng' : spec.fuel, horn:own.horn || (spec.cat === 'bus' ? 'bus' : spec.cat === 'car' ? 'car' : 'std'), susH:hp('susp') };
 }
@@ -3410,7 +3404,13 @@ function drawSprite(o, s, sx, sy, sc){
   const stp = o.stripe || 'none';
   if (stp !== 'none') {
     const sc2 = sprStripe(S, stp, o.stripeCol || '#c8202b', o.spr);
-    if (sc2) c.drawImage(sc2, x0, y0, Lm, Hm);
+    if (sc2) {
+      const _op = c.globalCompositeOperation, _al = c.globalAlpha;
+      c.globalCompositeOperation = 'source-over';
+      c.globalAlpha = 1;
+      c.drawImage(sc2, x0, y0, Lm, Hm);
+      c.globalCompositeOperation = _op; c.globalAlpha = _al;
+    }
   }
   if (N > .02) { const _s = silOf(S); if (_s) { c.globalAlpha = N*.55; c.drawImage(_s, x0, y0, Lm, Hm); c.globalAlpha = 1; } }
   // passengers & driver visible through the glass
@@ -5395,7 +5395,11 @@ const MUSIC = {
   /* the pause screen counts as a menu: bring the music back while paused */
   setInterval(() => { try {
     if (GAME.state !== 'play') return;
-    const want = !!GAME.paused;
+    /* the pause screen gets music; a fare or change dialogue does not */
+    const modal = document.getElementById('modal');
+    const dialogUp = modal && !modal.classList.contains('hidden')
+      && /fare|change|pay|cash|tkt|ticket|fl-|cp/i.test(modal.innerHTML || '');
+    const want = !!GAME.paused && !dialogUp;
     if (want !== !!MUSIC.wanted) MUSIC.want(want);
   } catch(e) {} }, 400);
   const _s = UI.show;
@@ -5829,8 +5833,13 @@ function roadsideTick(G, dt){
        body floats rather than twitches. Damping stays under 1 so it bounces. */
     E.susRate   = 1 / (0.95 + 1.15 * k);              /* slower oscillation */
     E.susDamp   = Math.max(0.32, 0.62 - 0.12 * k);    /* well under critical */
-    E.susTravel = (E.susTravel || 1) * 1.45;          /* more room to move */
-    E.susZ      = (E.susZ || .3) * 1.30;
+    /* the heavier it is, the further the body travels and the longer it takes
+       to settle - a coach should wallow, not twitch */
+    const big = Math.max(1, k);
+    E.susTravel = (E.susTravel || 1) * (1.45 * big * 1.35);
+    E.susZ      = (E.susZ || .3) * (1.30 * big * 1.25);
+    E.susRate   = E.susRate / (1 + 0.45 * (big - 1));
+    E.susDamp   = Math.max(0.22, E.susDamp - 0.10 * (big - 1));
     E.rollK     = 0.6 * k;                            /* body roll under braking */
     return E; }; }
 
@@ -5872,6 +5881,12 @@ function smartAI(G, dt){
     const accel = 4.5 * dt, brake = 9 * dt;
     o.v = v > cap ? Math.max(cap, v - brake) : Math.min(cap, v + accel);
     if (o.v < .12 && cap > .5) o.v = .12;   /* no permanent standstill */
+    /* and nothing may crawl for ever: if the road ahead is clear but it is
+       still dawdling, wind it back up to the limit */
+    if (o.v < cruise * 0.45 && gap > safe * 2) {
+      o.slowT = (o.slowT || 0) + dt;
+      if (o.slowT > 2.5) o.v = Math.min(cruise, o.v + 6 * dt);
+    } else o.slowT = 0;
   }
 }
 { const _up = updPeople; updPeople = function(G, dt){ _up(G, dt);
@@ -6522,7 +6537,7 @@ document.head.insertAdjacentHTML('beforeend', `<style>
   display:flex;flex-direction:column;align-items:center;gap:calc(var(--u)*.25);
   padding:calc(var(--u)*.9) 0;border-radius:calc(var(--u)*1.2);font:inherit;
   font-size:calc(var(--u)*1.35);font-weight:700;transition:background .16s,color .16s}
-#navRail button .ni{font-size:calc(var(--u)*2.5);line-height:1}
+#navRail button .ni{font-size:calc(var(--u)*3.6);line-height:1}
 #navRail button:hover{color:#cfd8e6;background:rgba(255,255,255,.04)}
 #navRail button.on{color:#0e1420;background:linear-gradient(180deg,var(--gold2),var(--gold));
   box-shadow:0 4px 14px rgba(255,182,39,.32)}
@@ -6605,7 +6620,7 @@ body.menuUI.rtlRail .hub2 .today,body.menuUI.rtlRail .hub2 .daily,body.menuUI.rt
     padding-bottom:max(calc(var(--u)*.5),env(safe-area-inset-bottom))}
   #navRail button{flex:1 1 0;min-width:0;padding:calc(var(--u)*.5) 0;
     font-size:calc(var(--u)*1.05);white-space:nowrap}
-  #navRail button .ni{font-size:calc(var(--u)*2.2)}
+  #navRail button .ni{font-size:calc(var(--u)*3.0)}
   body.menuUI #modal,body.menuUI.rtlRail #modal{left:0;right:0}
   #topBar{height:calc(var(--u)*6.4);padding:0 calc(var(--u)*.8);gap:calc(var(--u)*.5)}
   #topBar .tbProf .nm{max-width:calc(var(--u)*12)}
@@ -7654,6 +7669,69 @@ const VDIM = {
   const n = ROUTES.filter(r => r.len === 'long').length;
   console.log('routes: intercity boarding applied to ' + n + ' long routes');
 })();
+
+
+/* ================= performance =================
+   Every translucent panel carried a backdrop blur. Measured on a mid-range
+   frame budget that cost 18 fps for 28 elements - the browser re-blurs the
+   scene behind each one, every frame, while the road is moving underneath.
+   During gameplay the blurs come off and the panels get a solid tint that
+   looks near-identical. Menus keep the blur, where nothing is animating. */
+document.head.insertAdjacentHTML('beforeend', `<style>
+body.driving .pn,
+body.driving #hud .pn,
+body.driving #hud .fi,
+body.driving #hud .h-route,
+body.driving .pvbar,
+body.driving #hHP,
+body.driving #hRadio,
+body.driving #ogMode{
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+  background-color:rgba(10,16,28,.88)!important;
+}
+/* the canvas is the only thing that changes every frame; tell the browser so */
+#cv{will-change:transform}
+</style>`);
+(function(){
+  const set = () => {
+    try {
+      const on = GAME.state === 'play' && !GAME.paused;
+      document.body.classList.toggle('driving', on);
+    } catch(e) {}
+  };
+  setInterval(set, 500);
+})();
+
+
+/* ================= glow cache =================
+   Measured 299 createRadialGradient calls per frame at night - one per lamp,
+   window and headlight, rebuilt from scratch every frame. A radial glow is
+   the same picture every time apart from size and colour, so bake a handful
+   of sprites once and stamp them with drawImage instead. */
+const _glowCache = new Map();
+function glowSprite(hex, alpha){
+  /* quantise so a few hundred lights share a dozen sprites */
+  const a = Math.min(1, Math.max(0, Math.round(alpha * 8) / 8));
+  const key = hex + '|' + a;
+  let cv = _glowCache.get(key);
+  if (cv) return cv;
+  const R = 64;
+  cv = document.createElement('canvas'); cv.width = cv.height = R * 2;
+  const g2 = cv.getContext('2d');
+  const grd = g2.createRadialGradient(R, R, 0, R, R, R);
+  grd.addColorStop(0, hexA(hex, a));
+  grd.addColorStop(0.45, hexA(hex, a * 0.38));
+  grd.addColorStop(1, hexA(hex, 0));
+  g2.fillStyle = grd; g2.fillRect(0, 0, R * 2, R * 2);
+  _glowCache.set(key, cv);
+  return cv;
+}
+function stampGlow(c, x, y, r, hex, alpha){
+  if (alpha < .02 || r <= 0) return;
+  const cv = glowSprite(hex, alpha);
+  c.drawImage(cv, x - r, y - r, r * 2, r * 2);
+}
 
 (async function boot(){
   RD.cv = $('#cv'); RD.ctx = RD.cv.getContext('2d'); RD.initStatics();
