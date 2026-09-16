@@ -4281,9 +4281,13 @@ const PV = {items:{}, snap:null, n:0, skip:false,
       const id = (this.snap && this.snap.id) || UI.sel.wvid || s.cur.line;
       const o = s.owned[id] || {};
       const cos = {};
-      ['paint','paint2','stripe','stripeCol','tint','horn'].forEach(k => {
+      ['paint','paint2','stripe','stripeCol','tint','horn','rimT','rimC'].forEach(k => {
         if (o[k] !== undefined) cos[k] = o[k]; });
       if (o.rim) { cos.rimT = o.rim.t; cos.rimC = o.rim.c; }
+      /* what has been bought, not just what is fitted - otherwise a wheel or
+         sticker is paid for and then unavailable next time */
+      if (Array.isArray(o.rims)) cos.rims = o.rims;
+      if (Array.isArray(o.stk))  cos.stk  = o.stk;
       OGRA_NET.buy('garage', {
         vehicleId: id,
         upgrades:  o.up  || {},
@@ -5630,11 +5634,27 @@ function roadsideTick(G, dt){
 { const _es = effSpec;
   effSpec = function(spec, own){
     const E = _es.apply(this, arguments);
-    /* longer travel, less jarring, more body movement over bumps */
-    E.susZ = (E.susZ || .3)*1.18;
-    E.susTravel = (E.susTravel || 1)*1.35;
-    E.susDamp = .82;
+    /* E.susZ is the DAMPING RATIO used by car.c, not travel. Raising it makes
+       the ride stiffer, which is the opposite of what a coach should feel
+       like. Heavy vehicles get a LOW ratio so the body keeps moving, and a
+       low natural frequency so each movement is long and slow. */
+    const m = E.mass || spec.mass || 1500;
+    const k = Math.max(0.55, Math.min(2.6, Math.pow(m / 1400, 0.55)));
+
+    E.susZ = Math.max(0.24, 0.52 - 0.11 * k);   /* 0.45 small -> 0.24 coach */
+    E.susTravel = (E.susTravel || 1) * (1.35 + 0.55 * (k - 1));
+    E.susH = (E.susH != null ? E.susH : 1);
     return E; }; }
+
+/* natural frequency: a car rides at about 1.3 Hz, a loaded coach nearer
+   0.85 Hz - lower means slower, longer travel */
+(function(){
+  VEH.forEach(v => {
+    const m = v.mass || 1500;
+    const k = Math.max(0.55, Math.min(2.6, Math.pow(m / 1400, 0.55)));
+    v.fn = Math.max(0.78, 1.42 - 0.30 * k);
+  });
+})();
 
 /* ---------- 11: never two of the same model in view ---------- */
 { const _ma = mkAI;
@@ -5828,30 +5848,7 @@ function roadsideTick(G, dt){
   } }
 
 /* ---------- 7: softer, longer-travel suspension ---------- */
-{ const _es = effSpec;
-  effSpec = function(spec, own){
-    const E = _es.apply(this, arguments);
-    /* A microbus rides on short, stiff, quick springs. A coach carries five
-       times the mass on long soft ones that take far longer to settle. Scale
-       travel, rate and damping by the vehicle rather than using one figure. */
-    const m = E.mass || spec.mass || 1500;
-    const k = Math.max(0.55, Math.min(2.6, Math.pow(m / 1400, 0.55)));
-    E.susTravel = (E.susTravel || 1) * (0.72 * k);    /* long wheel travel on the big ones */
-    E.susZ      = (E.susZ || .3)     * (0.85 * k);    /* body movement */
-    /* heavier bodies oscillate slower and settle later */
-    /* softer springs that carry the motion further and settle slowly, so the
-       body floats rather than twitches. Damping stays under 1 so it bounces. */
-    E.susRate   = 1 / (0.95 + 1.15 * k);              /* slower oscillation */
-    E.susDamp   = Math.max(0.32, 0.62 - 0.12 * k);    /* well under critical */
-    /* the heavier it is, the further the body travels and the longer it takes
-       to settle - a coach should wallow, not twitch */
-    const big = Math.max(1, k);
-    E.susTravel = (E.susTravel || 1) * (1.45 * big * 1.35);
-    E.susZ      = (E.susZ || .3) * (1.30 * big * 1.25);
-    E.susRate   = E.susRate / (1 + 0.45 * (big - 1));
-    E.susDamp   = Math.max(0.22, E.susDamp - 0.10 * (big - 1));
-    E.rollK     = 0.6 * k;                            /* body roll under braking */
-    return E; }; }
+/* superseded: a later effSpec override owns the suspension now */
 
 /* ---------- 8: traffic that actually reads the road ---------- */
 function smartAI(G, dt){
