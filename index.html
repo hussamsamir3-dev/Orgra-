@@ -1485,10 +1485,17 @@ RD.drawSites = function(world, G){
   if (G) for (const e of G.props) { if (e.x < vl || e.x > vr) continue; const x = this.sx(e.x);
     if (e.t === 'cone') { const y = this.sy(world.h(e.x), e.d || 0); c.fillStyle = '#ff6a13'; c.beginPath(); c.moveTo(x - .2*P, y); c.lineTo(x, y - .7*P); c.lineTo(x + .2*P, y); c.fill(); c.fillStyle = '#fff'; c.fillRect(x - .1*P, y - .42*P, .2*P, .1*P); }
     else if (e.t === 'barrier') { const y = this.sy(world.h(e.x), e.d || 0); for (let k = 0; k < 5; k++) { c.fillStyle = k % 2 ? '#fff' : '#e0302a'; c.fillRect(x + k*.4*P, y - 1*P, .4*P, .3*P); } c.fillStyle = '#666'; c.fillRect(x, y - .7*P, .08*P, .7*P); c.fillRect(x + 1.9*P, y - .7*P, .08*P, .7*P); if (Math.floor(performance.now()/400) % 2) this.lights.push(['glow', x + 1*P, y - 1.1*P, .8*P, '#ffae00', 1]); }
-    else if (e.t === 'officer') { const y = this.sy(world.h(e.x), e.d || -.4); this.person(e.look, x, y, 1, performance.now()/300, false, e.wave, -1); c.fillStyle = '#fff'; c.fillRect(x - .5*P, y - 1.3*P, .25*P, .08*P); }
-    else if (e.t === 'copimg') {
-      const y = this.sy(world.h(e.x), DEP.walk);
-      drawCop(c, e, x, y, this.PPM);
+    else if (e.t === 'officer') {
+      /* the checkpoint officer is a photograph; every other officer stays
+         as the drawn figure */
+      if (e.cop && typeof drawCop === 'function' && COPIMG[0] && COPIMG[0].naturalWidth) {
+        e.t2 = (e.t2 || 0) + 0.016;
+        drawCop(c, e, x, this.sy(world.h(e.x), DEP.bld + .4), this.PPM);
+      } else {
+        const y = this.sy(world.h(e.x), e.d || -.4);
+        this.person(e.look, x, y, 1, performance.now()/300, false, e.wave, -1);
+        c.fillStyle = '#fff'; c.fillRect(x - .5*P, y - 1.3*P, .25*P, .08*P);
+      }
     }
     else if (e.t === 'artB' || e.t === 'artP' || e.t === 'artW') {
       /* skip anything the camera cannot see: without this every placed prop
@@ -2511,7 +2518,7 @@ const L = {
  change_t:['Paid with a big note','دفع بورقة كبيرة'], change_q:['Passenger pays EGP {b}. Give change correctly.','الراكب دفع {b} جنيه. رجّع الباقي صح.'],
  paused:['Paused','متوقف'], resume:['Resume','كمّل'], end_shift:['End shift','إنهاء الوردية'], quit:['Quit to hub','رجوع للقائمة'],
  summary:['Shift report','تقرير الوردية'], fares:['Fares','الأجرة'], tips:['Tips','البقشيش'], bonus:['Bonuses','مكافآت'], fuel_bought:['Fuel bought','بنزين اتشرى'], fines:['Fines','مخالفات'], tolls:['Tolls','رسوم طرق'], insurance:['Crash damages','تعويض خبطات'], commission:['App commission','عمولة التطبيق'], net:['Net profit','صافي المكسب'], fuel_burn:['Fuel burned {l} L ≈ EGP {c}','اتحرق {l} لتر ≈ {c} ج'], comfort:['Passenger comfort','راحة الركاب'], xp_gain:['+{x} XP','+{x} خبرة'], lvl_up:['LEVEL UP!','مستوى جديد!'], cont:['Continue','كمّل'], again:['Drive again','رحلة كمان'], dist_real:['Distance {d} km','المسافة {d} كم'],
- eng_on:['Engine running — shift to D','الموتور دار — حط على D'], ev_jam:['Traffic jam ahead on {s}','زحمة قدام في {s}'], ev_check:['Police checkpoint ahead — stop!','كمين قدام — اقف!'], ev_works:['Road works — lane closed, overtake when clear','أعمال طرق — الحارة مقفولة، اتخطى لما يفضى'], ev_break:['Broken-down car blocking the lane','عربية عطلانة سادة الحارة'],
+ eng_on:['Engine running — shift to D','الموتور دار — حط على D'], ev_jam:['Traffic jam ahead on {s}','زحمة قدام في {s}'], ev_check:['Police checkpoint ahead — stop!','كمين قدام — اقف!'], ev_works:['Road works ahead — slow down','أعمال طرق قدامك — هدّي السرعة'], ev_break:['Broken-down car blocking the lane','عربية عطلانة سادة الحارة'],
  ev_cones:['You smashed the work-zone cones — EGP {c}','خبطت أقماع الشغل — {c} ج'], ev_tuk:['Tuk-tuk cutting in!','توك توك داخل عليك!'], ev_donkey:['Donkey cart ahead — patience','عربية كارو قدام — طوّل بالك'], ev_wedding:['Wedding convoy! Honk along for a bonus 🎉','زفة! زمّر معاهم وخد مكافأة 🎉'], ev_amb:['Ambulance behind — keep right and slow down','إسعاف وراك — خليك يمين وهدّي'], ev_sheep:['Sheep crossing!','غنم بتعدي!'], ev_radar:['Speed camera ahead!','رادار قدام!'], ev_blackout:['Power cut — streetlights out ahead','النور قاطع — العواميد مطفية قدام'], ev_ala:['A passenger wants to get off soon','راكب عايز ينزل على جنب'],
  ev_flat:['Flat tire! Stop and change it','كاوتش نام! اقف وغيّره'], ev_bag:['Luggage fell off the roof!','شنطة وقعت من على السقف!'], ev_crash:['Crash! Damages: EGP {c}','خبطة! تعويض: {c} ج'], ev_hit:['You got hit!','حد خبطك!'], ev_nofuel:['Out of fuel!','البنزين خلص!'], ev_hot:['Engine overheating!','الموتور سخن!'], ev_door:['Door open while moving!','الباب مفتوح وإنت ماشي!'], ev_missed:['Passed {n} — passengers are angry','عديت {n} — الركاب زعلانين'], ev_wed_bonus:['Wedding bonus +EGP 100','مكافأة الزفة +100 ج'], ev_amb_ok:['You made way for the ambulance +50','فسحت للإسعاف +50'],
  ai_took:['A rival micro grabbed passengers at {n}','ميكروباص تاني خطف ركاب من {n}'], wx_rain:['Rain — roads are slippery','مطر — الطريق بيزحلق'], wx_dust:['Khamaseen dust storm','عاصفة خماسين'], wx_fog:['Fog — low visibility','شبورة — الرؤية ضعيفة'],
@@ -3618,7 +3625,11 @@ EVENTS.jam.w = t => THEMES[t].city ? .6 : .25;
   const oi = G.onImpact; G.onImpact = (ax, cv, kind) => { oi(ax, cv, kind); if (G.onboard.length && cv > 1.6 && Math.random() < .4) AU.voice('bump'); }; }; }
 FEAT.v5 = function(G, dt){ if (G.mode === 'attract') return; const car = G.car, kmh = Math.abs(car.vx)*3.6, W = G.world;
   // drop requests between stops
-  for (const p of G.onboard) if (p.mid && !p.req && p.mid - car.x < 95) { p.req = true; const tx = voxLine('drop'); G.bubble(tx); G.feedAdd('ev_ala', {}, 'pax'); AU.ding(); }
+  for (const p of G.onboard) if (p.mid && !p.req && p.mid - car.x < 95) {
+    /* nobody asks to be let out on an intercity run - they paid to reach
+       the far end, not the hard shoulder */
+    if (G.route && G.route.len === 'long') { p.req = true; p.mid = null; continue; }
+    p.req = true; const tx = voxLine('drop'); G.bubble(tx); G.feedAdd('ev_ala', {}, 'pax'); AU.ding(); }
   // hard braking
   if (car.brk > .75 && kmh > 25 && !(G.hbT > G.clock)) { G.hbT = G.clock + 1.6; AU.hardBrake(Math.min(1, kmh/80)); if (G.onboard.length && kmh > 40) { const tx = AU.voice('brake'); if (tx) G.bubble(tx); } }
   // standing still with a car behind -> honk & flash
@@ -6998,7 +7009,8 @@ Object.assign(L, {
   cp_lic:['Licence, please','الرخصة لو سمحت'],
   cp_ok:['All in order. Drive safe.','تمام. خد بالك من نفسك.'],
   cp_title:['Traffic checkpoint','كمين مرور'],
-  cp_pass:['He waves you through','بيعدّيك']
+  cp_pass:['He waves you through','بيعدّيك'],
+  hb_off:['Handbrake released','الفرامل اليدوي اتشال']
 });
 /* what the officer says, and what the driver can answer */
 const CP_TALK = {
@@ -8851,12 +8863,28 @@ document.head.insertAdjacentHTML('beforeend', `<style>
    right of the cluster: the start/stop button                         */
 #hud .h-bc .auxrow{ display:flex !important; align-items:flex-end !important;
   gap:calc(var(--u)*.6) !important; }
-#hud .h-bc .auxrow .eng,
-#hud .h-bc .auxrow [data-a="engine"]{ order:1 !important;
-  margin-inline-end:calc(var(--u)*1.2) !important; }
-#hud .h-bc .auxrow [data-a="park"],
-#hud .h-bc .auxrow [data-a="hand"]{ order:2 !important; }
-#hud .h-bc .auxrow [data-a="horn"]{ order:3 !important; }
+#hud .h-bc .auxrow,
+#hud .h-bc .auxrow .ctlcol,
+#hud .h-bc .auxrow .ctlrow{ direction:ltr !important; }
+/* one flat row: start/stop, handbrake, horn */
+#hud .h-bc .auxrow .ctlcol{
+  display:flex !important;
+  flex-direction:row !important;
+  align-items:flex-end !important;
+  gap:calc(var(--u)*.6) !important;
+}
+#hud .h-bc .auxrow .ctlcol > .eng,
+#hud .h-bc .auxrow .ctlcol > [data-a="engine"]{ order:1 !important; }
+#hud .h-bc .auxrow .ctlcol > .ctlrow{
+  order:2 !important;
+  display:flex !important;
+  flex-direction:row !important;
+  align-items:flex-end !important;
+  gap:calc(var(--u)*.6) !important;
+}
+#hud .h-bc .auxrow .ctlrow > [data-a="hand"],
+#hud .h-bc .auxrow .ctlrow > [data-a="park"]{ order:1 !important; }
+#hud .h-bc .auxrow .ctlrow > .hb:not([data-a]){ order:2 !important; }
 </style>`);
 
 
@@ -8877,6 +8905,88 @@ document.head.insertAdjacentHTML('beforeend', `<style>
     return _ma.apply(this, arguments);
   }; }
 
+
+
+/* ================= keep the screen alive =================
+   If any single draw throws, the rest of the frame never paints: the world
+   stops while the engine keeps running, which is exactly what a freeze looks
+   like. Catch it, keep drawing the next frame, and record what failed so it
+   can be found instead of guessed at. */
+{ const _rs = renderScene;
+  let bad = 0, told = false;
+  renderScene = function(){
+    try { return _rs.apply(this, arguments); }
+    catch (e) {
+      bad++;
+      if (bad <= 3) console.error('[ogra] render frame failed:', e && e.stack || e);
+      if (!told && bad > 30) {
+        told = true;
+        try { UI.toast(LANG.cur === 'ar'
+          ? 'في مشكلة في الرسم — كمّل عادي'
+          : 'A drawing fault was skipped', 2600); } catch(x) {}
+      }
+      return null;                       /* next frame gets a clean attempt */
+    }
+  };
+}
+{ const _up = updPeople;
+  updPeople = function(G, dt){
+    try { return _up.apply(this, arguments); }
+    catch (e) { console.error('[ogra] update failed:', e && e.stack || e); }
+  };
+}
+
+
+/* ---- the handbrake releases itself once you mean to move ---- */
+{ const _u2 = updPeople;
+  updPeople = function(G, dt){
+    _u2(G, dt);
+    try {
+      if (!G || !G.car || GAME.state !== 'play') return;
+      const onGas = (INP.gas > 0.35);
+      G._gasT = onGas ? (G._gasT || 0) + dt : 0;
+      if (G._gasT > 1 && G.car.hand) {
+        G.car.hand = false;
+        try { AU.ratchet && AU.ratchet(false); } catch(e) {}
+        G.feedAdd && G.feedAdd('hb_off', {}, 'ok');
+      }
+    } catch(e) {}
+  }; }
+
+
+/* ---- checkpoint: show the driver exactly where to stop ---- */
+{ const _dp = RD.drawEnvProps;
+  // draw the stop bay after the props so nothing paints over it
+  const _rs2 = renderScene;
+  renderScene = function(){
+    const r = _rs2.apply(this, arguments);
+    try {
+      const G = GAME.G, cp = G && G.cp;
+      if (!cp || !cp.wantPlayer || cp.playerDone) return r;
+      const c = RD.ctx, P = RD.PPM;
+      const x = RD.sx ? RD.sx(cp.x - 2.2) : null;
+      if (x == null) return r;
+      const y = RD.sy(G.world.h(cp.x), (cp.lane ? DEP.lane1 : DEP.lane0) + .02);
+      const t = performance.now() / 380;
+      const on = (Math.floor(t) % 2) === 0;
+      const w = 4.4 * P, h = 0.5 * P;
+      /* a painted bay that alternates red and blue, like a patrol light */
+      c.save();
+      c.globalAlpha = 0.85;
+      c.fillStyle = on ? '#e8443a' : '#2f6fe0';
+      c.fillRect(x - w / 2, y - h / 2, w, h);
+      c.globalAlpha = 0.25;
+      c.fillRect(x - w / 2, y - h * 3.2, w, h * 3.2);
+      c.globalAlpha = 1;
+      c.fillStyle = '#ffffff';
+      c.font = `900 ${0.8 * P}px Cairo, sans-serif`;
+      c.textAlign = 'center'; c.textBaseline = 'bottom';
+      c.fillText(LANG.cur === 'ar' ? 'قف هنا' : 'STOP HERE', x, y - h * 3.6);
+      c.restore();
+    } catch(e) {}
+    return r;
+  };
+}
 
 (async function boot(){
   RD.cv = $('#cv'); RD.ctx = RD.cv.getContext('2d'); RD.initStatics();
