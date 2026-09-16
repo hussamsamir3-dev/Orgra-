@@ -845,7 +845,9 @@ const hsh = (i, s) => fract(Math.sin(i*127.1 + s*311.7) * 43758.5453);
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const lerp = (a, b, t) => a + (b - a)*t;
 const smooth = t => t*t*(3 - 2*t);
-function mixHex(a, b, t){ const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+function mixHex(a, b, t){
+  if (typeof a !== 'string') a = '#888888';   /* a missing colour must not
+  if (typeof b !== 'string') b = '#000000';      stop the whole frame */ const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
   const r = Math.round(lerp(pa >> 16, pb >> 16, t)), g = Math.round(lerp(pa >> 8 & 255, pb >> 8 & 255, t)), bl = Math.round(lerp(pa & 255, pb & 255, t));
   return '#' + ((1 << 24) | (r << 16) | (g << 8) | bl).toString(16).slice(1); }
 function shade(hex, f){ return f < 0 ? mixHex(hex, '#000000', -f) : mixHex(hex, '#ffffff', f); }
@@ -2679,7 +2681,14 @@ UI.scr.settings = function(){ const s = S(), st = s.set, tg = (k) => `<button cl
    <div class="set" style="align-items:flex-start"><b>${t('controls')}</b><div class="grid" style="grid-template-columns:auto auto;gap:.3em 1.2em;font-size:calc(var(--u)*1.7)">${keys.map(k => `<span class="lbl">${t(k[0])}</span><span class="kbd">${k[1]}</span>`).join('')}</div></div>
    <div class="set"><b>${t('export')} / ${t('import')}</b><div class="row"><button class="btn gh sm" data-a="export">${t('export')}</button><button class="btn gh sm" data-a="import">${t('import')}</button></div></div>
    <div class="set"><b>${t('reset')}</b><button class="btn bad sm" data-a="reset">${t('reset')}</button></div></div></div>`; };
-UI.after.settings = function(){ document.querySelectorAll('input[data-v]').forEach(i => i.addEventListener('input', () => { S().set.vol[i.dataset.v] = +i.value; Object.assign(AU.vol, S().set.vol); AU.setVol(); saveGame(); })); };
+UI.after.settings = function(){ document.querySelectorAll('input[data-v]').forEach(i => i.addEventListener('input', () => { S().set.vol[i.dataset.v] = +i.value; Object.assign(AU.vol, S().set.vol); AU.setVol();
+      /* the music is an HTML audio element, outside AU's buses, so it was
+         only picking up the change on the next refresh */
+      try { if (typeof MUSIC !== 'undefined' && MUSIC.el) {
+        const vv = S().set.vol;
+        MUSIC.el.volume = Math.max(0, Math.min(1, (vv.master ?? 1) * (vv.music ?? .75)));
+      } } catch(e) {}
+      saveGame(); })); };
 
 /* =================== ACTIONS =================== */
 function todayStr(){ const d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
@@ -3050,7 +3059,14 @@ UI.scr.settings = function(){ const s = S(), st = s.set, u = UI.sel; u.stab = u.
   return `<div class="scr dim"><div class="hdr"><button class="back" data-a="nav" data-p="${GAME.state === 'play' ? 'none' : 'hub'}">${ic('back')}</button><h2>${t('settings')}</h2></div>
    <div class="tabs">${[['audio','s_audio'],['gfx','s_gfx'],['play','s_play'],['ctrl','s_ctrl'],['cam','s_cam'],['acc','s_acc']].map(([k, lb]) => `<button class="chip ${u.stab === k ? 'on' : ''}" data-a="stab" data-p="${k}">${t(lb)}</button>`).join('')}</div>
    <div class="scroll pn" style="flex:1;min-height:0;padding:0 calc(var(--u)*2.4)">${b}</div></div>`; };
-UI.after.settings = function(){ document.querySelectorAll('input[data-v]').forEach(i => i.addEventListener('input', () => { S().set.vol[i.dataset.v] = +i.value; Object.assign(AU.vol, S().set.vol); AU.setVol(); saveGame(); })); };
+UI.after.settings = function(){ document.querySelectorAll('input[data-v]').forEach(i => i.addEventListener('input', () => { S().set.vol[i.dataset.v] = +i.value; Object.assign(AU.vol, S().set.vol); AU.setVol();
+      /* the music is an HTML audio element, outside AU's buses, so it was
+         only picking up the change on the next refresh */
+      try { if (typeof MUSIC !== 'undefined' && MUSIC.el) {
+        const vv = S().set.vol;
+        MUSIC.el.volume = Math.max(0, Math.min(1, (vv.master ?? 1) * (vv.music ?? .75)));
+      } } catch(e) {}
+      saveGame(); })); };
 
 
 /* =================== UI v2 — part B (HUD & in-game windows) =================== */
@@ -4341,7 +4357,10 @@ const PV = {items:{}, snap:null, n:0, skip:false,
       const cos = {};
       ['paint','paint2','stripe','stripeCol','tint','horn','rimT','rimC'].forEach(k => {
         if (o[k] !== undefined) cos[k] = o[k]; });
-      if (o.rim) { cos.rimT = o.rim.t; cos.rimC = o.rim.c; }
+      if (o.rim) { cos.rimT = cos.rimT ?? o.rim.t; cos.rimC = cos.rimC ?? o.rim.c; }
+      /* send them explicitly so a colour-only change is never dropped */
+      if (o.rimT != null) cos.rimT = o.rimT;
+      if (o.rimC != null) cos.rimC = o.rimC;
       /* what has been bought, not just what is fitted - otherwise a wheel or
          sticker is paid for and then unavailable next time */
       if (Array.isArray(o.rims)) cos.rims = o.rims;
@@ -4355,7 +4374,15 @@ const PV = {items:{}, snap:null, n:0, skip:false,
         if (res && res.ok) {
           /* only clear the basket if the server says it stored the change,
              otherwise the player pays again next time for the same thing */
-          const saved = !res.stored || (res.stored.upgrades || res.stored.cosmetics);
+          const cos = res.stored && res.stored.cosmetics || null;
+          const saved = !res.stored || (res.stored.upgrades || cos);
+          try {
+            if (cos) {
+              const keys = Object.keys(cos).filter(k => cos[k] != null && cos[k] !== '');
+              UI.toast((LANG.cur === 'ar' ? 'اتحفظ: ' : 'Saved: ') +
+                       (keys.length ? keys.join(', ') : (LANG.cur === 'ar' ? 'لا شيء' : 'nothing')));
+            }
+          } catch(e) {}
           if (!saved) {
             UI.toast(LANG.cur === 'ar' ? 'الخادم مقبلش التعديل' : 'server did not store it');
             this.revert(); UI.refresh(); return;
@@ -8831,6 +8858,8 @@ function rhIsLong(G){ return !!(G && G.route && G.route.len === 'long'); }
           const look = mkLook(Math.random);
           const last = (G.route.st || []).length - 1;
           G.onboard.push({ mood: 88 + Math.random()*12, look,
+                           skin: look.skin, hair: look.hair || look.scarf || '#2b2b2b',
+                           bob: Math.random()*0.02,
                            dest: last, paid: true, ox: 0 });
         } catch(e) { break; }
       }
