@@ -622,24 +622,34 @@ AU.engineType = function(spec){
 };
 // rpm, load 0..1, throttle, running, boost 0..1, limiter
 AU.engineTick = function(p){
-  if (!this.ok) return; const e = this.eng, t = this.ctx.currentTime, k = .04;
+  if (!this.ok) return; const e = this.eng, t = this.ctx.currentTime;
   if (!p || !p.running || !isFinite(p.rpm)) { e.out.gain.setTargetAtTime(0, t, .12); return; }
-  const fire = p.rpm/60 * (e.cyl/2), base = e.big ? fire*.5 : fire;
+  /* The pitch was following raw rpm with a 40 ms constant, so every jitter in
+     the physics came through as a step. Smooth the value first, then let the
+     oscillators ease toward it more gently - a real engine's note does not
+     jump either. Load still responds quickly so the throttle feels alive. */
+  const rpmRaw = p.rpm;
+  e._rpm = (e._rpm == null) ? rpmRaw : e._rpm + (rpmRaw - e._rpm) * 0.18;
+  const rpm = e._rpm;
+  e._load = (e._load == null) ? (p.load || 0) : e._load + ((p.load || 0) - e._load) * 0.35;
+  const k = .11;                                   /* pitch: slower, smoother */
+  const kg = .05;                                  /* level: still responsive */
+  const fire = rpm/60 * (e.cyl/2), base = e.big ? fire*.5 : fire;
   e.o1.frequency.setTargetAtTime(base, t, k); e.o2.frequency.setTargetAtTime(base*.5, t, k); e.o3.frequency.setTargetAtTime(base*2.01, t, k);
   e.mod.frequency.setTargetAtTime(fire, t, k); e.cmod.frequency.setTargetAtTime(fire, t, k);
-  e.nbp.frequency.setTargetAtTime(420 + p.rpm*.35 + p.load*600, t, k);
-  const cut = (e.diesel ? 260 : 380) + p.rpm*(e.diesel ? .28 : .42) + p.load*(e.diesel ? 900 : 1700);
+  e.nbp.frequency.setTargetAtTime(420 + rpm*.35 + e._load*600, t, k);
+  const cut = (e.diesel ? 260 : 380) + rpm*(e.diesel ? .28 : .42) + e._load*(e.diesel ? 900 : 1700);
   e.lp.frequency.setTargetAtTime(cut, t, .06);
-  e.pre.gain.setTargetAtTime(.35 + p.load*.9, t, .05);
-  e.nam.gain.setTargetAtTime(.12 + p.load*.5, t, .05);
-  e.cmodG.gain.setTargetAtTime(e.diesel ? (.05 + (1 - p.load)*.05) : 0, t, .1);
-  e.ig.gain.setTargetAtTime((e.diesel ? .25 : .18) * (.2 + p.thr) * Math.min(1, p.rpm/2500), t, .08);
-  e.ibp.frequency.setTargetAtTime(90 + p.rpm*.05, t, .1);
-  e.boost += ((p.turbo ? p.thr*Math.min(1, p.rpm/(p.rpmMax*.55)) : 0) - e.boost)*.08;
+  e.pre.gain.setTargetAtTime(.35 + e._load*.9, t, .05);
+  e.nam.gain.setTargetAtTime(.12 + e._load*.5, t, .05);
+  e.cmodG.gain.setTargetAtTime(e.diesel ? (.05 + (1 - e._load)*.05) : 0, t, .1);
+  e.ig.gain.setTargetAtTime((e.diesel ? .25 : .18) * (.2 + p.thr) * Math.min(1, rpm/2500), t, .08);
+  e.ibp.frequency.setTargetAtTime(90 + rpm*.05, t, .1);
+  e.boost += ((p.turbo ? p.thr*Math.min(1, rpm/(rpmMax*.55)) : 0) - e.boost)*.08;
   e.tb.frequency.setTargetAtTime(1800 + e.boost*4200, t, .05); e.tg.gain.setTargetAtTime(e.boost*.018*(p.turbo || 0), t, .05);
   if (p.turbo && e.lastThr > .6 && p.thr < .15 && e.boost > .4) this.blowoff();
   e.lastThr = p.thr;
-  let g = (e.big ? .5 : .42) * (.45 + p.load*.55 + Math.min(.3, p.rpm/p.rpmMax*.3));
+  let g = (e.big ? .5 : .42) * (.45 + e._load*.55 + Math.min(.3, rpm/rpmMax*.3));
   if (p.limiter && (t*14 % 1) < .5) g *= .25;
   if (p.shifting) g *= .55;
   e.out.gain.setTargetAtTime(g, t, .05);
@@ -7401,7 +7411,10 @@ function netDone(r){
           litresUsed: Math.max(0, t.fuelUsed || 0),
           /* how far was actually driven, so an abandoned run is judged on what
              happened rather than on the full length of the route */
-          distanceKm: Math.max(0, Math.round(((G.car && G.car.x || 0) - (G.startX || 0)) / 125))
+          distanceKm: Math.max(0, +(((G.car && G.car.x || 0) - (G.startX || 0)) / 1000).toFixed(2)),
+          /* the world runs faster at a higher multiplier while the trip
+             clock does not, so the server needs it to judge speed */
+          timeScale: +((S().set && S().set.speed) || GAME.timeScale || 1)
         }).then(res => {
           if (res && res.breakdown) {
             const b = res.breakdown;
@@ -8527,7 +8540,7 @@ document.head.insertAdjacentHTML('beforeend', `<style>
   justify-content:center !important;
   margin-inline:auto !important;
   display:grid !important;
-  grid-template-columns:1fr minmax(calc(var(--u)*30), auto) 1fr !important;
+  grid-template-columns:1fr var(--clw, calc(var(--u)*34)) 1fr !important;
   align-items:end !important;
   width:min(96vw, calc(var(--u)*78)) !important;
   gap:calc(var(--u)*1.2) !important;
@@ -8987,6 +9000,48 @@ document.head.insertAdjacentHTML('beforeend', `<style>
     return r;
   };
 }
+
+
+document.head.insertAdjacentHTML('beforeend', `<style>
+/* On a narrow screen the cluster is almost the whole width, so there is no
+   room beside it. Put the controls in a row above it instead of off-screen. */
+@media (orientation:portrait) and (max-width:560px){
+  #hud .h-bc{
+    grid-template-columns:auto auto !important;
+    grid-template-rows:auto auto !important;
+    justify-content:center !important;
+    row-gap:calc(var(--u)*.8) !important;
+    padding-bottom:calc(var(--u)*13) !important;
+  }
+  #hud .h-bc .gearbox{ grid-column:1 !important; grid-row:1 !important;
+    justify-self:end !important; margin:0 !important; }
+  #hud .h-bc .auxrow{ grid-column:2 !important; grid-row:1 !important;
+    justify-self:start !important; margin:0 !important; }
+  /* the cluster keeps its own pinned position at the bottom */
+  #hud .h-bc .clpn{ grid-column:1 / -1 !important; grid-row:2 !important; }
+  #hud .clpn{ transform:translateX(-50%) scale(.80) !important; }
+}
+</style>`);
+
+/* ---- keep the side controls clear of the cluster ----
+   The cluster is pinned to the screen, so the middle grid column has to
+   reserve exactly its width. Measure it rather than guess: it changes with
+   the viewport and the 0.92 scale. */
+(function(){
+  const sync = () => {
+    try {
+      const cl = document.querySelector('#hud .clpn');
+      const bc = document.querySelector('#hud .h-bc');
+      if (!cl || !bc) return;
+      const w = cl.getBoundingClientRect().width;
+      if (w > 10) bc.style.setProperty('--clw', Math.ceil(w + 24) + 'px');
+    } catch(e) {}
+  };
+  addEventListener('resize', sync);
+  addEventListener('orientationchange', () => setTimeout(sync, 250));
+  setInterval(sync, 1000);
+  setTimeout(sync, 600);
+})();
 
 (async function boot(){
   RD.cv = $('#cv'); RD.ctx = RD.cv.getContext('2d'); RD.initStatics();
