@@ -5970,6 +5970,12 @@ function smartAI(G, dt){
 
     /* never park a car in the road: if the way is clear, get moving again */
     if (gap > safe * 1.5) cap = cruise;        /* get moving again sooner */
+    /* On a fast road a queue is far more disruptive than on a city street, so
+       thin the traffic and let it run closer to the limit. */
+    if (limit > 22) {                          /* above about 80 km/h */
+      cap = Math.max(cap, cruise * 0.92);
+      if (gap > safe) cap = cruise;
+    }
 
     const v = o.v == null ? cruise : o.v;
     const accel = 4.5 * dt, brake = 9 * dt;
@@ -8923,7 +8929,7 @@ function rhIsLong(G){ return !!(G && G.route && G.route.len === 'long'); }
    Everything is pre-scaled once into an offscreen canvas so the per-frame
    cost is a single drawImage, which is what made the earlier attempt slow. */
 const NEWART = {
-  bldg: ['bldg_00','bldg_01','bldg_02','bldg_03','bldg_04'],
+  bldg: [],
   ped:  ['ped_00','ped_01','ped_02','ped_03','ped_04','ped_05'],
   walkA:[], walkB:[]
 };
@@ -8948,10 +8954,7 @@ function seedArt(G){
   for (let x = 90; x < len - 40; x += 55 + R()*120) {
     if (x - last < 48) continue;
     const roll = R();
-    if (roll < 0.34) {
-      const k = NEWART.bldg[Math.floor(R()*NEWART.bldg.length)];
-      G.props.push({x, t:'artB', k, flip:R() < .5});
-    } else if (roll < 0.72) {
+    if (roll < 0.50) {
       const k = NEWART.ped[Math.floor(R()*NEWART.ped.length)];
       G.props.push({x, t:'artP', k});
     } else {
@@ -8970,6 +8973,47 @@ function seedArt(G){
         q.ph = (q.ph + dt * q.sp * 6) % 8;
         q.x += q.dir * dt * q.sp * 1.1;
       } } } catch(e) {} }; }
+
+
+document.head.insertAdjacentHTML('beforeend', `<style>
+/* ---- the volume panel was covering the controls on the left ---- */
+#volPop{
+  top:auto !important;
+  bottom:calc(var(--u)*11) !important;
+  right:max(calc(var(--u)*2),env(safe-area-inset-right)) !important;
+  left:auto !important;
+  z-index:2147483300 !important;
+}
+@media (orientation:portrait){
+  #volPop{ bottom:calc(var(--u)*14) !important; width:min(74vw,calc(var(--u)*34)) !important; }
+}
+
+/* ---- bottom controls, in the order asked for ----
+   left of the cluster: gear selector, then horn and handbrake
+   right of the cluster: the start/stop button                         */
+#hud .h-bc .auxrow{ display:flex !important; align-items:flex-end !important;
+  gap:calc(var(--u)*.6) !important; }
+#hud .h-bc .auxrow [data-a="horn"]{ order:1 !important; }
+#hud .h-bc .auxrow [data-a="park"],
+#hud .h-bc .auxrow [data-a="hand"]{ order:2 !important; }
+#hud .h-bc .auxrow .eng,
+#hud .h-bc .auxrow [data-a="engine"]{ order:3 !important;
+  margin-inline-start:calc(var(--u)*1.2) !important; }
+</style>`);
+
+
+/* ---- thinner traffic where the limit is high ---- */
+{ const _ma = mkAI;
+  mkAI = function(G, type, x, lane, v){
+    try {
+      const seg = G && G.world && G.world.segAt ? G.world.segAt(x) : null;
+      const lim = (seg && seg.lim) || 60;
+      /* a motorway carries fewer vehicles per kilometre than a city street */
+      if (lim >= 90 && Math.random() < 0.45) return null;
+      if (lim >= 70 && Math.random() < 0.25) return null;
+    } catch(e) {}
+    return _ma.apply(this, arguments);
+  }; }
 
 (async function boot(){
   RD.cv = $('#cv'); RD.ctx = RD.cv.getContext('2d'); RD.initStatics();
