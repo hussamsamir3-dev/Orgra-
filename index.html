@@ -1223,7 +1223,7 @@ RD.drawProps = function(world, G){
       c.strokeStyle = mixHex('#3f7a3a', '#000', N*.6); c.lineWidth = .18*P; const t = performance.now()/1000; for (let k = 0; k < 7; k++) { const a = -Math.PI*.5 + (k - 3)*.45 + Math.sin(t*.8 + k + p.x)*.04; c.beginPath(); c.moveTo(x + .2*P, gy - hh); c.quadraticCurveTo(x + .2*P + Math.cos(a)*1.6*P, gy - hh + Math.sin(a)*1.6*P - .4*P, x + .2*P + Math.cos(a)*2.8*P, gy - hh + Math.sin(a)*2.2*P + 1.4*P); c.stroke(); } }
     else if (p.t === 'tree') { const hh = p.h*P; c.fillStyle = mixHex('#5b4128', '#000', N*.6); c.fillRect(x - .15*P, gy - hh*.6, .3*P, hh*.6); c.fillStyle = mixHex('#4f7d3d', '#000', N*.6); for (let k = 0; k < 4; k++) circ(c, x + (k - 1.5)*.7*P, gy - hh*.7 - (k % 2)*.7*P, 1.5*P); }
     else if (p.t === 'billboard') { const hh = 6*P; c.fillStyle = mixHex('#555', '#000', N*.5); c.fillRect(x, gy - hh, .25*P, hh); c.fillRect(x + 5.75*P, gy - hh, .25*P, hh); const ads = [['#ffb627','أجرة — سوق وكسب'],['#2ee6ff','OGRA GO'],['#e74c3c','شاي العروسة'],['#27ae60','كله من خير مصر']];
-      const a = ads[p.k]; c.fillStyle = mixHex('#1b2230', '#000', N*.3); c.fillRect(x - .3*P, gy - hh - 3*P, 6.6*P, 3*P); c.fillStyle = a[0]; c.fillRect(x, gy - hh - 2.8*P, 6*P, 2.6*P); c.fillStyle = '#10151f'; c.font = `900 ${.7*P}px Cairo, Rajdhani, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; RD.ftext(c, a[1], x + 3*P, gy - hh - 1.5*P);
+      const a = ads[(p.k | 0) % ads.length] || ads[0];   /* never blank */ c.fillStyle = mixHex('#1b2230', '#000', N*.3); c.fillRect(x - .3*P, gy - hh - 3*P, 6.6*P, 3*P); c.fillStyle = a[0]; c.fillRect(x, gy - hh - 2.8*P, 6*P, 2.6*P); c.fillStyle = '#10151f'; c.font = `900 ${.7*P}px Cairo, Rajdhani, sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; RD.ftext(c, a[1], x + 3*P, gy - hh - 1.5*P);
       if (N > .1) this.lights.push(['rect', x, gy - hh - 2.8*P, 6*P, 2.6*P, a[0], .5]); }
     else if (p.t === 'kiosk') { c.fillStyle = mixHex(['#2f5fa5','#c0392b','#e0a33a'][p.k], '#000', N*.5); c.fillRect(x, gy - 2.1*P, 1.8*P, 2.1*P); c.fillStyle = mixHex('#f6e7c1', '#000', N*.4); c.fillRect(x + .2*P, gy - 1.7*P, 1.4*P, .8*P); if (N > .1) this.lights.push(['rect', x + .2*P, gy - 1.7*P, 1.4*P, .8*P, '#ffe0a0', .6]); }
     else if (p.t === 'bin') { c.fillStyle = mixHex('#3c7a4a', '#000', N*.6); c.fillRect(x, gy - .9*P, .6*P, .9*P); } }
@@ -3601,7 +3601,7 @@ AU.voice = function(key, force){ const st = GAME.save && GAME.save.set; if (!st 
   const a = VOX[key]; if (!a) return null; const p = a[Math.floor(Math.random()*a.length)]; this.say(p[0], p[1]); return LANG.cur === 'ar' ? p[0] : p[1]; };
 AU.say = function(ar, en){ try { if (!window.speechSynthesis || !GAME.save.set.voice) return; const lang = LANG.cur, u = new SpeechSynthesisUtterance(lang === 'ar' ? ar : en); u.lang = lang === 'ar' ? 'ar-EG' : 'en-US'; u.rate = lang === 'ar' ? 1.05 : 1.0; u.pitch = .85 + Math.random()*.3; u.volume = .75*this.vol.master;
   const vs = speechSynthesis.getVoices(); const pick = lang === 'ar' ? (vs.find(v => /ar[-_]EG/i.test(v.lang)) || vs.find(v => /^ar/i.test(v.lang))) : (vs.find(v => /en[-_]US/i.test(v.lang)) || vs.find(v => /^en/i.test(v.lang))); if (pick) u.voice = pick; speechSynthesis.cancel(); speechSynthesis.speak(u); } catch(e) {} };
-function voxLine(key){ const t2 = AU.voice(key, true); if (t2) return t2; const a = VOX[key], p = a[Math.floor(Math.random()*a.length)]; return LANG.cur === 'ar' ? p[0] : p[1]; }
+function voxLine(key){ const a = VOX[key], p = a[Math.floor(Math.random()*a.length)]; return LANG.cur === 'ar' ? p[0] : p[1]; }
 /* ---------- passengers ---------- */
 { const _b = board; board = function(G, p, s){ _b(G, p, s); if (Math.random() < .12) AU.voice('greet'); const st = G.world.stations, dest = st[Math.min(p.dest, st.length - 1)];
   if (Math.random() < .35 && dest && dest.x - G.car.x > 280) p.mid = G.car.x + 160 + Math.random()*(dest.x - G.car.x - 280); }; }
@@ -3718,7 +3718,6 @@ async function switchProfile(i, silent){ let d = null; try { if (window.storage)
 /* =================== v6 =================== */
 Object.assign(L, {
  sat:['Passengers','رضا الركاب'], pax_off:['Passenger got off','الراكب نزل'], go_locked:['Ogra Go unlocks at level 14','أجرة جو بتفتح في مستوى 14'], to_pickup:['Driving to pickup','رايح للزبون'], trip_prog:['Trip in progress','المشوار شغال'], eta:['ETA {m} min','الوصول بعد {m} دقيقة'], left:['{d} left','فاضل {d}'],
- vox_t:['Real voice clips','أصوات حقيقية'], vox_info:['The device voice sounds robotic, so it is off by default. For real voices, record or upload short clips (1–3 s) for each type. The game picks them randomly.','صوت الجهاز بيطلع زي الروبوت، عشان كده مقفول. عشان أصوات حقيقية سجّل أو ارفع مقاطع قصيرة (1–3 ثواني) لكل نوع، واللعبة هتختار منهم عشوائي.'],
  vox_greet:['Greeting','سلام'], vox_drop:['Drop me here','نزلني هنا'], vox_thanks:['Thanks','شكر'], vox_bump:['Complain (bumps)','شكوى مطبات'], vox_brake:['Complain (braking)','شكوى فرامل'], vox_honk:['Driver behind','السواق اللي ورا'], vox_angry:['Angry driver','سواق زعلان'], vox_call:['Station call','نداء المحطة'],
  rec:['Record','سجّل'], rec_stop:['Stop','وقّف'], clips:['{n} clips','{n} مقطع'], clear:['Clear','امسح'], mic_err:['Microphone not available here — upload a file instead','المايك مش متاح هنا — ارفع ملف بدل كده'], device_voice:['Device voice (robotic)','صوت الجهاز (روبوت)']
 });
@@ -3792,28 +3791,20 @@ Object.assign(VOX, {
  ok:[['اتفضل يا عم عدّي','Go ahead, pass'],['حاضر حاضر','Okay, okay!'],['عدّي يا باشا','Alright, go!']],
  call:[['رايح يا أسطى؟','Heading out!'],['يلا يا جماعة، على الله','All aboard!']]
 });
-GAME.vox = {}; RD._vb = {};
-(async function(){ try { if (window.storage) { const r = await window.storage.get('ogra-vox', false); if (r && r.value) GAME.vox = JSON.parse(r.value); } } catch(e) {} })();
-const saveVox = async () => { try { if (window.storage) await window.storage.set('ogra-vox', JSON.stringify(GAME.vox), false); } catch(e) { UI.toast('!'); } };
-AU.voice = function(key, force){ const now = performance.now(); if (this.paused || (!force && now - (this._lv || 0) < 7000)) return null; const clips = GAME.vox[key];
-  const a = VOX[key], p = a ? a[Math.floor(Math.random()*a.length)] : null, text = p ? (LANG.cur === 'ar' ? p[0] : p[1]) : null;
-  if (clips && clips.length && this.ok) { this._lv = now; const d = clips[Math.floor(Math.random()*clips.length)]; const play = buf => { const s = this.ctx.createBufferSource(); s.buffer = buf; s.playbackRate.value = .96 + Math.random()*.08; const g = this.ctx.createGain(); g.gain.value = .9; s.connect(g); g.connect(this.buses.fx); s.start(); };
-    if (RD._vb[d]) play(RD._vb[d]); else fetch(d).then(r => r.arrayBuffer()).then(ab => this.ctx.decodeAudioData(ab)).then(buf => { RD._vb[d] = buf; play(buf); }).catch(() => {}); return text; }
-  if (GAME.save && GAME.save.set.voice && p) { this._lv = now; this.say(p[0], p[1]); } return text; };
+AU.voice = function(key, force){
+  /* Passenger speech is text only - the recorded-clip feature was removed. */
+  const now = performance.now();
+  if (!force && now - (this._lv || 0) < 2600) return null;
+  const a = VOX[key]; if (!a || !a.length) return null;
+  const p = a[Math.floor(Math.random() * a.length)];
+  const text = LANG.cur === 'ar' ? p[0] : p[1];
+  this._lv = now;
+  try { this.say(p[0], p[1]); } catch(e) {}
+  return text;
+};
 { const _lg = loadGame; loadGame = async function(){ await _lg(); const s = GAME.save; if (!s.v6) { s.set.voice = false; s.v6 = 1; } }; }
-{ const _ss = UI.scr.settings; UI.scr.settings = function(){ let h = _ss(); if (UI.sel.stab !== 'audio') return h;
-  const cats = ['greet','drop','thanks','bump','brake','honk','angry','call'], rec = UI.recCat;
-  const block = `<div style="padding:1em 0"><b class="t1">${t('vox_t')}</b><div class="lbl" style="margin:.4em 0 .8em;line-height:1.6">${t('vox_info')}</div>${cats.map(c => `<div class="set" style="padding:.5em 0"><span>${t('vox_' + c)} <span class="tag">${t('clips', {n:(GAME.vox[c] || []).length})}</span></span><div class="row" style="gap:.35em">${(GAME.vox[c] || []).length ? `<button class="chip" data-a="voxPlay" data-p="${c}">▶</button><button class="chip" data-a="voxClr" data-p="${c}">${t('clear')}</button>` : ''}</div></div>`).join('')}</div>`;
-  const i = h.lastIndexOf('</div></div>'); return h.slice(0, i) + block + h.slice(i); }; }
-{ const fi = document.createElement('input'); fi.type = 'file'; fi.accept = 'audio/*'; fi.style.display = 'none'; document.body.appendChild(fi);
-  const addClip = (cat, blob) => { if (blob.size > 900000) { UI.toast('> 900 KB'); return; } const fr = new FileReader(); fr.onload = () => { (GAME.vox[cat] = GAME.vox[cat] || []).push(fr.result); if (GAME.vox[cat].length > 5) GAME.vox[cat].shift(); saveVox(); AU.ding(); UI.refresh(); }; fr.readAsDataURL(blob); };
-  fi.addEventListener('change', () => { const f = fi.files[0]; fi.value = ''; if (f && UI.voxCat) addClip(UI.voxCat, f); });
+{
   const _a = UI.act; UI.act = function(a, p, el){
-    if (a === 'voxUp') { UI.voxCat = p; fi.click(); return; }
-    if (a === 'voxPlay') { AU._lv = 0; AU.voice(p, true); return; }
-    if (a === 'voxClr') { delete GAME.vox[p]; saveVox(); UI.refresh(); return; }
-    if (a === 'voxRec') { if (UI.recorder) { UI.recorder.stop(); return; } if (!navigator.mediaDevices || !window.MediaRecorder) { UI.toast(t('mic_err'), 2600); return; }
-      navigator.mediaDevices.getUserMedia({audio:true}).then(st => { const mr = new MediaRecorder(st), ch = []; UI.recorder = mr; UI.recCat = p; UI.refresh(); mr.ondataavailable = e => ch.push(e.data); mr.onstop = () => { st.getTracks().forEach(tk => tk.stop()); UI.recorder = null; UI.recCat = null; addClip(p, new Blob(ch, {type:mr.mimeType})); }; mr.start(); setTimeout(() => { if (mr.state === 'recording') mr.stop(); }, 3500); }).catch(() => UI.toast(t('mic_err'), 2600)); return; }
     if (a === 'mode' && p === 'go' && S().lvl < 14) { UI.toast('🔒 ' + t('go_locked'), 2200); AU.ui('no'); return; }
     if (a === 'tab' && p === 'go' && S().lvl < 14) { UI.toast('🔒 ' + t('go_locked'), 2200); AU.ui('no'); return; }
     if (a === 'goAccept' && GAME.G && GAME.G.ride && GAME.G.ride.offer) { const r = _a(a, p, el); GAME.G.ride.d0 = Math.max(1, GAME.G.ride.offer.px - GAME.G.car.x); return r; }
@@ -3860,7 +3851,7 @@ drawSprite = function(o, s, sx, sy, sc){
   const sg = c.createRadialGradient(0, 0, Lm*.1, 0, 0, Lm*.55); sg.addColorStop(0, 'rgba(0,0,0,.45)'); sg.addColorStop(1, 'rgba(0,0,0,0)'); c.save(); c.scale(1, .12); c.fillStyle = sg; c.beginPath(); c.arc(0, .2, Lm*.55, 0, 6.28); c.fill(); c.restore();
   c.save(); c.translate(0, -lift); c.rotate(-(s.pitch || 0)); const x0 = -mid, y0 = -Hm + bot;
   // heads first (behind glass tint)
-  if (m.win && !m.rider) { const wyT = y0 + m.win[2]*Hm, wyB = y0 + m.win[3]*Hm, hy = wyT + (wyB - wyT)*.64, hr = Math.min(.115, (wyB - wyT)*.21), segs = (m.segs && m.segs.length ? m.segs : [[m.win[0], m.win[1]]]).map(q => [x0 + q[0]*Lm, x0 + q[1]*Lm]);
+  if (m.win && !m.rider && !(o && (o.aiOnly || o.ai))) {   /* AI carry no drawn occupants */ const wyT = y0 + m.win[2]*Hm, wyB = y0 + m.win[3]*Hm, hy = wyT + (wyB - wyT)*.64, hr = Math.min(.115, (wyB - wyT)*.21), segs = (m.segs && m.segs.length ? m.segs : [[m.win[0], m.win[1]]]).map(q => [x0 + q[0]*Lm, x0 + q[1]*Lm]);
     const front = segs[segs.length - 1], drvX = front[0] + (front[1] - front[0])*(Lm > 8 ? .55 : .42), slots = [];
     for (const [a, b] of segs) { const w = b - a, n = Math.max(1, Math.floor(w/.58)); for (let k = 0; k < n; k++) { const x = a + (k + .5)*w/n; if (Math.abs(x - drvX) > .45) slots.push(x); } }
     slots.sort((p, q) => q - p);
@@ -8885,6 +8876,7 @@ document.head.insertAdjacentHTML('beforeend', `<style>
     } catch(e) {}
     return _ma.apply(this, arguments);
   }; }
+
 
 (async function boot(){
   RD.cv = $('#cv'); RD.ctx = RD.cv.getContext('2d'); RD.initStatics();
