@@ -4291,8 +4291,18 @@ const PV = {items:{}, snap:null, n:0, skip:false,
         stickers:  o.stk || []
       }).then(res => {
         if (res && res.ok) {
+          /* only clear the basket if the server says it stored the change,
+             otherwise the player pays again next time for the same thing */
+          const saved = !res.stored || (res.stored.upgrades || res.stored.cosmetics);
+          if (!saved) {
+            UI.toast(LANG.cur === 'ar' ? 'الخادم مقبلش التعديل' : 'server did not store it');
+            this.revert(); UI.refresh(); return;
+          }
           this.snap = null; this.items = {}; this.n = 0;
           AU.cash(); AU.ding();
+        } else if (res && res.error === 'could not save purchase') {
+          UI.toast(LANG.cur === 'ar' ? 'فشل الحفظ — مفيش خصم' : 'save failed - nothing charged');
+          this.revert();
         } else if (res && res.error === 'insufficient funds') {
           UI.toast(t('need_cash')); AU.ui('no'); this.revert();
         } else {
@@ -7637,15 +7647,20 @@ const VDIM = {
     const v = vehById(id); if (!v) continue;
     const [L, H, tyre] = VDIM[id];
     v.L = L; v.H = H;
-    v.wr = tyre / 2;                       /* radius the renderer wants */
     if (v.spr && SPR[v.spr] && SPR[v.spr].m) {
       const m = SPR[v.spr].m;
-      /* keep the artwork's proportions but drive them from the real length */
+      /* Scale the artwork by real length, but leave the wheel radius alone.
+         Those were measured from each sprite's own pixels; overriding them
+         with a catalogue figure drops the body onto the road, because the
+         renderer seats the vehicle on its wheels. */
       const k = L / (m.L || L);
       m.L = L; m.H = H;
       if (m.wb) m.wb *= k;
       if (m.mid) m.mid *= k;
-      m.wr = tyre / 2;
+      if (m.wr) m.wr *= k;        /* keep it proportional to the same scaling */
+      v.wr = m.wr;
+    } else {
+      v.wr = tyre / 2;
     }
   }
   console.log('scale: real dimensions applied to ' + Object.keys(VDIM).length + ' vehicles');
