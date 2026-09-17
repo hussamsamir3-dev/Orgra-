@@ -9288,6 +9288,36 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
 
 </script>
 <script>
+/* ---------- fix: "Cannot read properties of null (reading 'parked')" ----------
+   The traffic-density rule makes mkAI() return null when a vehicle would
+   appear inside the view or on a quiet motorway. Some spawners pushed that
+   null straight into G.traffic, and the next frame crashed on it.
+   Now a skipped spawn returns a harmless placeholder far off-road, and any
+   empty slot is swept out before the game updates or draws. */
+(function(){
+  if (typeof mkAI !== 'function') return;
+  const VOID_X = -1e9;
+  const _ma = mkAI;
+  mkAI = function(G, type, x, lane, v){
+    const o = _ma.apply(this, arguments);
+    if (o) return o;
+    return {__void:true, type:type || 'sedan', style:type || 'sedan', x:VOID_X, y:0, lane:lane || 0, lp:lane || 0,
+            v:0, v0:0, L:4, H:1.5, wb:2.5, wr:.3, mass:1200, brake:false, blink:0, hz:false, wa:0, bob:0, bv:0,
+            honk:99, stuck:0, id:-1, parked:true, aiOnly:true, pax:0};
+  };
+  const clean = G => {
+    if (!G || !Array.isArray(G.traffic)) return;
+    let bad = false;
+    for (let i = 0; i < G.traffic.length; i++) { const o = G.traffic[i]; if (!o || o.__void) { bad = true; break; } }
+    if (bad) G.traffic = G.traffic.filter(o => o && !o.__void);
+    if (G.amb && G.amb.__void) G.amb = null;
+  };
+  if (typeof updateGame === 'function') { const _ug = updateGame; updateGame = function(G){ clean(G); const r = _ug.apply(this, arguments); clean(G); return r; }; }
+  if (typeof renderScene === 'function') { const _rs = renderScene; renderScene = function(G){ clean(G || (typeof GAME !== 'undefined' && GAME.G)); return _rs.apply(this, arguments); }; }
+  if (typeof updTraffic === 'function') { const _ut = updTraffic; updTraffic = function(G){ clean(G); return _ut.apply(this, arguments); }; }
+})();
+</script>
+<script>
 /* Independent backstop: if the main script never opens the menu, do it here. */
 (function(){
   var done = false;
