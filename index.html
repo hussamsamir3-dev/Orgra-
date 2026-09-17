@@ -9373,6 +9373,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
 
   /* ----- generic rail ----- */
   const saved = {};
+  window.OG_railify = (b, k) => railify(b, k);
   function railify(buttons, key){
     if (!buttons.length) return null;
     const first = buttons[0], parent = first.parentElement;
@@ -9408,9 +9409,9 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
     track.addEventListener('click', e => { if (moved) { e.stopPropagation(); e.preventDefault(); moved = false; } }, true);
     if (saved[key] != null) { track.style.scrollBehavior = 'auto'; track.scrollLeft = saved[key]; track.style.scrollBehavior = ''; }
     requestAnimationFrame(() => {
-      const on = track.querySelector('.on');
+      const on = track.querySelector('.on, .sel');
       if (on) { const tr = track.getBoundingClientRect(), r = on.getBoundingClientRect();
-        if (r.left < tr.left + 30 || r.right > tr.right - 30) { track.style.scrollBehavior = 'auto'; on.scrollIntoView({block:'nearest', inline:'center'}); track.style.scrollBehavior = ''; } }
+        if (r.left < tr.left + 30 || r.right > tr.right - 30) { track.style.scrollBehavior = 'auto'; track.scrollLeft += (r.left + r.width/2) - (tr.left + tr.width/2); track.style.scrollBehavior = ''; } }
       update();
     });
     new ResizeObserver(update).observe(track);
@@ -9478,7 +9479,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-17c';
+window.OGRA_BUILD = '2026-09-17e';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
@@ -9504,6 +9505,214 @@ window.OGRA_BUILD = '2026-09-17c';
   new MutationObserver(() => { const b = document.getElementById('ogDrawErr'); if (b && !b.dataset.build) { b.dataset.build = 1; b.textContent += '\nbuild ' + window.OGRA_BUILD; } })
     .observe(document.documentElement, {childList:true, subtree:true});
   console.log('[ogra] build', window.OGRA_BUILD);
+})();
+</script>
+<script>
+/* ---------- pause menu on phones ----------
+   On a landscape phone the pause panel is taller than the screen, and the
+   page blocks touch scrolling, so Resume / End shift / Quit sat out of reach
+   and the game looked frozen. The panel now scrolls, its action buttons stay
+   pinned in view, tapping outside the panel resumes, and the paused world
+   redraws gently so the menu stays responsive on slower devices. */
+(function(){
+  if (typeof UI === 'undefined' || !UI.modalShow) return;
+  document.head.insertAdjacentHTML('beforeend', `<style>
+    #modal{touch-action:manipulation}
+    #modal>.pn{max-height:calc(100vh - 16px)!important;max-height:calc(100dvh - 16px)!important;overflow-y:auto!important;
+      touch-action:pan-y!important;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+    #modal>.pn input[type=range]{touch-action:pan-y}
+    #modal .ogActs{position:sticky;bottom:calc(-1*max(16px,calc(var(--u,8px)*2.4)));z-index:3;margin-bottom:calc(-1*max(16px,calc(var(--u,8px)*2.4)))!important;
+      padding:10px 0 max(14px,calc(var(--u,8px)*2.2));background:linear-gradient(180deg,rgba(12,18,32,0),rgba(12,18,32,.96) 30%);flex-wrap:wrap;gap:8px}
+    @media (max-height:560px){
+      #modal .pn:has(> .set){display:grid;grid-template-columns:1fr 1fr;column-gap:18px}
+      #modal .pn:has(> .set) > :not(.set){grid-column:1/-1}
+      #modal .set{padding:4px 0!important}
+      #modal .mtitle{font-size:18px}
+    }
+  </style>`);
+  const pin = () => {
+    const m = document.getElementById('modal'); if (!m) return;
+    const r = m.querySelector('[data-a="resume"], [data-a="quit"], [data-a="endShift"]');
+    if (r && r.parentElement && !r.parentElement.classList.contains('pn')) r.parentElement.classList.add('ogActs');
+  };
+  const _ms = UI.modalShow; UI.modalShow = function(){ const out = _ms.apply(this, arguments); try { pin(); } catch(e) {} return out; };
+  /* tap the dimmed area around the pause panel to resume */
+  document.addEventListener('click', e => {
+    const m = document.getElementById('modal');
+    if (!m || e.target !== m || m.classList.contains('hidden')) return;
+    const res = m.querySelector('[data-a="resume"]'); if (res) res.click();
+  });
+  /* while the pause menu is open, redraw the frozen world a few times a second instead of every frame */
+  if (typeof renderScene === 'function') {
+    const _rs = renderScene; let last = 0;
+    renderScene = function(){
+      try {
+        const m = document.getElementById('modal');
+        if (GAME.paused && GAME.state === 'play' && m && !m.classList.contains('hidden')) {
+          const now = performance.now(); if (now - last < 220) return null; last = now;
+        }
+      } catch(e) {}
+      return _rs.apply(this, arguments);
+    };
+  }
+})();
+</script>
+<script>
+/* =====================================================================
+   PHONE LANDSCAPE LAYOUT
+   Short touch screens (phones held sideways) get one organised layout:
+   a slim top bar, a scrollable side rail hugging the edge, screens that
+   scroll as one page with a compact title, routes in a sliding row, and a
+   driving HUD whose side buttons sit in a neat grid clear of the pedals.
+   The Dynamic Island / notch side keeps its safe gap; the other side sits
+   close to the edge.
+   ===================================================================== */
+(function(){
+  const root = document.documentElement;
+  const probe = document.createElement('div');
+  probe.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;' +
+    'padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)';
+  document.documentElement.appendChild(probe);
+  let wasShort = null;
+  function layout(){
+    const T = window.OG_SAFE_TEST;
+    const cs = getComputedStyle(probe);
+    let L = T ? T.l : parseFloat(cs.paddingLeft) || 0, R = T ? T.r : parseFloat(cs.paddingRight) || 0;
+    const B = T ? (T.b || 0) : parseFloat(cs.paddingBottom) || 0;
+    const angle = T ? T.angle : (screen.orientation && typeof screen.orientation.angle === 'number' ? screen.orientation.angle : (window.orientation || 0));
+    const land = innerWidth > innerHeight;
+    /* iOS reports the same inset on both sides; only the camera side needs it */
+    if (land && L > 20 && R > 20) { if (angle === 90) R = 10; else if (angle === 270 || angle === -90) L = 10; }
+    root.style.setProperty('--ogSL', Math.max(8, L) + 'px');
+    root.style.setProperty('--ogSR', Math.max(8, R) + 'px');
+    root.style.setProperty('--ogSB', Math.max(0, Math.min(B, 14)) + 'px');
+    const touch = matchMedia('(pointer:coarse)').matches || 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    const short = land && innerHeight <= 520 && touch;
+    root.classList.toggle('ogShort', short);
+    if (wasShort !== null && wasShort !== short) { try { if (UI.cur && UI.cur.name && GAME.state !== 'play') UI.refresh(); } catch(e) {} }
+    wasShort = short;
+  }
+  window.OG_layout = layout;
+  layout();
+  addEventListener('resize', layout);
+  addEventListener('orientationchange', () => setTimeout(layout, 250));
+  if (screen.orientation && screen.orientation.addEventListener) screen.orientation.addEventListener('change', () => setTimeout(layout, 250));
+
+  document.head.insertAdjacentHTML('beforeend', `<style>
+  html.ogShort{--tb:46px;--nr:64px}
+
+  /* ---------- top bar ---------- */
+  html.ogShort #topBar{height:var(--tb)!important;gap:8px!important;
+    padding:0 var(--ogSR) 0 var(--ogSL)!important}
+  html.ogShort #topBar .tbProf{height:36px!important;gap:7px!important;padding:0 10px 0 4px!important}
+  html.ogShort #topBar .tbProf .lvl{width:26px!important;height:26px!important;font-size:13px!important}
+  html.ogShort #topBar .tbProf .av{width:28px!important;height:28px!important}
+  html.ogShort #topBar .tbProf .nm{font-size:13px!important;max-width:120px!important}
+  html.ogShort #topBar .tbProf .xp{display:block!important;font-size:10px!important;max-width:120px!important}
+  html.ogShort #topBar .tbChip{height:34px!important;font-size:14px!important;padding:0 10px!important}
+  html.ogShort #topBar .tbCash{font-size:15px!important}
+
+  /* ---------- side rail: hugs the edge, scrolls if it has to ---------- */
+  html.ogShort #navRail,html.ogShort #navRail.rtl{top:var(--tb)!important;bottom:0!important;height:auto!important;min-height:0!important;
+    width:calc(var(--nr) + var(--ogSR))!important;flex-direction:column!important;justify-content:flex-start!important;align-items:stretch!important;
+    gap:2px!important;overflow-y:auto!important;overflow-x:hidden!important;touch-action:pan-y!important;scrollbar-width:none;
+    border-top:0!important;box-sizing:border-box!important;padding:6px 5px calc(8px + var(--ogSB)) 5px!important}
+  html.ogShort #navRail::-webkit-scrollbar{display:none}
+  html.ogShort #navRail.rtl{right:0!important;left:auto!important;padding-right:calc(5px + var(--ogSR))!important;
+    border-left:1px solid var(--line)!important;border-right:0!important}
+  html.ogShort #navRail:not(.rtl){left:0!important;right:auto!important;width:calc(var(--nr) + var(--ogSL))!important;
+    padding-left:calc(5px + var(--ogSL))!important;border-right:1px solid var(--line)!important}
+  html.ogShort #navRail button{flex:0 0 auto!important;min-height:40px!important;height:auto!important;padding:4px 0!important;
+    gap:1px!important;font-size:9.5px!important;line-height:1.15!important;white-space:nowrap!important;border-radius:10px!important}
+  html.ogShort #navRail button .ni{font-size:19px!important}
+  html.ogShort #navRail button .ni img{width:24px!important;height:24px!important}
+
+  /* ---------- screen area ---------- */
+  html.ogShort body.menuUI #screens,html.ogShort body.menuUI.rtlRail #screens{top:var(--tb)!important;bottom:0!important}
+  html.ogShort body.menuUI.rtlRail #screens{left:var(--ogSL)!important;right:calc(var(--nr) + var(--ogSR))!important}
+  html.ogShort body.menuUI:not(.rtlRail) #screens{left:calc(var(--nr) + var(--ogSL))!important;right:var(--ogSR)!important}
+  html.ogShort body.menuUI.rtlRail #modal{left:0!important;right:calc(var(--nr) + var(--ogSR))!important}
+  html.ogShort body.menuUI:not(.rtlRail) #modal{right:0!important;left:calc(var(--nr) + var(--ogSL))!important}
+
+  /* every menu screen scrolls as one page */
+  html.ogShort body.menuUI #screens .scr{position:absolute!important;inset:0!important;display:block!important;
+    overflow-y:auto!important;overflow-x:hidden!important;touch-action:pan-y!important;overscroll-behavior:contain;
+    -webkit-overflow-scrolling:touch;padding:6px 10px calc(54px + var(--ogSB))!important}
+  html.ogShort body.menuUI #screens .scr > .scroll,html.ogShort body.menuUI #screens .scr > .grid.scroll{
+    overflow:visible!important;flex:none!important;height:auto!important;max-height:none!important;min-height:0!important;padding-bottom:0!important}
+  html.ogShort body.menuUI #screens .scr > .pn{overflow:visible!important;height:auto!important;max-height:none!important;
+    min-height:0!important;margin-top:10px!important;position:relative!important}
+  html.ogShort body.menuUI #screens .scr > *{margin-left:0;margin-right:0}
+  html.ogShort body.menuUI #screens .scan{position:fixed!important}
+
+  /* compact title: one line instead of a banner */
+  html.ogShort .scrHead{margin:0 0 8px!important;display:flex!important;align-items:baseline;justify-content:center;gap:10px;flex-wrap:wrap}
+  html.ogShort .scrHead h1{font-size:22px!important;line-height:1.15!important}
+  html.ogShort .scrHead .chkRule{display:none!important}
+  html.ogShort .scrHead .sub{font-size:12px!important;margin:0!important;opacity:.8}
+  html.ogShort body.menuUI #screens .scr > .hdr{margin:0 0 6px!important;min-height:0!important;gap:8px!important;align-items:center!important}
+  html.ogShort body.menuUI #screens .hdr .back{width:40px!important;height:40px!important;min-height:40px!important;flex:none!important}
+
+  /* touch targets: comfortable, not oversized */
+  html.ogShort #screens .chip,html.ogShort #screens .btn,html.ogShort #screens button{min-height:38px!important;padding-block:6px!important}
+  html.ogShort #screens .tabs,html.ogShort #screens .row{gap:6px!important;row-gap:6px!important}
+
+  /* routes: cards slide sideways so the vehicle and Start stay close */
+  html.ogShort .scr[data-s="routes"] .grid.scroll.ogRouteGrid{display:block!important}
+  html.ogShort #screens .ogRoutes .ogTrack > [data-a="route"],html.ogShort #screens .ogRoutes .ogTrack > .card{
+    width:232px!important;min-height:0!important;height:auto!important;margin:0!important;white-space:normal!important}
+  html.ogShort #screens .ogRoutes .ogTrack > .card *{white-space:normal!important}
+  html.ogShort #screens .ogRoutes .ogTrack > .card > .row:last-of-type{display:none!important}
+  html.ogShort #screens .ogRoutes .ogTrack{align-items:stretch!important;padding-bottom:6px!important}
+  html.ogShort #screens .ogVc img{height:36px!important;min-height:36px!important}
+  html.ogShort #screens .ogVc{min-width:118px!important;width:118px!important}
+
+  /* status badge stays small and out of the way */
+  html.ogShort #ogMode{left:calc(var(--ogSL) + 2px)!important;bottom:calc(4px + var(--ogSB))!important;transform:scale(.85);transform-origin:left bottom}
+
+  /* ---------- driving HUD ---------- */
+  html.ogShort #hud{--pad:var(--ogSL)!important;--padr:var(--ogSR)!important}
+  html.ogShort #hud .h-tl,html.ogShort #hud .h-bl{left:var(--ogSL)!important}
+  html.ogShort #hud .h-tr,html.ogShort #hud .h-br{right:var(--ogSR)!important}
+  html.ogShort #hud.lh .h-br{left:var(--ogSL)!important;right:auto!important}
+  html.ogShort #hud.lh .h-bl{right:var(--ogSR)!important;left:auto!important}
+  html.ogShort #hud .h-tl{width:178px!important;max-width:178px!important}
+  html.ogShort #hud .h-tl > .row{flex-wrap:wrap!important;gap:4px!important}
+  html.ogShort #hud #hRoute{left:calc(var(--ogSL) + 186px)!important;right:calc(var(--ogSR) + 100px)!important;
+    width:auto!important;max-width:none!important;min-width:0!important;transform:none!important;margin:0!important}
+  html.ogShort #hud .h-bc .gearbox button{width:38px!important;min-width:38px!important;height:40px!important;min-height:40px!important}
+  html.ogShort #hud .h-bc .auxrow button,html.ogShort #hud .h-bc .auxrow .eng{min-width:40px!important;min-height:40px!important}
+  @media (max-width:760px){
+    html.ogShort #hud .h-bc .gearbox button{width:32px!important;min-width:32px!important}
+    html.ogShort #hud .pedal{min-width:70px!important;width:70px!important;min-height:78px!important;height:78px!important}
+  }
+  html.ogShort #hud .h-tr{display:grid!important;grid-template-columns:42px 42px!important;gap:5px!important;
+    justify-content:end!important;justify-items:end!important;align-content:start!important;width:auto!important}
+  html.ogShort #hud .h-tr > #hPax,html.ogShort #hud .h-tr > #hClock{grid-column:1 / -1!important;justify-self:end!important;margin:0!important}
+  html.ogShort #hud .h-tr > .hb,html.ogShort #hud .h-tr > #radioBtn{width:42px!important;height:42px!important;
+    min-width:0!important;min-height:0!important;margin:0!important;font-size:17px!important}
+  html.ogShort #hud .h-tr > #radioBtn *{max-width:100%;max-height:100%}
+  </style>`);
+
+  /* tag each screen with its name, and slide the route cards on short screens */
+  if (typeof UI !== 'undefined' && UI.show) {
+    const _s = UI.show;
+    UI.show = function(){
+      const r = _s.apply(this, arguments);
+      try {
+        const name = UI.cur && UI.cur.name;
+        document.querySelectorAll('#screens .scr').forEach(s => { if (name) s.dataset.s = name; });
+        if (name === 'routes' && root.classList.contains('ogShort') && window.OG_railify) {
+          const grid = document.querySelector('#screens .scr .grid.scroll');
+          if (grid && !grid.querySelector('.ogRail')) {
+            const cards = [...grid.children].filter(c => c.matches('[data-a="route"], .card'));
+            if (cards.length > 1) { const rail = window.OG_railify(cards, 'routes-cards'); if (rail) { rail.classList.add('ogRoutes'); grid.classList.add('ogRouteGrid'); } }
+          }
+        }
+      } catch(e) { console.warn('[ogra] layout', e); }
+      return r;
+    };
+  }
 })();
 </script>
 <script>
