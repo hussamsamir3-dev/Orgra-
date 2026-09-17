@@ -9479,7 +9479,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-17h';
+window.OGRA_BUILD = '2026-09-17i';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
@@ -9906,12 +9906,20 @@ window.OGRA_BUILD = '2026-09-17h';
 
   /* 2. draw the paused road once, then leave it */
   if (typeof renderScene === 'function') {
-    const _rs = renderScene; let heldFor = null;
+    const _rs = renderScene; let heldFor = null, heldKey = '', heldAt = 0;
+    const keyNow = () => { const cv = RD.cv || document.querySelector('canvas'); return (cv ? cv.width + 'x' + cv.height : '') + '|' + innerWidth + 'x' + innerHeight; };
+    const release = () => { heldFor = null; };
+    addEventListener('resize', release); addEventListener('orientationchange', release);
+    document.addEventListener('visibilitychange', release);
+    if (window.visualViewport) visualViewport.addEventListener('resize', release);
     renderScene = function(G){
       try {
         if (GAME.paused && GAME.state === 'play' && modalOpen()) {
-          if (heldFor === GAME.G) return null;
-          const r = _rs.apply(this, arguments); heldFor = GAME.G; return r;
+          const now = performance.now();
+          /* keep the paused road still, but repaint if the screen changed or once a second,
+             so the canvas can never be left blank behind the menu */
+          if (heldFor === GAME.G && heldKey === keyNow() && now - heldAt < 1000) return null;
+          const r = _rs.apply(this, arguments); heldFor = GAME.G; heldKey = keyNow(); heldAt = now; return r;
         }
       } catch(e) {}
       heldFor = null;
@@ -9960,6 +9968,13 @@ window.OGRA_BUILD = '2026-09-17h';
     if (gap > 1500 && window.__ogActAt && now - window.__ogActAt < gap + 2000) report({message:'screen stalled ' + (gap/1000).toFixed(1) + ' s after tapping "' + window.__ogLastAct + '"'}, 'stall');
     requestAnimationFrame(watch);
   })(lastT);
+  /* 6. if the game never reaches a screen, say why instead of showing nothing */
+  setTimeout(() => {
+    try {
+      const up = typeof GAME !== 'undefined' && GAME.state && (GAME.state === 'play' || (UI.cur && UI.cur.name) || document.getElementById('ogGate') || document.querySelector('iframe'));
+      if (!up) report({message:'game did not start (state ' + (typeof GAME !== 'undefined' ? GAME.state : 'no GAME') + ')'}, 'start-up');
+    } catch(e) { report(e, 'start-up'); }
+  }, 12000);
 })();
 </script>
 <script>
