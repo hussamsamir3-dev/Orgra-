@@ -1104,8 +1104,8 @@ RD.drawMid = function(world){
 
 /* ---------- near layer: cached facades ---------- */
 RD.facade = function(b){
-  const P = Math.round(this.PPM*this.DPR*10)/10; if (b.cv && b.cvP === P) return b.cv;
-  const s = P, W = b.w, Hm = this.bldH(b), cv = b.cv || document.createElement('canvas'); cv.width = Math.max(2, Math.ceil(W*s)); cv.height = Math.max(2, Math.ceil((Hm + 3.5)*s)); b.cv = cv; b.cvP = P; b.lit = [];
+  const P = Math.round(this.PPM*this.DPR*10)/10; if (b.cv && b.cvKey === P && b.cv.width) return b.cv; const _Hm0 = this.bldH(b), _k = Math.min(1, Math.sqrt((RD._facCap || 6e6)/Math.max(1, b.w*P*(_Hm0 + 3.5)*P)), 8000/Math.max(1, b.w*P), 8000/Math.max(1, (_Hm0 + 3.5)*P));
+  const s = P*_k, W = b.w, Hm = this.bldH(b), cv = b.cv || document.createElement('canvas'); cv.width = Math.max(2, Math.ceil(W*s)); cv.height = Math.max(2, Math.ceil((Hm + 3.5)*s)); b.cv = cv; b.cvP = s; b.cvKey = P; cv.__k = _k; b.lit = [];
   const c = cv.getContext('2d'), R = rng(b.seed), H0 = cv.height; c.clearRect(0, 0, cv.width, H0);
   const X = m => m*s, Y = m => H0 - m*s; // y metres up from ground
   const box = (x, y, w, h, col) => { c.fillStyle = col; c.fillRect(X(x), Y(y + h), w*s, h*s); };
@@ -1213,7 +1213,7 @@ RD.drawNearBack = function(world){ // buildings & sidewalk-side scenery
       c.fillStyle = mixHex('#3d6b7a', '#000', this.night*.6); c.fillRect(x0, gy - .15*P, b.w*P + 1, .2*P); continue; }
     if (st === 'rock') { c.fillStyle = mixHex(b.col, '#000', this.night*.65); c.beginPath(); c.moveTo(x0, gy + 2); for (let k = 0; k <= 8; k++) { const lx = b.x + k*b.w/8; c.lineTo(this.sx(lx), gy - (5 + hsh(Math.floor(lx), 4)*7)*P); } c.lineTo(x0 + b.w*P, gy + 2); c.fill(); continue; }
     if (st === 'plaza') { c.fillStyle = mixHex('#cfd6dc', '#000', this.night*.6); c.fillRect(x0, gy - .3*P, b.w*P, .35*P); continue; }
-    const cv = this.facade(b); const hpx = cv.height/this.DPR;
+    const cv = this.facade(b); if (!cv || !cv.width || !cv.height) continue; const hpx = cv.height/this.DPR/(cv.__k || 1);
     if (RD.mirror) { c.save(); c.translate(x0 + b.w*P, gy - hpx); c.scale(-1, 1); c.drawImage(cv, 0, 0, b.w*P, hpx); c.restore(); } else c.drawImage(cv, x0, gy - hpx, b.w*P, hpx);
     if (b.lit && this.night > .05) for (const L of b.lit) { const lx = RD.mirror ? x0 + (b.w - L[0] - L[2])*P : x0 + L[0]*P, ly = gy - (L[1] + L[3])*P, lw = L[2]*P, lh = L[3]*P;
       const t = L[4]; if (t === 2 || t === 5 || t === 6) this.lights.push(['rect', lx, ly, lw, lh, t === 6 ? 'anim' : L[5] || '#6ef0ff', t === 2 ? .45 : .7]);
@@ -9479,7 +9479,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-17e';
+window.OGRA_BUILD = '2026-09-17g';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
@@ -9713,6 +9713,150 @@ window.OGRA_BUILD = '2026-09-17e';
       return r;
     };
   }
+})();
+</script>
+<script>
+/* ---------- building facade memory ----------
+   Every building kept a large painted facade canvas, and old ones were only
+   released whenever the browser got round to it. On a long road on iPhone
+   Safari that passed the canvas memory limit, new canvases came back empty
+   and drawImage threw, stopping the drawing. Now: facades on phones are
+   painted at a sensible size, canvases behind or far ahead are released
+   straight away, the total stays under a budget, and a facade that cannot
+   be painted is skipped for that frame instead of stopping the game. */
+(function(){
+  if (typeof RD === 'undefined' || !RD.facade) return;
+  const mobile = /iP(hone|ad|od)|Android|Mobile/i.test(navigator.userAgent) || navigator.maxTouchPoints > 0 || matchMedia('(pointer:coarse)').matches;
+  /* last line of defence: an image that failed to load, or a canvas the
+     browser could not allocate, is skipped instead of stopping the frame */
+  if (!CanvasRenderingContext2D.prototype.__ogSafeDraw) {
+    const di = CanvasRenderingContext2D.prototype.drawImage;
+    CanvasRenderingContext2D.prototype.drawImage = function(img){
+      if (!img) return;
+      if (typeof HTMLImageElement !== 'undefined' && img instanceof HTMLImageElement && (!img.complete || !img.naturalWidth)) return;
+      if (typeof HTMLCanvasElement !== 'undefined' && img instanceof HTMLCanvasElement && (!img.width || !img.height)) return;
+      try { return di.apply(this, arguments); }
+      catch(e) { if (e && (e.name === 'InvalidStateError' || e.name === 'IndexSizeError' || e.name === 'TypeError')) return; throw e; }
+    };
+    CanvasRenderingContext2D.prototype.__ogSafeDraw = true;
+  }
+  RD._facCap = mobile ? 1.6e6 : 6e6;           /* pixels per facade canvas */
+  const BUDGET = mobile ? 24e6 : 90e6;         /* pixels for all facades together */
+  const LIVE = new Set();
+  const free = b => { try { if (b.cv) { b.cv.width = 0; b.cv.height = 0; } } catch(e) {} b.cv = null; b.cvP = b.cvKey = null; b._pp = b._pp6 = null; LIVE.delete(b); };
+  let lastSweep = 0;
+  function sweep(force){
+    const now = performance.now(); if (!force && now - lastSweep < 700) return; lastSweep = now;
+    const P = RD.PPM || 40, L = RD.camL - 90, Rr = RD.camL + RD.W/P + 160, mid = RD.camL + RD.W/P/2, keep = [];
+    let px = 0;
+    for (const b of LIVE) {
+      if (!b.cv || !b.cv.width) { free(b); continue; }
+      if (b.x + b.w < L || b.x > Rr) { free(b); continue; }
+      const a = b.cv.width*b.cv.height; px += a; keep.push([b, a]);
+    }
+    if (px > BUDGET) {
+      keep.sort((x, y) => Math.abs(y[0].x - mid) - Math.abs(x[0].x - mid));
+      for (const [b, a] of keep) { if (px <= BUDGET*.75) break; if (b.x + b.w > RD.camL - 5 && b.x < RD.camL + RD.W/P + 5) continue; free(b); px -= a; }
+    }
+    RD._facPx = px;
+  }
+  const _fac = RD.facade;
+  RD.facade = function(b){
+    try {
+      const cv = _fac.call(this, b);
+      if (!cv || !cv.width || !cv.height) { free(b); sweep(true); return null; }
+      LIVE.add(b); return cv;
+    } catch(e) { free(b); sweep(true); return null; }
+  };
+  const _dnb = RD.drawNearBack;
+  RD.drawNearBack = function(world){ try { sweep(false); } catch(e) {} return _dnb.apply(this, arguments); };
+  if (typeof newSession === 'function') { const _ns = newSession; newSession = function(){ try { [...LIVE].forEach(free); } catch(e) {} return _ns.apply(this, arguments); }; }
+  window.OG_facStats = () => { let px = 0; LIVE.forEach(b => { if (b.cv) px += b.cv.width*b.cv.height; }); return {live:LIVE.size, MP:+(px/1e6).toFixed(1)}; };
+})();
+</script>
+<script>
+/* =====================================================================
+   PANORAMIC BACKGROUNDS
+   Twelve seamless skyline loops (from the eighteen painted strips) sit in
+   the middle distance behind the street. Each road theme gets the skyline
+   that matches where it is, neighbouring themes cross-fade, and each file
+   loads only when a route actually needs it.
+   ===================================================================== */
+(function(){
+  if (typeof RD === 'undefined' || !RD.drawMid) return;
+  const LOOPS = {downtown:[3272,152], popular:[4819,147], islamic:[2099,162], corniche:[6502,189], modern:[2590,106],
+    capital:[1591,117], giza:[2781,136], desert:[1926,98], open:[1614,108], ring:[3051,146], rural:[2476,144], coast:[1693,138]};
+  /* road theme -> skyline */
+  const MAP = {downtown:'downtown', popular:'popular', islamic:'islamic', corniche:'corniche', modern:'modern', capital:'capital',
+    giza:'giza', desert:'desert', openDesert:'open', sinai:'open', windfarm:'open', ring:'ring', rural:'rural',
+    coast:'coast', resort:'coast', redsea:'coast', alex:'coast'};
+  const WATER = {corniche:1.15, alex:1.15};          /* sit behind the river on the Nile and Alexandria */
+  const MEDIAN = 78;                                  /* typical building height inside a loop, in pixels */
+  const IMG = {};
+  const get = name => {
+    if (!LOOPS[name]) return null;
+    let im = IMG[name];
+    if (!im) { im = IMG[name] = new Image(); im.decoding = 'async'; im.src = 'assets/bg_' + name + '.webp'; }
+    return im.complete && im.naturalWidth ? im : null;
+  };
+  const preload = world => { try { (world.segs || []).forEach(s => { const n = MAP[s.theme]; if (n) get(n); }); } catch(e) {} };
+
+  function drawLoop(c, name, theme, alpha){
+    const im = get(name); if (!im || alpha <= .01) return false;
+    const P = RD.PPM, H = RD.H || innerHeight;
+    const k = Math.max(.8, Math.min(2.1, Math.max(78, Math.min(200, H*.25))/MEDIAN));
+    const sw = LOOPS[name][0]*k, sh = LOOPS[name][1]*k;
+    const bottom = RD.ROADY - 1.6*P - (WATER[theme] || 0)*P + 2;
+    const off = RD.camL*P*.38 + (name.charCodeAt(0)*97 % 1000);
+    let x = -(((off % sw) + sw) % sw);
+    c.save(); c.globalAlpha = alpha*(1 - RD.night*.12);
+    if (RD.mirror) { c.translate(RD.W, 0); c.scale(-1, 1); }
+    for (; x < RD.W; x += sw - 1) c.drawImage(im, Math.floor(x), Math.round(bottom - sh), Math.ceil(sw) + 1, Math.round(sh));
+    c.restore();
+    return true;
+  }
+
+  const _dm = RD.drawMid;
+  RD.drawMid = function(world){
+    try {
+      const P = this.PPM, cx = this.camL + this.W/P/2, segs = world.segs || [];
+      let i = segs.findIndex(s => cx >= s.x0 && cx < s.x1); if (i < 0) i = segs.length - 1;
+      const seg = segs[i], theme = seg ? seg.theme : world.themeAt(cx), name = MAP[theme];
+      if (name && get(name)) {
+        const F = 70; let nb = null, a = 1;
+        if (seg) {
+          const dL = cx - seg.x0, dR = seg.x1 - cx;
+          if (dL < F && segs[i - 1]) { nb = segs[i - 1]; a = .5 + dL/(2*F); }
+          else if (dR < F && segs[i + 1]) { nb = segs[i + 1]; a = .5 + dR/(2*F); }
+        }
+        const c = this.ctx, nbName = nb && MAP[nb.theme];
+        if (nbName && nbName !== name) drawLoop(c, nbName, nb.theme, 1 - a); else a = 1;
+        drawLoop(c, name, theme, a);
+        return;
+      }
+      if (name) get(name);                            /* still loading: keep the old skyline for now */
+    } catch(e) {}
+    return _dm.apply(this, arguments);
+  };
+  /* the painted skyline replaces the old grey far blocks and duplicate landmarks;
+     river, sea and distant hills are kept where the road needs them */
+  const KEEP_FAR = {corniche:1, alex:1, desert:1, giza:1, redsea:1};
+  const _df = RD.drawFar;
+  RD.drawFar = function(world){
+    try {
+      const th = world.themeAt(this.camL + this.W/this.PPM/2), name = MAP[th];
+      if (name && get(name)) {
+        if (!KEEP_FAR[th]) return;
+        const marks = world.marks, hz = this.hazeCol; let n = 0; world.marks = [];
+        /* the first two haze colours paint the old opposite-bank blocks: make them invisible */
+        this.hazeCol = function(){ return n++ < 2 ? 'rgba(0,0,0,0)' : hz.apply(this, arguments); };
+        try { return _df.apply(this, arguments); } finally { world.marks = marks; this.hazeCol = hz; }
+      }
+    } catch(e) {}
+    return _df.apply(this, arguments);
+  };
+  if (typeof newSession === 'function') { const _ns = newSession; newSession = function(){ const G = _ns.apply(this, arguments); try { preload(G.world); } catch(e) {} return G; }; }
+  try { if (GAME.G && GAME.G.world) preload(GAME.G.world); } catch(e) {}
 })();
 </script>
 <script>
