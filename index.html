@@ -9474,6 +9474,39 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
 })();
 </script>
 <script>
+/* ---------- traffic list that can never hold an empty slot ----------
+   Every read of G.traffic, from any part of the game, gets a list with
+   empty slots and skipped spawns already removed. This closes the
+   "reading 'parked' of null" crash no matter which spawner caused it. */
+window.OGRA_BUILD = '2026-09-17c';
+(function(){
+  const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
+  function guard(G){
+    if (!G || typeof G !== 'object') return G;
+    const d = Object.getOwnPropertyDescriptor(G, 'traffic');
+    if (d && d.get && d.get.__ogGuard) return G;
+    let list = Array.isArray(G.traffic) ? G.traffic : [];
+    const get = function(){
+      for (let i = 0; i < list.length; i++) if (bad(list[i])) { list = list.filter(o => !bad(o)); break; }
+      return list;
+    };
+    get.__ogGuard = true;
+    Object.defineProperty(G, 'traffic', {configurable:true, enumerable:true, get,
+      set(v){ list = Array.isArray(v) ? v : []; }});
+    return G;
+  }
+  window.OGRA_guardTraffic = guard;
+  if (typeof newSession === 'function') { const _ns = newSession; newSession = function(){ return guard(_ns.apply(this, arguments)); }; }
+  /* sessions that already exist, including the menu background drive */
+  const sweep = () => { try { if (typeof GAME !== 'undefined' && GAME.G) guard(GAME.G); } catch(e) {} };
+  sweep(); setInterval(sweep, 1000);
+  /* show which build is running on the error box, so a stale cached page is obvious */
+  new MutationObserver(() => { const b = document.getElementById('ogDrawErr'); if (b && !b.dataset.build) { b.dataset.build = 1; b.textContent += '\nbuild ' + window.OGRA_BUILD; } })
+    .observe(document.documentElement, {childList:true, subtree:true});
+  console.log('[ogra] build', window.OGRA_BUILD);
+})();
+</script>
+<script>
 /* Independent backstop: if the main script never opens the menu, do it here. */
 (function(){
   var done = false;
