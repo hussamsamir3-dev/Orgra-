@@ -9479,7 +9479,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-17i';
+window.OGRA_BUILD = '2026-09-17j';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
@@ -9587,7 +9587,7 @@ window.OGRA_BUILD = '2026-09-17i';
     root.style.setProperty('--ogSR', Math.max(8, R) + 'px');
     root.style.setProperty('--ogSB', Math.max(0, Math.min(B, 14)) + 'px');
     const touch = matchMedia('(pointer:coarse)').matches || 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-    const short = land && innerHeight <= 520 && touch;
+    const short = (land && innerHeight <= 540 && touch) || matchMedia('(pointer:coarse) and (orientation:landscape) and (max-height:540px)').matches;
     root.classList.toggle('ogShort', short);
     if (wasShort !== null && wasShort !== short) { try { if (UI.cur && UI.cur.name && GAME.state !== 'play') UI.refresh(); } catch(e) {} }
     wasShort = short;
@@ -9595,6 +9595,9 @@ window.OGRA_BUILD = '2026-09-17i';
   window.OG_layout = layout;
   layout();
   addEventListener('resize', layout);
+  setInterval(layout, 1500);
+  if (window.visualViewport) visualViewport.addEventListener('resize', layout);
+  addEventListener('pageshow', layout);
   addEventListener('orientationchange', () => setTimeout(layout, 250));
   if (screen.orientation && screen.orientation.addEventListener) screen.orientation.addEventListener('change', () => setTimeout(layout, 250));
 
@@ -9692,7 +9695,107 @@ window.OGRA_BUILD = '2026-09-17i';
   html.ogShort #hud .h-tr > .hb,html.ogShort #hud .h-tr > #radioBtn{width:42px!important;height:42px!important;
     min-width:0!important;min-height:0!important;margin:0!important;font-size:17px!important}
   html.ogShort #hud .h-tr > #radioBtn *{max-width:100%;max-height:100%}
-  </style>`);
+  
+/* same layout straight from CSS, so it applies even before (or without) the script */
+@media (pointer:coarse) and (orientation:landscape) and (max-height:540px){
+:root{--ogSL:max(8px,env(safe-area-inset-left));--ogSR:max(8px,env(safe-area-inset-right));--ogSB:0px}
+
+  :root{--tb:46px;--nr:64px}
+
+  /* ---------- top bar ---------- */
+  #topBar{height:var(--tb)!important;gap:8px!important;
+    padding:0 var(--ogSR) 0 var(--ogSL)!important}
+  #topBar .tbProf{height:36px!important;gap:7px!important;padding:0 10px 0 4px!important}
+  #topBar .tbProf .lvl{width:26px!important;height:26px!important;font-size:13px!important}
+  #topBar .tbProf .av{width:28px!important;height:28px!important}
+  #topBar .tbProf .nm{font-size:13px!important;max-width:120px!important}
+  #topBar .tbProf .xp{display:block!important;font-size:10px!important;max-width:120px!important}
+  #topBar .tbChip{height:34px!important;font-size:14px!important;padding:0 10px!important}
+  #topBar .tbCash{font-size:15px!important}
+
+  /* ---------- side rail: hugs the edge, scrolls if it has to ---------- */
+  #navRail,#navRail.rtl{top:var(--tb)!important;bottom:0!important;height:auto!important;min-height:0!important;
+    width:calc(var(--nr) + var(--ogSR))!important;flex-direction:column!important;justify-content:flex-start!important;align-items:stretch!important;
+    gap:2px!important;overflow-y:auto!important;overflow-x:hidden!important;touch-action:pan-y!important;scrollbar-width:none;
+    border-top:0!important;box-sizing:border-box!important;padding:6px 5px calc(8px + var(--ogSB)) 5px!important}
+  #navRail::-webkit-scrollbar{display:none}
+  #navRail.rtl{right:0!important;left:auto!important;padding-right:calc(5px + var(--ogSR))!important;
+    border-left:1px solid var(--line)!important;border-right:0!important}
+  #navRail:not(.rtl){left:0!important;right:auto!important;width:calc(var(--nr) + var(--ogSL))!important;
+    padding-left:calc(5px + var(--ogSL))!important;border-right:1px solid var(--line)!important}
+  #navRail button{flex:0 0 auto!important;min-height:40px!important;height:auto!important;padding:4px 0!important;
+    gap:1px!important;font-size:9.5px!important;line-height:1.15!important;white-space:nowrap!important;border-radius:10px!important}
+  #navRail button .ni{font-size:19px!important}
+  #navRail button .ni img{width:24px!important;height:24px!important}
+
+  /* ---------- screen area ---------- */
+  body.menuUI #screens,body.menuUI.rtlRail #screens{top:var(--tb)!important;bottom:0!important}
+  body.menuUI.rtlRail #screens{left:var(--ogSL)!important;right:calc(var(--nr) + var(--ogSR))!important}
+  body.menuUI:not(.rtlRail) #screens{left:calc(var(--nr) + var(--ogSL))!important;right:var(--ogSR)!important}
+  body.menuUI.rtlRail #modal{left:0!important;right:calc(var(--nr) + var(--ogSR))!important}
+  body.menuUI:not(.rtlRail) #modal{right:0!important;left:calc(var(--nr) + var(--ogSL))!important}
+
+  /* every menu screen scrolls as one page */
+  body.menuUI #screens .scr{position:absolute!important;inset:0!important;display:block!important;
+    overflow-y:auto!important;overflow-x:hidden!important;touch-action:pan-y!important;overscroll-behavior:contain;
+    -webkit-overflow-scrolling:touch;padding:6px 10px calc(54px + var(--ogSB))!important}
+  body.menuUI #screens .scr > .scroll,body.menuUI #screens .scr > .grid.scroll{
+    overflow:visible!important;flex:none!important;height:auto!important;max-height:none!important;min-height:0!important;padding-bottom:0!important}
+  body.menuUI #screens .scr > .pn{overflow:visible!important;height:auto!important;max-height:none!important;
+    min-height:0!important;margin-top:10px!important;position:relative!important}
+  body.menuUI #screens .scr > *{margin-left:0;margin-right:0}
+  body.menuUI #screens .scan{position:fixed!important}
+
+  /* compact title: one line instead of a banner */
+  .scrHead{margin:0 0 8px!important;display:flex!important;align-items:baseline;justify-content:center;gap:10px;flex-wrap:wrap}
+  .scrHead h1{font-size:22px!important;line-height:1.15!important}
+  .scrHead .chkRule{display:none!important}
+  .scrHead .sub{font-size:12px!important;margin:0!important;opacity:.8}
+  body.menuUI #screens .scr > .hdr{margin:0 0 6px!important;min-height:0!important;gap:8px!important;align-items:center!important}
+  body.menuUI #screens .hdr .back{width:40px!important;height:40px!important;min-height:40px!important;flex:none!important}
+
+  /* touch targets: comfortable, not oversized */
+  #screens .chip,#screens .btn,#screens button{min-height:38px!important;padding-block:6px!important}
+  #screens .tabs,#screens .row{gap:6px!important;row-gap:6px!important}
+
+  /* routes: cards slide sideways so the vehicle and Start stay close */
+  .scr[data-s="routes"] .grid.scroll.ogRouteGrid{display:block!important}
+  #screens .ogRoutes .ogTrack > [data-a="route"],#screens .ogRoutes .ogTrack > .card{
+    width:232px!important;min-height:0!important;height:auto!important;margin:0!important;white-space:normal!important}
+  #screens .ogRoutes .ogTrack > .card *{white-space:normal!important}
+  #screens .ogRoutes .ogTrack > .card > .row:last-of-type{display:none!important}
+  #screens .ogRoutes .ogTrack{align-items:stretch!important;padding-bottom:6px!important}
+  #screens .ogVc img{height:36px!important;min-height:36px!important}
+  #screens .ogVc{min-width:118px!important;width:118px!important}
+
+  /* status badge stays small and out of the way */
+  #ogMode{left:calc(var(--ogSL) + 2px)!important;bottom:calc(4px + var(--ogSB))!important;transform:scale(.85);transform-origin:left bottom}
+
+  /* ---------- driving HUD ---------- */
+  #hud{--pad:var(--ogSL)!important;--padr:var(--ogSR)!important}
+  #hud .h-tl,#hud .h-bl{left:var(--ogSL)!important}
+  #hud .h-tr,#hud .h-br{right:var(--ogSR)!important}
+  #hud.lh .h-br{left:var(--ogSL)!important;right:auto!important}
+  #hud.lh .h-bl{right:var(--ogSR)!important;left:auto!important}
+  #hud .h-tl{width:178px!important;max-width:178px!important}
+  #hud .h-tl > .row{flex-wrap:wrap!important;gap:4px!important}
+  #hud #hRoute{left:calc(var(--ogSL) + 186px)!important;right:calc(var(--ogSR) + 100px)!important;
+    width:auto!important;max-width:none!important;min-width:0!important;transform:none!important;margin:0!important}
+  #hud .h-bc .gearbox button{width:38px!important;min-width:38px!important;height:40px!important;min-height:40px!important}
+  #hud .h-bc .auxrow button,#hud .h-bc .auxrow .eng{min-width:40px!important;min-height:40px!important}
+  @media (max-width:760px){
+    #hud .h-bc .gearbox button{width:32px!important;min-width:32px!important}
+    #hud .pedal{min-width:70px!important;width:70px!important;min-height:78px!important;height:78px!important}
+  }
+  #hud .h-tr{display:grid!important;grid-template-columns:42px 42px!important;gap:5px!important;
+    justify-content:end!important;justify-items:end!important;align-content:start!important;width:auto!important}
+  #hud .h-tr > #hPax,#hud .h-tr > #hClock{grid-column:1 / -1!important;justify-self:end!important;margin:0!important}
+  #hud .h-tr > .hb,#hud .h-tr > #radioBtn{width:42px!important;height:42px!important;
+    min-width:0!important;min-height:0!important;margin:0!important;font-size:17px!important}
+  #hud .h-tr > #radioBtn *{max-width:100%;max-height:100%}
+  
+}
+</style>`);
 
   /* tag each screen with its name, and slide the route cards on short screens */
   if (typeof UI !== 'undefined' && UI.show) {
@@ -9702,7 +9805,7 @@ window.OGRA_BUILD = '2026-09-17i';
       try {
         const name = UI.cur && UI.cur.name;
         document.querySelectorAll('#screens .scr').forEach(s => { if (name) s.dataset.s = name; });
-        if (name === 'routes' && root.classList.contains('ogShort') && window.OG_railify) {
+        if (name === 'routes' && (root.classList.contains('ogShort') || matchMedia('(pointer:coarse) and (orientation:landscape) and (max-height:540px)').matches) && window.OG_railify) {
           const grid = document.querySelector('#screens .scr .grid.scroll');
           if (grid && !grid.querySelector('.ogRail')) {
             const cards = [...grid.children].filter(c => c.matches('[data-a="route"], .card'));
