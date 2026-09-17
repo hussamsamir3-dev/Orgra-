@@ -9479,7 +9479,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-17j';
+window.OGRA_BUILD = '2026-09-17k';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
@@ -10078,6 +10078,48 @@ window.OGRA_BUILD = '2026-09-17j';
       if (!up) report({message:'game did not start (state ' + (typeof GAME !== 'undefined' ? GAME.state : 'no GAME') + ')'}, 'start-up');
     } catch(e) { report(e, 'start-up'); }
   }, 12000);
+})();
+</script>
+<script>
+/* ---------- keep driving through a hiccup ----------
+   The main loop used to swallow any error in the physics step: the picture
+   kept drawing while the world stopped moving, which looked like a freeze
+   with no explanation. Now an error is reported on screen, the moving parts
+   that caused it are cleaned out, and the drive carries on. */
+(function(){
+  if (typeof updateGame !== 'function') return;
+  const ARRAYS = ['traffic','peds','walkers','fx','parts','debris','shops','onboard','riders','queue','lights','pickups'];
+  const WORLD = ['bld','props','isx','st','marks','shops','signs','slopes','feat'];
+  const okNum = v => typeof v !== 'number' || Number.isFinite(v);
+  function clean(G){
+    if (!G) return;
+    const scrub = (obj, keys) => { if (!obj) return; for (const k of keys) { const a = obj[k];
+      if (Array.isArray(a)) obj[k] = a.filter(o => o && (typeof o !== 'object' || (okNum(o.x) && okNum(o.lane) && okNum(o.v)))); } };
+    scrub(G, ARRAYS); scrub(G.world, WORLD);
+    const c = G.car;
+    if (c) { for (const k of ['x','y','vx','vy','lane','lp','rpm','heat','fuel']) if (typeof c[k] === 'number' && !Number.isFinite(c[k])) c[k] = k === 'x' ? (G.lastGoodX || 0) : 0; }
+  }
+  let fails = 0, lastFail = 0, told = 0;
+  const _ug = updateGame;
+  updateGame = function(G, dt, inp){
+    try { const r = _ug.apply(this, arguments); if (G && G.car && Number.isFinite(G.car.x)) G.lastGoodX = G.car.x; fails = 0; return r; }
+    catch(e) {
+      const now = performance.now();
+      if (now - lastFail > 4000) fails = 0;
+      lastFail = now; fails++;
+      try { clean(G); } catch(_) {}
+      if (fails >= 4) { try { G.fx = []; G.parts = []; G.debris = []; G.traffic = []; G.peds = []; G.walkers = []; } catch(_) {} }
+      if (now - told > 8000) { told = now; try { (window.OG_report || function(){})(e, 'driving step'); } catch(_) {} }
+      if (fails < 8) { try { return _ug.apply(this, arguments); } catch(_) {} }   /* one clean retry */
+      return null;
+    }
+  };
+  /* the same protection for the crowd and overtake counters */
+  for (const fn of ['updPeople','countOvertakes']) {
+    if (typeof window[fn] === 'function' || typeof eval(fn) === 'function') {
+      try { const orig = eval(fn); eval(fn + ' = function(G){ try { return orig.apply(this, arguments); } catch(e) { try { clean(G); } catch(_) {} try { (window.OG_report||function(){})(e, "' + fn + '"); } catch(_) {} } }'); } catch(e) {}
+    }
+  }
 })();
 </script>
 <script>
