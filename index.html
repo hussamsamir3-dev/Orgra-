@@ -9479,7 +9479,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-17g';
+window.OGRA_BUILD = '2026-09-17h';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
@@ -9857,6 +9857,109 @@ window.OGRA_BUILD = '2026-09-17g';
   };
   if (typeof newSession === 'function') { const _ns = newSession; newSession = function(){ const G = _ns.apply(this, arguments); try { preload(G.world); } catch(e) {} return G; }; }
   try { if (GAME.G && GAME.G.world) preload(GAME.G.world); } catch(e) {}
+})();
+</script>
+<script>
+/* ---------- pause menu on iPhone Safari ----------
+   1. Buttons in pop-up menus react on the finger lift itself, so Safari's
+      delayed or swallowed "click" can never leave a button dead.
+   2. While the game is paused under a menu, the road is drawn once and then
+      left still, and the heavy background blur is switched off on touch
+      screens, so the menu stays light on the phone's graphics chip.
+   3. Speech is only cancelled when something is actually being spoken.
+   4. If the game is ever left paused with no menu on screen, it resumes.
+   5. Any script error, or a long stall after tapping a button, shows a small
+      report with the build number, so a screenshot tells exactly what broke. */
+(function(){
+  const touch = matchMedia('(pointer:coarse)').matches || navigator.maxTouchPoints > 0;
+  const modal = () => document.getElementById('modal');
+  const modalOpen = () => { const m = modal(); return !!(m && !m.classList.contains('hidden') && m.innerHTML.trim()); };
+
+  /* 1. act on finger lift */
+  if (touch) {
+    let start = null, fired = 0;
+    document.addEventListener('touchstart', e => {
+      const m = modal(); if (!m || !m.contains(e.target)) { start = null; return; }
+      const t = e.changedTouches[0]; start = {x:t.clientX, y:t.clientY, el:e.target, at:Date.now()};
+    }, {passive:true, capture:true});
+    document.addEventListener('touchend', e => {
+      if (!start) return; const s = start; start = null;
+      const t = e.changedTouches[0];
+      if (Math.abs(t.clientX - s.x) > 12 || Math.abs(t.clientY - s.y) > 12 || Date.now() - s.at > 800) return;
+      const btn = s.el.closest && s.el.closest('#modal [data-a]');
+      if (!btn || btn.matches('input, select, textarea') || btn.disabled) return;
+      e.preventDefault();                               /* no second, delayed click */
+      fired = Date.now(); window.__ogLastAct = btn.dataset.a; window.__ogActAt = performance.now();
+      try { UI.act(btn.dataset.a, btn.dataset.p, btn); } catch(err) { report(err, 'button ' + btn.dataset.a); }
+    }, {passive:false, capture:true});
+    /* swallow the synthetic click Safari may still send right after */
+    document.addEventListener('click', e => {
+      if (Date.now() - fired < 600 && e.target.closest && e.target.closest('#modal [data-a]')) { e.stopPropagation(); e.preventDefault(); }
+    }, true);
+    document.head.insertAdjacentHTML('beforeend', `<style>
+      body:not(.menuUI) #modal,body:not(.menuUI) #modal *{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+      body:not(.menuUI) #modal{background:rgba(3,6,12,.72)!important}
+      body:not(.menuUI) #modal>.pn{background:rgba(12,18,32,.97)!important}
+    </style>`);
+  }
+  document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('#modal [data-a]'); if (b) { window.__ogLastAct = b.dataset.a; window.__ogActAt = performance.now(); } }, true);
+
+  /* 2. draw the paused road once, then leave it */
+  if (typeof renderScene === 'function') {
+    const _rs = renderScene; let heldFor = null;
+    renderScene = function(G){
+      try {
+        if (GAME.paused && GAME.state === 'play' && modalOpen()) {
+          if (heldFor === GAME.G) return null;
+          const r = _rs.apply(this, arguments); heldFor = GAME.G; return r;
+        }
+      } catch(e) {}
+      heldFor = null;
+      return _rs.apply(this, arguments);
+    };
+  }
+
+  /* 3. speech */
+  try {
+    if (window.speechSynthesis && speechSynthesis.cancel) {
+      const cancel = speechSynthesis.cancel.bind(speechSynthesis);
+      speechSynthesis.cancel = function(){ try { if (speechSynthesis.speaking || speechSynthesis.pending) cancel(); } catch(e) {} };
+    }
+  } catch(e) {}
+
+  /* 4. never stuck paused without a menu */
+  let bare = 0;
+  setInterval(() => {
+    try {
+      const busy = UI.fueling || document.querySelector('#hud .siteUI, #phone:not(.hidden)');
+      if (GAME.state === 'play' && GAME.paused && !modalOpen() && !busy) { if (++bare >= 3) { GAME.paused = false; try { AU.pauseGame(false); } catch(e) {} bare = 0; } }
+      else bare = 0;
+    } catch(e) {}
+  }, 500);
+
+  /* 5. reports */
+  let box = null, hideT = 0;
+  function report(err, where){
+    try {
+      const msg = (err && (err.message || err.reason && err.reason.message || err.reason)) || String(err);
+      const st = (err && (err.stack || err.error && err.error.stack || err.reason && err.reason.stack)) || '';
+      const line = String(st).split('\n').slice(0, 2).join('\n');
+      if (!box) { box = document.createElement('div'); box.id = 'ogReport';
+        box.style.cssText = 'position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:2147483600;max-width:92vw;background:rgba(40,8,12,.94);color:#ffd7db;border:1px solid #ff4d5e;border-radius:10px;padding:8px 12px;font:12px/1.4 ui-monospace,Menlo,monospace;white-space:pre-wrap;direction:ltr;pointer-events:auto';
+        box.onclick = () => box.remove(); }
+      box.textContent = 'OGRA report · ' + (where || 'error') + '\n' + msg + (line ? '\n' + line : '') + '\nbuild ' + (window.OGRA_BUILD || '?') + ' · tap to close';
+      document.body.appendChild(box); clearTimeout(hideT); hideT = setTimeout(() => box && box.remove(), 15000);
+    } catch(e) {}
+  }
+  window.OG_report = report;
+  addEventListener('error', e => { if (e && e.message && !/ResizeObserver|Script error/.test(e.message)) report(e.error || e, 'script error'); });
+  addEventListener('unhandledrejection', e => { const r = e && e.reason; if (r && !/AbortError|NotAllowedError|play\(\)/.test(String(r && (r.name || r.message || r)))) report(e, 'promise'); });
+  let lastT = performance.now();
+  (function watch(now){
+    const gap = now - lastT; lastT = now;
+    if (gap > 1500 && window.__ogActAt && now - window.__ogActAt < gap + 2000) report({message:'screen stalled ' + (gap/1000).toFixed(1) + ' s after tapping "' + window.__ogLastAct + '"'}, 'stall');
+    requestAnimationFrame(watch);
+  })(lastT);
 })();
 </script>
 <script>
