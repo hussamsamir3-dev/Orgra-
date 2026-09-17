@@ -9318,6 +9318,162 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
 })();
 </script>
 <script>
+/* ---------- vehicle rails: arrows when the fleet is wider than the screen,
+   and a garage-collection picker on the routes screen ---------- */
+(function(){
+  if (typeof UI === 'undefined' || !UI.show) return;
+  const AR = () => typeof LANG !== 'undefined' && LANG.cur === 'ar';
+  const TX = {
+    notRoute: ['Not on this route', 'مش للخط ده'],
+    switched: ['Route changed to {r} for this vehicle', 'غيّرنا الخط لـ {r} عشان يناسب العربية'],
+    noRoute:  ['None of your unlocked routes allow this vehicle yet', 'مفيش خط مفتوح يناسب العربية دي لسه'],
+    seats:    ['seats', 'راكب'],
+    owned:    ['{n} vehicles in your garage', '{n} عربية في جراجك'],
+    prev: ['Previous', 'السابق'], next: ['Next', 'التالي'],
+    map: ['🗺️ Route map', '🗺️ الخريطة']
+  };
+  const tx = (k, v) => { let s = TX[k][AR() ? 1 : 0]; for (const x in (v || {})) s = s.replace('{' + x + '}', v[x]); return s; };
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const thumb = v => { try { const a = ASSETS.veh[v.spr]; return a && a.d ? a.d : ''; } catch(e) { return ''; } };
+
+  document.head.insertAdjacentHTML('beforeend', `<style>
+    .ogRail{direction:ltr;display:flex;align-items:center;gap:6px;min-width:0;max-width:100%;flex:1 1 auto}
+    .ogTrack{display:flex;gap:8px;overflow-x:auto;overflow-y:hidden;flex:1 1 auto;min-width:0;padding:4px 2px;
+      scroll-behavior:smooth;scrollbar-width:none;touch-action:pan-x;overscroll-behavior-x:contain;cursor:grab}
+    .ogTrack::-webkit-scrollbar{display:none}
+    .ogTrack.drag{cursor:grabbing;scroll-behavior:auto}
+    .ogTrack > *{flex:none!important;white-space:nowrap}
+    .ogRail.fade-s .ogTrack{-webkit-mask-image:linear-gradient(90deg,transparent,#000 28px);mask-image:linear-gradient(90deg,transparent,#000 28px)}
+    .ogRail.fade-e .ogTrack{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent)}
+    .ogRail.fade-s.fade-e .ogTrack{-webkit-mask-image:linear-gradient(90deg,transparent,#000 28px,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(90deg,transparent,#000 28px,#000 calc(100% - 28px),transparent)}
+    .ogArr{flex:none;width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font:900 22px/1 system-ui;
+      background:linear-gradient(180deg,#ffd98a,#ffb627);color:#1b1204;border:0;box-shadow:0 4px 14px rgba(0,0,0,.45);cursor:pointer;transition:opacity .15s,transform .1s}
+    .ogArr:active{transform:scale(.92)}
+    .ogArr[disabled]{opacity:.25;pointer-events:none;background:rgba(255,255,255,.25)}
+    .ogArr[hidden]{display:none}
+    .ogVehBox{flex:1 1 100%!important;min-width:0!important;max-width:100%!important}
+    .ogVc{display:flex!important;flex-direction:column;align-items:stretch;gap:2px;width:calc(var(--u,8px)*19);min-width:132px;padding:6px 8px 7px!important;
+      border-radius:12px;background:rgba(255,255,255,.04);border:1px solid rgba(140,190,255,.18);color:inherit;text-align:start;cursor:pointer;position:relative;
+      min-height:0!important}
+    .ogVc img{width:100%;height:calc(var(--u,8px)*6);min-height:44px;object-fit:contain;object-position:center bottom;pointer-events:none;
+      filter:drop-shadow(0 3px 3px rgba(0,0,0,.5))}
+    .ogVc b{font-size:13px;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
+    .ogVc small{font-size:11px;opacity:.7;display:block}
+    .ogVc .fl{height:3px;border-radius:3px;background:rgba(255,255,255,.12);overflow:hidden;margin-top:3px}
+    .ogVc .fl i{display:block;height:100%;background:#39f28b}
+    .ogVc .fl i.lo{background:#ff4d5e}
+    .ogVc.on{border-color:#ffb627;background:rgba(255,182,39,.12);box-shadow:inset 0 0 0 1px #ffb627}
+    .ogVc.no{opacity:.5}
+    .ogVc.no em{position:absolute;top:6px;inset-inline-start:6px;font-style:normal;font-size:10px;font-weight:800;padding:1px 6px;border-radius:10px;background:rgba(0,0,0,.6);color:#ffc28a}
+    .ogVc:hover{border-color:rgba(255,182,39,.6)}
+    .ogVehHead{display:flex;align-items:center;gap:8px;margin-bottom:2px}
+    .ogVehHead .cnt{font-size:11.5px;opacity:.6}
+    .o2mapBtn.inl{position:static!important;box-shadow:none!important;padding:.55em 1em!important;font-size:14px!important}
+  </style>`);
+
+  /* ----- generic rail ----- */
+  const saved = {};
+  function railify(buttons, key){
+    if (!buttons.length) return null;
+    const first = buttons[0], parent = first.parentElement;
+    if (!parent || parent.closest('.ogTrack')) return null;
+    const rail = document.createElement('div'); rail.className = 'ogRail'; rail.dataset.rail = key;
+    const L = document.createElement('button'), Rb = document.createElement('button'), track = document.createElement('div');
+    L.className = Rb.className = 'ogArr'; L.type = Rb.type = 'button'; const chev = d => `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="${d}"/></svg>`; L.innerHTML = chev('M15 5l-7 7 7 7'); Rb.innerHTML = chev('M9 5l7 7-7 7');
+    L.setAttribute('aria-label', tx('prev')); Rb.setAttribute('aria-label', tx('next'));
+    track.className = 'ogTrack';
+    track.style.direction = getComputedStyle(parent).direction;
+    parent.insertBefore(rail, first);
+    buttons.forEach(b => track.appendChild(b));
+    rail.append(L, track, Rb);
+    const rtl = () => getComputedStyle(track).direction === 'rtl';
+    const update = () => {
+      const max = track.scrollWidth - track.clientWidth, over = max > 4;
+      L.hidden = Rb.hidden = !over;
+      const sl = track.scrollLeft, atLeft = rtl() ? Math.abs(sl) >= max - 2 : sl <= 2, atRight = rtl() ? Math.abs(sl) <= 2 : sl >= max - 2;
+      L.disabled = over && atLeft; Rb.disabled = over && atRight;
+      rail.classList.toggle('fade-s', over && !atLeft); rail.classList.toggle('fade-e', over && !atRight);
+      saved[key] = sl;
+    };
+    const step = dir => track.scrollBy({left:dir*Math.max(160, track.clientWidth*.8), behavior:'smooth'});
+    L.onclick = e => { e.stopPropagation(); step(-1); try { AU.ui('open'); } catch(_) {} };
+    Rb.onclick = e => { e.stopPropagation(); step(1); try { AU.ui('open'); } catch(_) {} };
+    track.addEventListener('scroll', update, {passive:true});
+    track.addEventListener('wheel', e => { if (track.scrollWidth <= track.clientWidth) return; if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) { track.scrollLeft += e.deltaY*(rtl() ? -1 : 1); e.preventDefault(); } }, {passive:false});
+    /* mouse drag; a drag must not count as a tap on a vehicle */
+    let down = null, moved = false;
+    track.addEventListener('pointerdown', e => { if (e.pointerType !== 'mouse') return; down = {x:e.clientX, sl:track.scrollLeft}; moved = false; });
+    addEventListener('pointermove', e => { if (!down) return; const dx = e.clientX - down.x; if (Math.abs(dx) > 5) { moved = true; track.classList.add('drag'); } if (moved) track.scrollLeft = down.sl - dx; });
+    addEventListener('pointerup', () => { if (down) { down = null; track.classList.remove('drag'); } });
+    track.addEventListener('click', e => { if (moved) { e.stopPropagation(); e.preventDefault(); moved = false; } }, true);
+    if (saved[key] != null) { track.style.scrollBehavior = 'auto'; track.scrollLeft = saved[key]; track.style.scrollBehavior = ''; }
+    requestAnimationFrame(() => {
+      const on = track.querySelector('.on');
+      if (on) { const tr = track.getBoundingClientRect(), r = on.getBoundingClientRect();
+        if (r.left < tr.left + 30 || r.right > tr.right - 30) { track.style.scrollBehavior = 'auto'; on.scrollIntoView({block:'nearest', inline:'center'}); track.style.scrollBehavior = ''; } }
+      update();
+    });
+    new ResizeObserver(update).observe(track);
+    return rail;
+  }
+
+  /* ----- routes: pick any vehicle from the garage ----- */
+  function vehCard(v, on, ok){
+    const s = S(), own = s.owned[v.id] || {}, E = (() => { try { return effSpec(v, own); } catch(e) { return null; } })();
+    const tank = (E && E.tank) || v.tank || 60, f = Math.max(0, Math.min(1, (own.fuel || 0)/tank)), img = thumb(v);
+    return `<button class="ogVc ${on ? 'on' : ''} ${ok ? '' : 'no'}" ${ok ? `data-a="pickveh"` : `data-og="pickany"`} data-p="${esc(v.id)}" title="${esc(tn(v.n))}">
+      ${ok ? '' : `<em>${tx('notRoute')}</em>`}${img ? `<img src="${esc(img)}" alt="" loading="lazy" draggable="false">` : ''}
+      <b>${esc(tn(v.n))}</b><small>${v.seats || '—'} ${tx('seats')}${typeof CLS_N !== 'undefined' && v.cls && CLS_N[v.cls] ? ' · ' + esc(tn(CLS_N[v.cls])) : ''}</small>
+      <span class="fl"><i class="${f < .25 ? 'lo' : ''}" style="width:${Math.round(f*100)}%"></i></span></button>`;
+  }
+  function buildRoutePicker(){
+    const scr = document.querySelector('#screens'); if (!scr) return;
+    const s = S(), u = UI.sel, isGo = u.tab === 'go', vk = isGo ? 'gvid' : 'vid';
+    const anchor = scr.querySelector('[data-a="pickveh"]') || scr.querySelector('.pn [data-a="nav"][data-p="showroom"]');
+    if (!anchor) return;
+    const row = anchor.parentElement, box = row.parentElement;
+    const R0 = isGo ? null : (routeById(u.route) || ROUTES[0]);
+    const mine = Object.keys(s.owned).map(vehById).filter(v => v && !v.hidden && (isGo ? v.cat === 'car' : v.cat !== 'car'));
+    if (!mine.length) return;                      /* keep the "go to showroom" prompt */
+    const okFor = v => isGo || !R0 || routeAllows(R0, v);
+    mine.sort((a, b) => (okFor(b) - okFor(a)) || ((a.seats || 0) - (b.seats || 0)));
+    row.innerHTML = mine.map(v => vehCard(v, u[vk] === v.id, okFor(v))).join('');
+    box.classList.add('ogVehBox');
+    const lbl = box.querySelector('.lbl');
+    if (lbl && !lbl.querySelector('.cnt')) { lbl.classList.add('ogVehHead'); lbl.insertAdjacentHTML('beforeend', `<span class="cnt">· ${tx('owned', {n:mine.length})}</span>`); }
+    railify([...row.children], 'routes-' + (isGo ? 'go' : 'line'));
+    if (row.children.length === 0) row.remove();
+    /* map button sits beside Start instead of floating over the panel */
+    const mb = document.querySelector('.o2mapBtn'), start = scr.querySelector('[data-a="start"]');
+    if (mb && start && !isGo) { mb.classList.add('inl'); mb.textContent = tx('map'); start.parentElement.insertBefore(mb, start); }
+  }
+  document.addEventListener('click', e => {
+    const b = e.target.closest('[data-og="pickany"]'); if (!b) return;
+    e.stopPropagation(); e.preventDefault();
+    const s = S(), u = UI.sel, v = vehById(b.dataset.p); if (!v) return;
+    const cur = routeById(u.route);
+    const pool = ROUTES.filter(r => r.lvl <= s.lvl && routeAllows(r, v));
+    const r = pool.find(q => q.len === (cur && cur.len)) || pool[0];
+    if (!r) { UI.toast ? UI.toast(tx('noRoute')) : alert(tx('noRoute')); try { AU.ui('no'); } catch(_) {} return; }
+    u.route = r.id; if (u.cls && u.cls !== 'all' && !(r.cls || []).includes(u.cls)) u.cls = 'all'; u.vid = v.id;
+    UI.refresh(); if (UI.toast) UI.toast(tx('switched', {r:tn(r.n)})); try { AU.ui('open'); } catch(_) {}
+  }, true);
+
+  /* ----- apply after every screen draw ----- */
+  const apply = () => {
+    try {
+      const cur = UI.cur && UI.cur.name;
+      if (cur === 'routes') buildRoutePicker();
+      const w = [...document.querySelectorAll('#screens [data-a="wveh"]')];
+      if (w.length) { const groups = new Map(); w.forEach(b => { const p = b.parentElement; if (!groups.has(p)) groups.set(p, []); groups.get(p).push(b); });
+        let i = 0; groups.forEach(list => railify(list, 'garage-' + (i++))); }
+    } catch(e) { console.warn('[ogra] vehicle rail', e); }
+  };
+  const _s = UI.show; UI.show = function(){ const r = _s.apply(this, arguments); apply(); return r; };
+  addEventListener('resize', () => document.querySelectorAll('.ogTrack').forEach(t => t.dispatchEvent(new Event('scroll'))));
+})();
+</script>
+<script>
 /* Independent backstop: if the main script never opens the menu, do it here. */
 (function(){
   var done = false;
