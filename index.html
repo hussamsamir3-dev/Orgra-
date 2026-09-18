@@ -924,8 +924,8 @@ class World {
     for (let x = a; x < b; x += 4) { const th = this.themeAt(x), T = THEMES[th];
       if (x < 40 || (this.len < Infinity && x > this.len - 20)) continue;
       const r = R();
-      if (r < .012*T.bumps) this.feat.push({x, w:3.4, h:.1 + R()*.04, t:'hump', mark:R() < .6});
-      else if (r < .018*T.bumps) this.feat.push({x, w:1.6, h:.12, t:'hump2', mark:R() < .3});
+      if (r < .012*T.bumps) this.feat.push({x, w:3.4, h:(.1 + R()*.04)*1.2, t:'hump', mark:R() < .6});
+      else if (r < .018*T.bumps) this.feat.push({x, w:1.6, h:.144, t:'hump2', mark:R() < .3});
       else if (r < .018*T.bumps + .02*T.rough) this.feat.push({x, w:.8 + R()*1.2, h:-(.05 + R()*.09), t:'hole', lane:R() < .75 ? 0 : 1});
       else if (r < .018*T.bumps + .02*T.rough + .012*T.rough) this.feat.push({x, w:15 + R()*50, h:.014 + R()*.02, t:'rough'});
       else if (r < .06 && T.city && R() < .15) this.feat.push({x, w:.8, h:-.018, t:'manhole'});
@@ -2096,7 +2096,7 @@ function startEvent(G, k){
     case 'radarMobile': W.radars.push({x:x + 60, done:false, hidden:true}); W.radars.sort((a, b) => a.x - b.x); if (G.hasRadar) G.feedAdd('ev_radar', {}, 'warn'); break;
     case 'blackout': G.blackout = {x:car.x + 200, w:260}; G.feedAdd('ev_blackout', {}, 'info'); break;
     case 'pax': if (G.onboard.length) { const p = G.onboard[Math.floor(R()*G.onboard.length)]; const r = R();
-      if (r < .12) { G.modal('nochange', {p}); } else if (r < .65 && !p.mid) { p.mid = car.x + 90 + R()*80; G.feedAdd('ev_ala', {}, 'pax'); AU.say('على جنب هنا يا أسطى', 'Pull over here please'); }
+      if (false) { G.modal('nochange', {p}); } else if (r < .65 && !p.mid) { p.mid = car.x + 90 + R()*80; G.feedAdd('ev_ala', {}, 'pax'); AU.say('على جنب هنا يا أسطى', 'Pull over here please'); }
       else { G.bubble(pickLine('chat')); } } break;
   }
 }
@@ -3866,7 +3866,7 @@ FEAT.v6 = function(G, dt){ if (G.mode === 'attract') return; const car = G.car, 
   if (G.mode === 'line' && stopped && !(G.dropT > G.clock)) { const p = G.onboard.find(q => q.req && q.mid != null && Math.abs(q.mid - car.x) < 70); if (p) { G.dropT = G.clock + .9; if (!car.door && G.save.set.autoDoor) { car.door = true; AU.door(car.spec.cat === 'bus' || car.spec.cat === 'minibus' ? 'bus' : 'van'); } p.mid = null; alight(G, p, true); AU.steps(); G.feedAdd('pax_off', {}, 'ok'); } }
   // honk -> the car ahead hurries up or pulls aside
   if (G.horn && !G._hw) { const ah = G.traffic.filter(o => !o.lane && !o.over && !o.parked && !o.dead && !o.isTow && o.lp > -.3 && o.x > car.x && o.x - car.x - (o.L + car.spec.L)/2 < 30).sort((a, b) => a.x - b.x)[0];
-    if (ah && !(ah.yieldCD > G.clock)) { ah.yieldCD = G.clock + 8; const redAhead = W.tl.some(l => l.x > ah.x && l.x - ah.x < 25 && l.st !== 'g'); if (!redAhead) { if (['citybus','citybus2','coach','dd','tram'].includes(ah.type) || Math.random() < .45) { ah.v0 = Math.min(ah.v0 + 4, 22); ah.hurryT = 7; } else ah.yieldT = 5 + Math.random()*3; if (Math.random() < .4) G.shout(ah, pickTx(Math.random() < .5 ? 'ok' : 'angry')); } } }
+    if (ah && !(ah.yieldCD > G.clock)) { ah.yieldCD = G.clock + 8; const redAhead = W.tl.some(l => l.x > ah.x && l.x - ah.x < 25 && l.st !== 'g'); if (!redAhead) { if (['citybus','citybus2','coach','dd','tram'].includes(ah.type) || Math.random() < .45) { const lm = ((W.segAt && W.segAt(ah.x) || {}).lim || 60)/3.6; ah.v0 = Math.max(ah.v0, lm*.98); ah.v = Math.max(ah.v, lm*.8); ah.hurryT = 9; } else { ah.yieldT = 6 + Math.random()*3; const lm2 = ((W.segAt && W.segAt(ah.x) || {}).lim || 60)/3.6; ah.v0 = Math.max(ah.v0, lm2*.9); } if (Math.random() < .4) G.shout(ah, pickTx(Math.random() < .5 ? 'ok' : 'angry')); } } }
   G._hw = G.horn;
   // pass-by sounds
   for (const o of G.traffic) { if (o.lane === 1 && !o.pb && o.x < car.x + 2 && o.x > car.x - 6) { o.pb = true; const rv = o.v + Math.abs(car.vx); if (rv > 8) AU.whoosh(clamp(rv/30, .25, 1), -.2, o.L > 6); if (o.type === 'moto') AU.motoPass(-.3); }
@@ -4237,7 +4237,7 @@ function renderScene(G, dt){ const c = RD.ctx, W = G.world, car = G.car, set = G
   /* zoom by speed: close in when crawling (bus fills about half the width),      fully pulled back by 40 km/h */
   const zFar = 1.08 - clamp(spd/90, 0, 1)*(RD.coarse ? .24 : .32) - clamp((L - 5)/8, 0, 1)*.1 - (behind ? .04 : 0);
   const zNear = clamp(.66*RD.Ws/Math.max(1, L*RD.PPM), zFar, 2.8);
-  let zt = lerp(zNear, zFar, clamp((spd - 5)/35, 0, 1));
+  let zt = lerp(zNear, zFar, clamp((spd - 5)/25, 0, 1));   /* fully pulled back by 30 km/h */
   if (!set.dynZoom || G.mode === 'attract') zt = 1 - clamp((L - 5)/8, 0, 1)*.1;
   zt *= (set.zoom || 1)*0.80;   /* pull the camera back for a longer view */
   RD.zoom = RD.zoom || zt; RD.zoom = lerp(RD.zoom, zt, 1 - Math.exp(-dt*(zt < RD.zoom ? .9 : .6)));
@@ -4245,9 +4245,9 @@ function renderScene(G, dt){ const c = RD.ctx, W = G.world, car = G.car, set = G
   const vw = RD.W/RD.PPM, minF = (L/2 + 1.2)/vw; let frac;
   if (G.mode === 'attract') frac = .34; else if (car.vx < -.5 || car.gear < 0) frac = Math.max(.55, 1 - minF - .05); else if (behind) frac = clamp((car.x - behind.x)/vw, minF + .02, .36); else { /* the back of the bus stays at least 15% in from the left edge */
     const acc = car.vx - (G.__camV ?? car.vx); G.__camV = car.vx;
-    let want = .21 + (L/2 + .6)/vw + (acc > .05 ? -.01 : acc < -.08 ? .02 : 0);
+    let want = .12 + (L/2 + .3)/vw + (acc > .05 ? -.01 : acc < -.08 ? .02 : 0);
     if (G.rest && G.rest.active) want += .06;
-    frac = Math.max(minF + .02, Math.min(.5, want));
+    frac = Math.max(minF*.75, Math.min(.5, want));
     G.camFrac = G.camFrac == null ? frac : (G.camFrac + (frac - G.camFrac)*.08); frac = G.camFrac; }
   G.camFrac = G.camFrac ?? frac; G.camFrac = lerp(G.camFrac, frac, 1 - Math.exp(-dt*(frac > G.camFrac ? 1.6 : .7)));
   RD.camL = G.mode === 'attract' ? lerp(RD.camL, car.x - vw*G.camFrac, 1 - Math.exp(-dt*3.2)) : car.x - vw*G.camFrac; if (G.mode !== 'attract' && !(car.vx < -.4 || car.gear < 0)) { if (RD._fwd != null && RD.camL < RD._fwd - .004) RD.camL = RD._fwd; RD._fwd = RD.camL; } else RD._fwd = null; RD.camY = lerp(RD.camY, W.h(car.x), 1 - Math.exp(-dt*2.5));
@@ -8677,7 +8677,7 @@ function rhOpen(G){
      of the traffic stream so the queue behind simply drives past */
   try {
     G.car.on = false; G.car.eng = 0; G.car.thr = 0; G.car.vx = 0; G.car.sel = 'P';
-    G.car.park = true; G.car.hidden = true;
+    G.car.park = true; G.car.hidden = false;   /* parked on the shoulder, still visible */
     GAME.paused = true;
     if (typeof MUSIC !== 'undefined') MUSIC.want(false);
     AU.amb && AU.amb('rest');
@@ -9487,7 +9487,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-17q';
+window.OGRA_BUILD = '2026-09-17s';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
@@ -10191,8 +10191,8 @@ window.OGRA_BUILD = '2026-09-17q';
     const raw = W.h.bind(W); let lastGood = 0;
     W.h = function(x){
       if (!fin(x)) return lastGood;
-      const a = raw(x - 2.4), b = raw(x), c = raw(x + 2.4);
-      let v = fin(a) && fin(c) ? (a + 2*b + c)/4 : b;          /* soften the step at segment joins */
+      const a = raw(x - 6), b = raw(x), c = raw(x + 6), a2 = raw(x - 2.5), c2 = raw(x + 2.5);
+      let v = fin(a) && fin(c) && fin(a2) && fin(c2) ? (a + 2*a2 + 4*b + 2*c2 + c)/10 : b;          /* soften the step at segment joins */
       if (!fin(v)) return lastGood;
       lastGood = v; return v;
     };
@@ -10846,6 +10846,346 @@ window.OGRA_BUILD = '2026-09-17q';
       return _want(on);
     };
   }
+})();
+</script>
+<script>
+/* =====================================================================
+   PARK ON THE SHOULDER · HORN THAT CLEARS THE ROAD · MOTION BLUR ·
+   REAL BALANCE AT THE COUNTER · MORE EGYPTIAN TALK
+   ===================================================================== */
+(function(){
+  if (typeof RD === 'undefined' || typeof GAME === 'undefined') return;
+  const AR = () => typeof LANG !== 'undefined' && LANG.cur === 'ar';
+  const pick = a => a[Math.floor(Math.random()*a.length)];
+
+  /* ---------- 1. the bus pulls onto the shoulder, brake on, road clear ---------- */
+  function parkAside(G, on){
+    const car = G.car; if (!car) return;
+    if (on) {
+      if (car.__laneWas == null) car.__laneWas = car.lane;
+      car.park = true; car.hidden = false;                 /* visible, but off the carriageway */
+      car.__parkAside = true;
+    } else if (car.__parkAside) {
+      car.__parkAside = false; car.park = false;
+      if (car.__laneWas != null) { car.lane = car.__laneWas; car.__laneWas = null; }
+    }
+  }
+  function asideTick(G, dt){
+    const car = G.car; if (!car) return;
+    const resting = !!(G.rest && G.rest.active) || !!document.getElementById('rhScreen');
+    if (resting) {
+      parkAside(G, true);
+      car.lane = Math.max(-1.05, (car.lane ?? 0) - dt*1.6);  /* slides onto the shoulder */
+      car.vx = 0; car.vy = 0;
+      for (const o of G.traffic) {                            /* and the road stays clear */
+        if (!o || o.__void || o.parked || o.isTow) continue;
+        if (Math.abs(o.x - car.x) > 70) continue;
+        o.brake = false; o.cpCap = null; o.stuck = 0;
+        if (o.v < o.v0*.85) o.v = Math.min(o.v0, o.v + dt*6);
+      }
+    } else if (car.__parkAside) {
+      car.lane = Math.min(car.__laneWas ?? 0, (car.lane ?? 0) + dt*1.2);
+      if (Math.abs(car.lane - (car.__laneWas ?? 0)) < .05) parkAside(G, false);
+    }
+  }
+
+  /* ---------- 2. the balance the counter uses is the one you can see ---------- */
+  function shownCash(){
+    let best = 0;
+    try { best = Math.max(best, S().cash || 0); } catch(e) {}
+    try { if (window.OGRA_NET && OGRA_NET.player && OGRA_NET.player.cash) best = Math.max(best, OGRA_NET.player.cash); } catch(e) {}
+    try { const el = document.querySelector('#topBar .tbCash, .tbCash, #hudCash');
+      if (el) { const n = parseInt(String(el.textContent).replace(/[^\d]/g, ''), 10); if (n > best) best = n; } } catch(e) {}
+    return best;
+  }
+  if (typeof rhBuy === 'function') {
+    const _buy = rhBuy;
+    rhBuy = function(id){
+      try {
+        const m = (typeof RH_MENU !== 'undefined') && RH_MENU.find(q => q.id === id), s = S();
+        if (m && s.cash < m.p && shownCash() >= m.p) s.cash = shownCash();   /* the local copy was stale */
+      } catch(e) {}
+      return _buy.apply(this, arguments);
+    };
+  }
+
+  /* ---------- 3. motion blur on anything moving fast past the camera ---------- */
+  if (typeof RD.vehicle === 'function') {
+    const _veh = RD.vehicle;
+    RD.vehicle = function(o, s, sx, sy, sc){
+      let rel = 0;
+      try { const G = GAME.G; if (G && o && !o.parked && G.car) rel = Math.abs((o.v || 0) - (o.lane === 1 ? -G.car.vx : G.car.vx)); } catch(e) {}
+      if (rel > 11 && GAME.save && GAME.save.set.particles !== false) {
+        const c = this.ctx, n = rel > 22 ? 3 : 2, step = Math.min(14, rel*.35)*(o.lane === 1 ? 1 : -1);
+        c.save();
+        for (let i = n; i >= 1; i--) { c.globalAlpha = .1 + .05*(n - i); _veh.call(this, o, s, sx + step*i, sy, sc); }
+        c.restore();
+      }
+      return _veh.apply(this, arguments);
+    };
+  }
+  if (typeof RD.person === 'function') {
+    const _p = RD.person;
+    RD.person = function(L, x, fy, sc, ph, walking, wave, face){
+      try {
+        const G = GAME.G, kmh = G ? Math.abs(G.car.vx)*3.6 : 0;
+        if (kmh > 55 && GAME.save && GAME.save.set.particles !== false) {
+          const c = this.ctx, step = Math.min(18, kmh*.18);
+          c.save(); c.globalAlpha = .16; _p.call(this, L, x + step, fy, sc, ph, walking, wave, face); c.restore();
+        }
+      } catch(e) {}
+      return _p.apply(this, arguments);
+    };
+  }
+
+  /* ---------- 4. Egyptian street talk ---------- */
+  const EG = {
+    greet:[['صباح الفل يا أسطى','Morning, boss'],['مساء الخير يا ريس','Evening, chief'],['يا أسطى الأجرة بكام؟','How much is the fare, boss?'],['اتفضل، وصّلني لآخر الخط','Take me to the end of the line, please']],
+    drop:[['على جنب كده لو سمحت','Pull over just here, please'],['هنا كويس يا أسطى','This spot is fine, boss'],['ورا الإشارة بس','Just past the light'],['نزّلني عند الكشك','Drop me by the kiosk']],
+    thanks:[['ربنا يكرمك يا أسطى','God bless you, boss'],['تسلم إيدك','Thanks a lot'],['يعطيك العافية','Well driven, thanks']],
+    bump:[['يا نهار أبيض! المطب ده','What a bump, my back!'],['شوية شوية على الحديد','Easy on the springs, boss'],['هدّي شوية بالله عليك','Go gentle, please']],
+    brake:[['إيه الفرملة دي؟ طيرتنا','That braking nearly launched us'],['بالراحة يا ريس، فيه ناس واقفة','Gently, chief, people are standing']],
+    honk:[['كلاكس يا أسطى، الراجل نايم','Give him the horn, he is asleep'],['يلا يا عم اتحرك','Come on, move along']]
+  };
+  try { if (typeof VOX !== 'undefined') for (const k in EG) if (VOX[k]) VOX[k] = EG[k]; } catch(e) {}
+
+  if (typeof updPeople === 'function') { const _up = updPeople; updPeople = function(G, dt){ const r = _up.apply(this, arguments); try { asideTick(G, dt); } catch(e) {} return r; }; }
+})();
+</script>
+<script>
+/* =====================================================================
+   AIR CONDITIONING · PROGRESS-BAR ICONS · CHECKPOINT STOP LINE ·
+   AN EVENING AT THE REST HOUSE
+   ===================================================================== */
+(function(){
+  if (typeof RD === 'undefined' || typeof GAME === 'undefined') return;
+  const AR = () => typeof LANG !== 'undefined' && LANG.cur === 'ar';
+  const pick = a => a[Math.floor(Math.random()*a.length)];
+  const say = (G, pair) => { try { G.bubble(AR() ? pair[0] : pair[1]); } catch(e) {} };
+
+  /* ================= 1. AIR CONDITIONING ================= */
+  /* Which vehicles actually have it: coaches, the newer minibuses and the
+     modern cars. A 1980s Fiat or an old HiAce does not. */
+  const AC_FLEET = {v_tourismo:1, coach:1, coach2:1, v_zk6128:1, citybus2:1, v_yutong77:1, v_higer:1,
+                    v_joya6:1, coaster:1, minibus_ac:1, v_isuzu:1, sedan_mid:1, hatch:1, sedan16:1, sedan_compact:1, crossover:1, exec:1, suv_big:1};
+  const hasAC = car => !!(car && car.spec && AC_FLEET[car.spec.id]);
+  /* outside air: hot desert afternoons, cool nights on the coast */
+  function outsideTemp(G){
+    const hour = ((G.clock/3600 + (G.tod0 || 8)) % 24), th = (G.world.themeAt(G.car.x) || '');
+    const sun = Math.max(0, Math.cos((hour - 14.5)/24*2*Math.PI));
+    let base = 19 + sun*15;
+    if (/desert|openDesert|giza|ring|sinai|windfarm/.test(th)) base += 6;
+    if (/coast|redsea|resort|alex|corniche/.test(th)) base -= 3;
+    if (G.weather === 'rain') base -= 5;
+    if (G.weather === 'dust') base += 2;
+    return Math.round(base*10)/10;
+  }
+  function acTick(G, dt){
+    const car = G.car; if (!car || !car.spec) return;
+    const A = G.ac = G.ac || {on:false, lvl:2, cabin:null, out:26, load:0};
+    A.out = outsideTemp(G);
+    if (A.cabin == null) A.cabin = A.out;
+    if (!hasAC(car)) { A.has = false; A.on = false; }
+    else A.has = true;
+    const pax = (G.onboard || []).length, cap = car.spec.seats || 14;
+    const vol = Math.max(8, (car.spec.L || 5)*2.2);            /* cabin size in cubic metres */
+    const doors = (Math.abs(car.vx) < .4 && G.atStop) ? 4 : 1;  /* doors open at a stop: heat pours in */
+    const air = Math.max(6, vol*1.2*1005/1000);            /* kJ per degree of cabin air */
+    const leak = (0.006 + 0.004*doors)*(1 + Math.abs(car.vx)/60);
+    const bodies = pax*0.1/air;                                 /* about 100 W of body heat each */
+    const sun = Math.max(0, (A.out - 20))*0.0008;
+    let cool = 0;
+    if (A.on && car.on) {
+      const kw = [0, 2.2, 3.6, 5.0][A.lvl] || 3.6;              /* compressor duty */
+      cool = kw*0.9/air;
+      A.load = [0, .45, .75, 1.15][A.lvl] || .75;               /* litres per hour of fuel */
+      car.fuel = Math.max(0, car.fuel - A.load*dt*(G.clockMul || 1)/3600);
+      A.drag = [0, .02, .035, .05][A.lvl] || .035;              /* a little less pull from the engine */
+    } else { A.load = 0; A.drag = 0; }
+    A.cabin += ((A.out - A.cabin)*leak + bodies + sun - cool)*dt;
+    A.cabin = Math.max(A.on ? 16 : A.out - 2, Math.min(A.out + 14, A.cabin));
+    car.ac = A.on;  car.cabinT = A.cabin;  G.tempC = A.out;
+    /* comfort: 21-26 is fine, outside that moods drift */
+    const pain = A.cabin > 28 ? (A.cabin - 28)/10 : A.cabin < 17 ? (17 - A.cabin)/10 : 0;
+    if (pain > 0) for (const p of G.onboard || []) if (p.mood != null) p.mood = Math.max(20, p.mood - pain*dt*1.6);
+    /* they ask for it when it is hot and the bus has one */
+    if (A.has && !A.on && A.cabin > 31 && pax && !(G.__acAsk > G.clock)) {
+      G.__acAsk = G.clock + 240;
+      say(G, pick([['الجو حر أوي.. شغّل التكييف يا أسطى', 'It is boiling, put the AC on, boss'],
+                   ['يا ريس التكييف لو سمحت، الدنيا نار', 'Chief, the AC please, we are melting']]));
+    }
+    if (A.has && A.on && A.cabin < 19 && pax && !(G.__acCold > G.clock)) {
+      G.__acCold = G.clock + 300;
+      say(G, [['التكييف تلج.. هوّنه شوية', 'The AC is freezing, turn it down']][0]);
+    }
+  }
+  function acToggle(){
+    const G = GAME.G, A = G && G.ac; if (!A) return;
+    if (!A.has) { try { G.feedAdd && G.feedAdd('ev_none', {}, 'info'); } catch(e) {} say(G, [['العربية دي مفيهاش تكييف أصلاً', 'This vehicle has no air conditioning']][0]); return; }
+    if (!A.on) { A.on = true; A.lvl = 2; } else if (A.lvl < 3) A.lvl++; else { A.on = false; A.lvl = 2; }
+    try { AU.ui && AU.ui('open'); } catch(e) {}
+    acPaint();
+  }
+  window.OG_acToggle = acToggle;
+  function acPaint(){
+    const b = document.getElementById('acBtn'); if (!b) return;
+    const A = GAME.G && GAME.G.ac; if (!A) return;
+    const bars = A.on ? '▮'.repeat(A.lvl) : '';
+    b.innerHTML = `<span style="font-size:1.05em">❄</span><small style="display:block;font-size:.62em;line-height:1">${A.has ? (A.on ? bars : 'off') : '—'}</small>`;
+    b.classList.toggle('am', !!A.on);
+    b.title = A.has ? `${Math.round(A.cabin)}°C / ${Math.round(A.out)}°C` : 'no AC';
+  }
+  function acMount(){
+    if (document.getElementById('acBtn')) return;
+    const tr = document.querySelector('#hud .h-tr'); if (!tr) return;
+    const b = document.createElement('button');
+    b.id = 'acBtn'; b.className = 'pn hb'; b.type = 'button';
+    b.addEventListener('click', e => { e.preventDefault(); acToggle(); });
+    b.addEventListener('touchend', e => { e.preventDefault(); acToggle(); }, {passive:false});
+    const pause = tr.querySelector('[data-a="pause"]');
+    pause ? tr.insertBefore(b, pause) : tr.appendChild(b);
+    acPaint();
+  }
+
+  /* ================= 2. PROGRESS-BAR ICONS ================= */
+  const POI_ICON = {gas:'⛽', rest:'☕', cafe:'☕', mech:'🔧', shop:'🛒', check:'🚓', event:'⚠'};
+  function poiPaint(G){
+    const line = document.querySelector('#hRoute .rt-line'); if (!line || !G.world || !G.world.len) return;
+    const W = G.world, car = G.car, len = W.len;
+    if (!line.__poi) {
+      line.__poi = {};
+      const add = (key, x, kind) => { if (x == null || x < 0 || x > len) return;
+        const d = document.createElement('i'); d.className = 'ogPoi'; d.dataset.k = kind; d.textContent = POI_ICON[kind] || '•';
+        d.style.cssText = `position:absolute;bottom:105%;transform:translateX(-50%);font-size:9px;line-height:1;opacity:.85;pointer-events:none;left:${x/len*100}%`;
+        d.__x = x; line.appendChild(d); line.__poi[key] = d; };
+      (W.fuel || []).forEach((f, i) => add('f' + i, f.x, 'gas'));
+      (W.shops || []).forEach((s, i) => add('s' + i, s.x, s.t === 'rest' || s.t === 'cafe' ? 'rest' : s.t === 'mech' ? 'mech' : 'shop'));
+    }
+    /* anything behind you is removed for good: fewer nodes, less to draw */
+    for (const k in line.__poi) { const d = line.__poi[k];
+      if (d.__x < car.x - 30) { d.remove(); delete line.__poi[k]; }
+      else if (d.__x - car.x < 900) d.style.opacity = .95; }
+    const cp = G.cp;
+    if (cp && !line.__cp) { const d = document.createElement('i'); d.className = 'ogPoi'; d.textContent = POI_ICON.check;
+      d.style.cssText = `position:absolute;bottom:105%;transform:translateX(-50%);font-size:10px;line-height:1;left:${cp.x/len*100}%`;
+      line.appendChild(d); line.__cp = d; d.__x = cp.x; }
+    if (line.__cp && line.__cp.__x < car.x - 30) { line.__cp.remove(); line.__cp = null; }
+    /* drop station dots you have already passed */
+    W.stations.forEach((st, i) => { if (st.x < car.x - 40) { const e = document.getElementById('hs' + i); if (e) e.remove(); } });
+  }
+
+  /* ================= 3. CHECKPOINT: a stop line, and no vanishing patrol car ================= */
+  function cpKeep(G){
+    const cp = G.cp; if (!cp) return;
+    const near = Math.abs(cp.x - G.car.x) < 320;
+    if (near) {
+      if (!cp.__car || G.traffic.indexOf(cp.__car) < 0) {
+        try { const p = mkSpr(G, 'poltraffic', cp.x + 7, 0, 0);
+          p.v = 0; p.v0 = 0; p.parked = true; p.lp = -.55; p.lightbar = true; p.keep = true; p.cpCar = true;
+          G.traffic.push(p); cp.__car = p; } catch(e) {}
+      }
+      if (cp.__car) { cp.__car.v = 0; cp.__car.parked = true; cp.__car.x = cp.x + 7; }
+      if (!cp.__sign) { G.props.push(cp.__sign = {x:cp.x - 1.5, t:'stopsign'}); }
+    }
+  }
+  /* paint the stop line on the tarmac, with the distance while you approach */
+  function cpDraw(G){
+    const cp = G.cp; if (!cp || cp.playerDone) return;
+    const d = cp.x - G.car.x; if (d > 160 || d < -20) return;
+    const c = RD.ctx, P = RD.PPM, W = G.world;
+    const x = RD.sx(cp.x), y = RD.sy(W.h(cp.x), 0);
+    c.save();
+    c.fillStyle = cp.wantPlayer ? 'rgba(255,60,60,.85)' : 'rgba(255,255,255,.7)';
+    c.fillRect(x - .25*P, y - .05*P, .5*P, 5.2*P);                       /* the stop line across the lane */
+    c.fillStyle = 'rgba(255,255,255,.9)'; c.font = `700 ${Math.round(.9*P)}px Cairo, system-ui`;
+    c.textAlign = 'center'; c.textBaseline = 'bottom';
+    if (cp.wantPlayer && !cp.open) c.fillText(AR() ? 'قف' : 'STOP', x, y - .3*P);
+    c.restore();
+  }
+
+  /* ================= 4. AN EVENING AT THE REST HOUSE ================= */
+  const OWNER = {
+    hello:[['اتفضل يا أسطى، الشاي على الحساب النهارده', 'Sit down, boss, tea is on me tonight'],
+           ['نوّرت الاستراحة، الطريق عامل إيه؟', 'You light the place up, how is the road?']],
+    road:[['الطريق قدامك فاضي، بس خد بالك من الكمين', 'The road ahead is clear, mind the checkpoint'],
+          ['فيه شبورة بعد الكيلو عشرين، هدّي', 'There is fog after the 20 km mark, take it easy']],
+    family:[['ربنا يبارك لك في عيالك يا أسطى', 'God bless your children, boss'],
+            ['اتكلم معاهم، الطريق طويل والكلام بيونّس', 'Give them a call, the road is long']],
+    dominoes:[['تعالى نلعب دور دومينو بسرعة', 'Come on, one quick round of dominoes']]
+  };
+  const ACTS = [
+    {id:'chat',   ic:'🗣', n:['اقعد مع صاحب الاستراحة', 'Chat with the owner'],
+     run:G => ({txt:pick(OWNER.road), fx:{rest:5}})},
+    {id:'family', ic:'📞', n:['كلّم البيت', 'Call home'],
+     run:G => ({txt:pick(OWNER.family), fx:{rest:8, mood:3}})},
+    {id:'domino', ic:'🁫', n:['دور دومينو (٢٠ ج)', 'Dominoes (EGP 20)'],
+     run:G => { const win = Math.random() < .45;
+       return {txt:win ? ['كسبت الدور وخدت ٥٠ ج', 'You win the round and take EGP 50'] : ['خسرت الدور.. المرة الجاية', 'You lose this one, next time'],
+               fx:{cash:win ? 50 : -20, rest:6}}; }},
+    {id:'shisha', ic:'💨', n:['شيشة معسّل (٦٠ ج)', 'Shisha (EGP 60)'],
+     run:G => ({txt:[['نفس عميق وارتحت خالص', 'A deep draw and you feel properly rested']][0], fx:{cash:-60, rest:20}})},
+    {id:'pray',   ic:'🕌', n:['صلّي في المسجد', 'Pray at the mosque'],
+     run:G => ({txt:[['خرجت من الصلاة وانت صافي', 'You come out calm and clear-headed']][0], fx:{rest:14, rep:.03}})},
+    {id:'tea4all',ic:'🫖', n:['شاي لكل الركاب (٣٠ ج)', 'Tea for everyone (EGP 30)'],
+     run:G => ({txt:[['الركاب دعوا لك بالسلامة', 'The passengers bless you for it']][0], fx:{cash:-30, mood:20, rep:.06}})},
+    {id:'stretch',ic:'🧘', n:['فك عضلاتك', 'Stretch your legs'],
+     run:G => ({txt:[['ظهرك ارتاح والدنيا بقت أحسن', 'Your back thanks you']][0], fx:{rest:10}})},
+    {id:'wash',   ic:'🧽', n:['غسيل سريع للعربية (٥٠ ج)', 'Quick wash (EGP 50)'],
+     run:G => ({txt:[['العربية بقت تلمع', 'The bus is gleaming']][0], fx:{cash:-50, clean:1, rep:.02}})}
+  ];
+  function applyFx(G, fx){
+    try {
+      if (fx.cash) { const s = S(); s.cash = Math.max(0, (s.cash || 0) + fx.cash); saveGame(); }
+      if (fx.rest) G.fatigue = Math.max(0, (G.fatigue || 0) - fx.rest/100);
+      if (fx.mood) ((G.rest && G.rest.outPax) || G.onboard || []).forEach(p => { if (p.mood != null) p.mood = Math.min(p.mood0 || 100, p.mood + fx.mood); });
+      if (fx.rep && S().rep != null) S().rep = Math.min(5, S().rep + fx.rep);
+      if (fx.clean && G.own && G.own.cond) { G.own.cond.glass = 100; G.own.cond.body = Math.min(100, (G.own.cond.body || 0) + 3); }
+    } catch(e) {}
+  }
+  function eveningPanel(G){
+    const scr = document.getElementById('rhScreen'); if (!scr || scr.querySelector('.rhEve')) return;
+    const box = document.createElement('div');
+    box.className = 'rhEve';
+    box.style.cssText = 'position:relative;margin:calc(var(--u)*1.1) auto 0;max-width:min(96%,calc(var(--u)*70));padding:calc(var(--u)*1.2);' +
+      'border-radius:14px;background:rgba(8,14,26,.85);border:1px solid rgba(255,182,39,.32)';
+    const list = ACTS.slice().sort(() => Math.random() - .5).slice(0, 5);
+    box.innerHTML = `<div class="rhSay" id="rhEveSay" style="margin:0 0 .6em">${AR() ? pick(OWNER.hello)[0] : pick(OWNER.hello)[1]}</div>
+      <div class="row" style="justify-content:center;gap:.45em;flex-wrap:wrap">
+        ${list.map(a => `<button class="chip" data-act="${a.id}">${a.ic} ${AR() ? a.n[0] : a.n[1]}</button>`).join('')}</div>
+      <div style="text-align:center;margin-top:.5em;color:#9fb0cc;font-size:calc(var(--u)*1.6)" id="rhEveState"></div>`;
+    const bar = scr.querySelector('.rhBar');
+    bar ? bar.parentElement.insertBefore(box, bar) : scr.appendChild(box);
+    const state = () => { const el = box.querySelector('#rhEveState'); if (!el) return;
+      const G2 = GAME.G, out = (G2.rest && G2.rest.outPax || []).length;
+      el.textContent = AR() ? `راحتك: ${Math.round(100 - (G2.fatigue || 0)*100)}% · ${out} راكب برّه` : `Rest: ${Math.round(100 - (G2.fatigue || 0)*100)}% · ${out} passengers outside`; };
+    state();
+    box.addEventListener('click', e => {
+      const b = e.target.closest('[data-act]'); if (!b) return;
+      const a = ACTS.find(q => q.id === b.dataset.act); if (!a) return;
+      const G2 = GAME.G, cost = (a.run(G2) || {});
+      if (cost.fx && cost.fx.cash < 0) { const have = (S().cash || 0); if (have + cost.fx.cash < 0) { box.querySelector('#rhEveSay').textContent = AR() ? 'الفلوس مش مكفية يا أسطى' : 'Not enough money, boss'; return; } }
+      applyFx(G2, cost.fx || {});
+      box.querySelector('#rhEveSay').textContent = AR() ? cost.txt[0] : cost.txt[1];
+      b.disabled = true; b.style.opacity = .5; state();
+      try { AU.ui && AU.ui('open'); } catch(_) {}
+    });
+  }
+  if (typeof rhOpen === 'function') { const _rh = rhOpen; rhOpen = function(G){ const r = _rh.apply(this, arguments); setTimeout(() => { try { eveningPanel(G); } catch(e) {} }, 700); return r; }; }
+
+  /* ================= hooks ================= */
+  if (typeof updateGame === 'function') {
+    const _ug = updateGame;
+    updateGame = function(G, dt, inp){
+      const out = _ug.apply(this, arguments);
+      try { acTick(G, dt); cpKeep(G); } catch(e) { if (window.OG_report) OG_report(e, 'ac/checkpoint'); }
+      return out;
+    };
+  }
+  if (typeof renderScene === 'function') {
+    const _rs = renderScene;
+    renderScene = function(G){ const out = _rs.apply(this, arguments); try { cpDraw(G || GAME.G); } catch(e) {} return out; };
+  }
+  setInterval(() => { try { if (GAME.state === 'play' && GAME.G) { acMount(); acPaint(); poiPaint(GAME.G); } } catch(e) {} }, 900);
 })();
 </script>
 <script>
