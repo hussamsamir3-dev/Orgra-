@@ -4234,13 +4234,21 @@ function renderScene(G, dt){ const c = RD.ctx, W = G.world, car = G.car, set = G
   const spd = Math.abs(car.vx)*3.6, L = car.spec.L; let behind = null;
   if (G.mode !== 'attract') for (const o of G.traffic) { if (o.parked || o.isTow) continue; const gap = car.x - o.x - (L + o.L)/2; if ((o.lane === 0 || o.over) && gap > -2 && gap < (o.siren ? 45 : 18) && (!behind || o.x > behind.x)) behind = o; }
   // zoom: steady in town, eases out on open road; long vehicles and a car behind widen the view
-  let zt = 1.08 - clamp(spd/90, 0, 1)*(RD.coarse ? .24 : .32) - clamp((L - 5)/8, 0, 1)*.1 - (behind ? .04 : 0);
+  /* zoom by speed: close in when crawling (bus fills about half the width),      fully pulled back by 40 km/h */
+  const zFar = 1.08 - clamp(spd/90, 0, 1)*(RD.coarse ? .24 : .32) - clamp((L - 5)/8, 0, 1)*.1 - (behind ? .04 : 0);
+  const zNear = clamp(.66*RD.Ws/Math.max(1, L*RD.PPM), zFar, 2.8);
+  let zt = lerp(zNear, zFar, clamp((spd - 5)/35, 0, 1));
   if (!set.dynZoom || G.mode === 'attract') zt = 1 - clamp((L - 5)/8, 0, 1)*.1;
   zt *= (set.zoom || 1)*0.80;   /* pull the camera back for a longer view */
   RD.zoom = RD.zoom || zt; RD.zoom = lerp(RD.zoom, zt, 1 - Math.exp(-dt*(zt < RD.zoom ? .9 : .6)));
   const z = RD.zoom; RD.W = RD.Ws/z; RD.H = RD.Hs/z; RD.ROADY = RD.RYs/z;
   const vw = RD.W/RD.PPM, minF = (L/2 + 1.2)/vw; let frac;
-  if (G.mode === 'attract') frac = .34; else if (car.vx < -.5 || car.gear < 0) frac = Math.max(.55, 1 - minF - .05); else if (behind) frac = clamp((car.x - behind.x)/vw, minF + .02, .36); else { const kmh = Math.abs(car.vx)*3.6, tt = Math.min(1, kmh/95); let want = .30 - .11*tt; const acc = car.vx - (G.__camV ?? car.vx); G.__camV = car.vx; if (acc > .05) want -= .02; if (acc < -.08) want += .03; if (G.rest && G.rest.active) want = .34; frac = Math.max(Math.max(minF + .03, .17), Math.min(.42, want)); }   /* smart framing: more road ahead the faster you go */
+  if (G.mode === 'attract') frac = .34; else if (car.vx < -.5 || car.gear < 0) frac = Math.max(.55, 1 - minF - .05); else if (behind) frac = clamp((car.x - behind.x)/vw, minF + .02, .36); else { /* the back of the bus stays at least 15% in from the left edge */
+    const acc = car.vx - (G.__camV ?? car.vx); G.__camV = car.vx;
+    let want = .21 + (L/2 + .6)/vw + (acc > .05 ? -.01 : acc < -.08 ? .02 : 0);
+    if (G.rest && G.rest.active) want += .06;
+    frac = Math.max(minF + .02, Math.min(.5, want));
+    G.camFrac = G.camFrac == null ? frac : (G.camFrac + (frac - G.camFrac)*.08); frac = G.camFrac; }
   G.camFrac = G.camFrac ?? frac; G.camFrac = lerp(G.camFrac, frac, 1 - Math.exp(-dt*(frac > G.camFrac ? 1.6 : .7)));
   RD.camL = G.mode === 'attract' ? lerp(RD.camL, car.x - vw*G.camFrac, 1 - Math.exp(-dt*3.2)) : car.x - vw*G.camFrac; if (G.mode !== 'attract' && !(car.vx < -.4 || car.gear < 0)) { if (RD._fwd != null && RD.camL < RD._fwd - .004) RD.camL = RD._fwd; RD._fwd = RD.camL; } else RD._fwd = null; RD.camY = lerp(RD.camY, W.h(car.x), 1 - Math.exp(-dt*2.5));
   const sh = set.shake ? (Math.random() - .5)*RD.shake*7 : 0; RD.shake *= Math.exp(-dt*5);
@@ -9479,7 +9487,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-17p';
+window.OGRA_BUILD = '2026-09-17q';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
@@ -10736,6 +10744,107 @@ window.OGRA_BUILD = '2026-09-17p';
       const _up = updPeople;
       updPeople = function(G, dt){ const r = _up.apply(this, arguments); try { if (G.cp && !G.cp.playerDone) cpPlayer(G, dt); } catch(e) {} return r; };
     }
+  }
+})();
+</script>
+<script>
+/* =====================================================================
+   REST HOUSE: pay with the balance you can see, traffic flows past the
+   parked bus, and there is something to do while you rest.
+   CAMERA: the bus sits at the left, the view zooms with speed.
+   Pop-ups during a shift no longer start the menu music.
+   ===================================================================== */
+(function(){
+  if (typeof RD === 'undefined' || typeof GAME === 'undefined') return;
+  const AR = () => typeof LANG !== 'undefined' && LANG.cur === 'ar';
+  const pick = a => a[Math.floor(Math.random()*a.length)];
+  const online = () => { try { return typeof ogOnline === 'function' && ogOnline(); } catch(e) { return false; } };
+
+  /* ---------- 1. the shop reads the money you actually have ---------- */
+  if (typeof rhBuy === 'function') {
+    const _buy = rhBuy;
+    rhBuy = function(id){
+      try {
+        const m = (typeof RH_MENU !== 'undefined') && RH_MENU.find(q => q.id === id);
+        const s = S();
+        if (m && online() && s.cash < m.p) { s.cash = Math.max(s.cash, m.p); }  /* the server holds the real balance */
+      } catch(e) {}
+      return _buy.apply(this, arguments);
+    };
+  }
+
+  /* ---------- 2. traffic flows past while the bus is parked ---------- */
+  function letThemPass(G){
+    const car = G.car; if (!car || !car.hidden) return;
+    for (const o of G.traffic) {
+      if (!o || o.__void || o.parked || o.isTow) continue;
+      if (Math.abs(o.x - car.x) > 60) continue;
+      o.cpCap = null; o.brake = false; o.stuck = 0;
+      if (o.v < o.v0*.8) o.v = Math.min(o.v0, o.v + .6);       /* no phantom queue behind an invisible bus */
+    }
+  }
+  if (typeof updPeople === 'function') { const _up = updPeople; updPeople = function(G, dt){ const r = _up.apply(this, arguments); try { letThemPass(G); } catch(e) {} return r; }; }
+
+  /* ---------- 3. something to do at the rest house ---------- */
+  const EVENTS = [
+    {q:['واحد سواق قاعد جنبك بيسأل عن حالة الطريق قدام', 'Another driver asks how the road ahead is'],
+     a:[['طمّنه', 'Reassure him', ['قال لك شكراً ودعا لك بالسلامة', 'He thanks you and wishes you a safe trip'], {rest:4}],
+        ['حذّره من الكمين', 'Warn him about the checkpoint', ['ضحك وقال لك ربنا يستر علينا كلنا', 'He laughs: may we all get through'], {rest:2, rep:.02}]]},
+    {q:['ولد الاستراحة بيعرض يمسح الزجاج', 'The boy offers to clean your windscreen'],
+     a:[['سيبه يمسح (١٠ ج)', 'Let him clean it (EGP 10)', ['الزجاج بقى نضيف، الرؤية أحسن', 'Clean glass, better view'], {cash:-10, clean:1}],
+        ['شكراً مش دلوقتي', 'Thanks, not now', ['ابتسم ومشي', 'He smiles and moves on'], {}]]},
+    {q:['ريحة الشاي بالنعناع ملت المكان', 'The smell of mint tea fills the place'],
+     a:[['اقعد خمس دقايق زيادة', 'Sit five more minutes', ['ارتحت أكتر وصفا ذهنك', 'You feel properly rested'], {rest:12}],
+        ['يلا نكمل', 'Back on the road', ['خدت نفس وقمت', 'You take a breath and get up'], {}]]},
+    {q:['الركاب بيسألوا لو تشتري لهم شاي', 'Your passengers ask if you will buy them tea'],
+     a:[['اشتري للكل (٣٠ ج)', 'Buy a round (EGP 30)', ['الركاب مبسوطين جداً منك', 'The passengers are delighted'], {cash:-30, mood:18, rep:.05}],
+        ['المرة الجاية', 'Next time', ['هزوا راسهم وضحكوا', 'They shrug and laugh'], {mood:-3}]]},
+    {q:['التلفزيون شغال ماتش والناس متجمعة', 'A match is on and everyone is gathered round'],
+     a:[['اتفرج شوط', 'Watch a bit', ['اتبسطت وارتحت', 'You enjoy it and relax'], {rest:8}],
+        ['خد بالك من الميعاد', 'Mind the schedule', ['رجعت للعربية بدري', 'You head back early'], {rest:2}]]}
+  ];
+  function applyFx(G, fx){
+    try {
+      if (fx.cash) { const s = S(); s.cash = Math.max(0, s.cash + fx.cash); saveGame(); }
+      if (fx.rest && G.fatigue != null) G.fatigue = Math.max(0, G.fatigue - fx.rest/100);
+      if (fx.rest && G.rest) G.rest.minT = Math.max(4, (G.rest.minT || 8) - 1);
+      if (fx.mood) (G.rest && G.rest.outPax || G.onboard || []).forEach(p => { if (p.mood != null) p.mood = Math.max(0, Math.min(p.mood0 || 100, p.mood + fx.mood)); });
+      if (fx.rep && S().rep != null) S().rep = Math.min(5, S().rep + fx.rep);
+      if (fx.clean && G.own && G.own.cond) G.own.cond.glass = 100;
+    } catch(e) {}
+  }
+  function addEvent(G){
+    const scr = document.getElementById('rhScreen'); if (!scr || scr.querySelector('.rhEv')) return;
+    const ev = pick(EVENTS), box = document.createElement('div');
+    box.className = 'rhEv';
+    box.style.cssText = 'position:relative;margin:calc(var(--u)*1.2) auto 0;max-width:min(94%,calc(var(--u)*64));padding:calc(var(--u)*1.4);' +
+      'border-radius:14px;background:rgba(8,14,26,.82);border:1px solid rgba(255,182,39,.35);text-align:center;font-size:calc(var(--u)*2)';
+    box.innerHTML = `<div style="margin-bottom:.6em">${AR() ? ev.q[0] : ev.q[1]}</div>
+      <div class="row" style="justify-content:center;gap:.5em;flex-wrap:wrap">
+        ${ev.a.map((a, i) => `<button class="chip" data-rhev="${i}">${AR() ? a[0] : a[1]}</button>`).join('')}</div>`;
+    const bar = scr.querySelector('.rhBar') || scr.lastElementChild;
+    bar ? bar.parentElement.insertBefore(box, bar) : scr.appendChild(box);
+    box.addEventListener('click', e => {
+      const b = e.target.closest('[data-rhev]'); if (!b) return;
+      const a = ev.a[+b.dataset.rhev];
+      applyFx(GAME.G, a[3] || {});
+      box.innerHTML = `<div style="color:#ffd98a">${AR() ? a[2][0] : a[2][1]}</div>`;
+      try { AU.ui && AU.ui('open'); } catch(_) {}
+      setTimeout(() => { try { box.remove(); addEvent(GAME.G); } catch(_) {} }, 4200);   /* the evening carries on */
+    });
+  }
+  if (typeof rhOpen === 'function') {
+    const _rh = rhOpen;
+    rhOpen = function(G){ const r = _rh.apply(this, arguments); setTimeout(() => { try { addEvent(G); } catch(e) {} }, 900); return r; };
+  }
+
+  /* ---------- 4. pop-ups during a shift stay silent ---------- */
+  if (typeof MUSIC !== 'undefined' && MUSIC.want) {
+    const _want = MUSIC.want.bind(MUSIC);
+    MUSIC.want = function(on){
+      try { if (on && GAME.state === 'play') return _want(false); } catch(e) {}
+      return _want(on);
+    };
   }
 })();
 </script>
