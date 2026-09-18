@@ -9479,7 +9479,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-17m';
+window.OGRA_BUILD = '2026-09-17n';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
@@ -10313,6 +10313,274 @@ window.OGRA_BUILD = '2026-09-17m';
         const rev = G.car.vx < -.4 || G.car.gear < 0;
 
       } catch(e) {}
+      return out;
+    };
+  }
+})();
+</script>
+<script>
+/* =====================================================================
+   1. REST STOPS: passengers get out, stretch, and climb back on
+   2. PASSENGER TALK: lines that come from what you are actually doing
+   3. RAIN: layered streaks, spray, puddles and drops on the glass
+   ===================================================================== */
+(function(){
+  if (typeof RD === 'undefined' || typeof GAME === 'undefined') return;
+  const AR = () => typeof LANG !== 'undefined' && LANG.cur === 'ar';
+  const pick = a => a[Math.floor(Math.random()*a.length)];
+  const say = (G, pair, tag) => { try { G.bubble(AR() ? pair[0] : pair[1], undefined, tag); } catch(e) {} };
+  const lim = G => { try { const s = G.world.segAt(G.car.x); return (s && s.lim) || 60; } catch(e) { return 60; } };
+  const longRoute = G => !!(G && G.route && G.route.len === 'long');
+
+  /* ================= 1. REST STOP BREAK ================= */
+  const OUT_LINES = [
+    ['هنزّل نفسّ ونرجع على طول', "We'll stretch our legs and come right back"],
+    ['هجيب لي شاي بسرعة يا أسطى', "Grabbing a quick tea, boss"],
+    ['خمس دقايق وراجعين', 'Five minutes and we are back'],
+    ['هدخل الحمام وجاي', 'Bathroom stop, back in a minute']
+  ];
+  const BACK_LINES = [
+    ['كلنا ركبنا يا أسطى، يلا بينا', 'Everyone is back on, let us go'],
+    ['تمام، نقدر نكمل', 'All set, we can carry on'],
+    ['ربنا يخليك، اتعشينا', 'Thanks for that, we ate well']
+  ];
+  const HORN_LINES = [
+    ['سامعينك يا أسطى، جايين', 'We hear you, coming!'],
+    ['ثانية واحدة وجايين', 'One second, on our way']
+  ];
+  function restSite(G){
+    const W = G.world, x = G.car.x;
+    const s = (W.shops || []).find(s => s && (s.t === 'rest' || s.t === 'cafe') && Math.abs(s.x - x) < 26);
+    if (s) return s;
+    const st = W.stops && W.stops[G.stopI];
+    if (st && Math.abs(st.x - x) < 20 && /rest|استراح/i.test(((st.n && (st.n.en + ' ' + st.n.ar)) || ''))) return {x:st.x, t:'rest'};
+    return null;
+  }
+  function startBreak(G, site){
+    const car = G.car, riders = (G.onboard || []).filter(p => !p.out);
+    if (!riders.length) return;
+    G.rest = G.rest || {}; G.rest.mine = true; G.rest.active = true; G.rest.t = 0; G.rest.site = site; G.rest.recall = false;
+    G.restPed = [];
+    riders.forEach((p, i) => {
+      p.out = true;
+      G.restPed.push({p, look:p.look, x:car.x - 1 + Math.random()*2, tgt:site.x + (Math.random() - .5)*18,
+        lane:-1.02 - Math.random()*.25, v:0, ph:Math.random()*6, face:1, st:'out', wait:6 + Math.random()*22, ph2:0});
+    });
+    try { G.feedAdd('rest_in', {}, 'info'); AU.door && AU.door('bus'); } catch(e) {}
+    say(G, pick(OUT_LINES), 'pax');
+    G.rest.minT = 18;                                     /* they need at least this long */
+  }
+  function finishBreak(G, lost){
+    const R = G.rest; if (!R) return;
+    R.active = false; R.recall = false;
+    const out = (G.onboard || []).filter(p => p.out);
+    if (lost && out.length) {
+      out.forEach(p => { const i = G.onboard.indexOf(p); if (i >= 0) G.onboard.splice(i, 1); });
+      try { G.feedAdd('rest_left', {n:out.length}, 'bad'); } catch(e) { try { G.feedAdd('tow_pax', {n:out.length}, 'bad'); } catch(_) {} }
+      say(G, [`سِبت ${out.length} راكب في الاستراحة!`, `You drove off and left ${out.length} passengers!`], 'bad');
+      if (G.rep != null) G.rep = Math.max(0, G.rep - .3);
+      G.trip && (G.trip.stars = Math.min(G.trip.stars ?? 5, 2));
+    } else {
+      out.forEach(p => { p.out = false; });
+      try { G.feedAdd('rest_back', {}, 'ok'); AU.door && AU.door('bus'); } catch(e) {}
+      say(G, pick(BACK_LINES), 'pax');
+    }
+    G.restPed = [];
+  }
+  function restBreakTick(G, dt){
+    if (!G || GAME.state !== 'play' || !longRoute(G)) return;
+    const car = G.car, R = G.rest;
+    if (!R || !R.active) {
+      if (Math.abs(car.vx) < .5 && (G.onboard || []).length && !(G.__restDone > G.clock)) {
+        const site = restSite(G);
+        if (site && !site.__broke) { site.__broke = 1; startBreak(G, site); }
+      }
+      return;
+    }
+    R.t += dt;
+    /* the driver calls them back with the horn, or they come by themselves */
+    if (!R.recall && (G.horn && R.t > R.minT || R.t > 95)) {
+      R.recall = true;
+      if (G.horn) say(G, pick(HORN_LINES), 'pax');
+      G.restPed.forEach(q => { q.st = 'back'; q.tgt = car.x + (Math.random() - .5)*2.5; });
+    }
+    let boarded = 0;
+    for (const q of G.restPed) {
+      const dx = q.tgt - q.x, dir = Math.sign(dx);
+      if (q.st === 'out' || q.st === 'back') {
+        const sp = q.st === 'back' ? 1.9 : 1.25;
+        q.v = Math.abs(dx) > .4 ? dir*sp : 0;
+        q.x += q.v*dt; q.face = q.v ? (q.v > 0 ? 1 : -1) : q.face;
+        q.ph += Math.abs(q.v)*dt*3.1;
+        if (Math.abs(dx) <= .4) {
+          if (q.st === 'back') { q.st = 'aboard'; }
+          else { q.st = 'idle'; q.v = 0; }
+        }
+      } else if (q.st === 'idle') {
+        q.wait -= dt;
+        if (q.wait <= 0) { q.tgt = R.site.x + (Math.random() - .5)*20; q.wait = 8 + Math.random()*20; q.st = 'out'; }
+      }
+      if (q.st === 'aboard') boarded++;
+    }
+    if (R.recall && boarded >= G.restPed.length) { G.__restDone = G.clock + 60; finishBreak(G, false); return; }
+    /* drove away with people still outside */
+    if (Math.abs(car.vx) > 4 && G.restPed.some(q => q.st !== 'aboard') && Math.abs(car.x - R.site.x) > 45) { G.__restDone = G.clock + 60; finishBreak(G, true); }
+  }
+  function drawRestPed(G){
+    const R = G.rest; if (!R || !R.active || !G.restPed || !G.restPed.length) return;
+    const W = G.world, vl = RD.camL - 6, vr = RD.camL + RD.W/RD.PPM + 6;
+    for (const q of G.restPed) {
+      if (q.st === 'aboard' || q.x < vl || q.x > vr) continue;
+      const d = q.lane < -.9 ? -.82 : -.6;
+      try { RD.person(q.look, RD.sx(q.x), RD.sy(W.h(q.x), d), 1 + d*.06, q.ph, Math.abs(q.v) > .05, false, q.face); } catch(e) {}
+    }
+  }
+
+  /* the older, invisible rest timer stands aside while ours is running */
+  if (typeof restTick === 'function') { const _rt2 = restTick; restTick = function(G, dt){ if (G && G.rest && G.rest.mine) return; return _rt2.apply(this, arguments); }; }
+
+  /* ================= 2. TALK THAT FOLLOWS YOUR DRIVING ================= */
+  const T = {
+    fast:      [['احنا ماشيين {kmh} والحد {lim}.. هوّن علينا', 'We are doing {kmh} in a {lim} zone, take it easy'],
+                ['يا أسطى الطريق مش سباق', 'Boss, this is not a race'],
+                ['هوّن شوية، الولاد معانا', 'Slow down a little, we have kids with us']],
+    slow:      [['إحنا متأخرين وماشيين {kmh} بس', 'We are late and only doing {kmh}'],
+                ['يلا يا أسطى الناس مستنية', 'Come on, people are waiting for us']],
+    late:      [['اتأخرنا {min} دقيقة على الميعاد', 'We are {min} minutes behind schedule'],
+                ['هلحق الشغل يا أسطى؟', 'Am I going to make it to work, boss?']],
+    rough:     [['ودّينا في المطبات دي!', 'Those bumps are killing us!'],
+                ['ظهري اتكسر من الطريق ده', 'That road just wrecked my back']],
+    braking:   [['بلاش فرامل فجأة كده', 'Please, no more sudden braking'],
+                ['كل شوية فرملة، هنقع', 'Braking every minute, we keep falling forward']],
+    smooth:    [['سواقتك حلوة والله', 'You drive smoothly, respect'],
+                ['مرتاحين معاك يا أسطى', 'Comfortable ride, boss']],
+    rain:      [['المطرة دي مش بسيطة، خد بالك', 'This rain is heavy, be careful'],
+                ['الطريق زلق.. براحة', 'The road is slippery, go gently']],
+    dust:      [['الرملة مغطية الدنيا', 'The dust is covering everything'],
+                ['مش شايفين حاجة قدامنا', 'We can barely see ahead']],
+    hot:       [['الجو حر.. شغّل التكييف لو سمحت', 'It is hot, could you turn on the air conditioning'],
+                ['نفتح الشباك يا أسطى؟', 'Can we open a window, boss?']],
+    crowded:   [['العربية مليانة أوي', 'The bus is packed'],
+                ['مفيش مكان نتنفس فيه', 'There is no room to breathe']],
+    fare:      [['الأجرة {fare} ج؟ غالية شوية', 'The fare is EGP {fare}? A bit steep'],
+                ['خد الأجرة يا أسطى، {fare} ج', 'Here is the fare, boss, EGP {fare}']],
+    nearly:    [['فاضل {km} كيلو بس', 'Only {km} km to go'],
+                ['قربنا الحمد لله', 'Almost there, thankfully']],
+    night:     [['الطريق ضلمة، خلي بالك', 'It is dark out, take care'],
+                ['نوّر شوية يا أسطى', 'Use your lights, boss']],
+    fuel:      [['البنزين على الآخر.. هنقف؟', 'The fuel is nearly out, are we stopping?']],
+    jam:       [['الزحمة دي مش هتخلص', 'This traffic is never going to clear']],
+    good:      [['ربنا يخليك يا أسطى', 'God bless you, boss'],
+                ['أحسن سواق ركبت معاه', 'The best driver I have ridden with']]
+  };
+  function talkTick(G, dt){
+    if (GAME.state !== 'play' || G.mode === 'attract' || !(G.onboard || []).length) return;
+    if (G.rest && G.rest.active) return;
+    G.__talkT = (G.__talkT || 0) - dt;
+    if (G.__talkT > 0) return;
+    const car = G.car, kmh = Math.abs(car.vx)*3.6, L = lim(G), pool = [];
+    const add = (k, w, v) => { if (w > 0) pool.push({k, w, v:v || {}}); };
+    const cap = (typeof capacity === 'function') ? capacity(car) : 14;
+    const load = (G.onboard.length)/Math.max(1, cap);
+    const km = G.world.len < Infinity ? Math.max(0, (G.world.len - car.x)*(G.scale || 1)/1000) : null;
+    const late = G.schedLate != null ? G.schedLate : (G.trip && G.trip.late) || 0;
+    const rough = G.__rough || 0, brakes = G.__brakes || 0;
+    add('fast', kmh > L + 12 ? 3 : 0, {kmh:Math.round(kmh), lim:L});
+    add('slow', kmh > 1 && kmh < L*.45 && !G.jamNear ? 1.5 : 0, {kmh:Math.round(kmh)});
+    add('late', late > 120 ? 2 : 0, {min:Math.round(late/60)});
+    add('rough', rough > 2.2 ? 2.5 : 0);
+    add('braking', brakes >= 3 ? 2.5 : 0);
+    add('rain', G.weather === 'rain' ? 1.6 : 0);
+    add('dust', G.weather === 'dust' || G.weather === 'fog' ? 1.4 : 0);
+    add('hot', (G.tempC || 0) > 33 && !car.ac ? 1.2 : 0);
+    add('crowded', load > .92 ? 1.4 : 0);
+    add('nearly', km != null && km < 6 ? 1.2 : 0, {km:Math.max(1, Math.round(km))});
+    add('night', RD.night > .7 && !car.lights ? 1.4 : 0);
+    add('fuel', (car.fuel != null && car.E && car.E.tank && car.fuel/car.E.tank < .12) ? 1.6 : 0);
+    add('jam', (G.traffic || []).filter(o => o && !o.parked && o.x > car.x && o.x < car.x + 120 && o.v < 3).length >= 4 ? 1.5 : 0);
+    const calm = rough < .8 && brakes === 0 && kmh <= L + 4 && kmh > L*.5;
+    add('smooth', calm ? 1.2 : 0);
+    add('good', calm && (G.trip && (G.trip.overtakes || 0) >= 0) && Math.random() < .4 ? .6 : 0);
+    if (!pool.length) { G.__talkT = 12; return; }
+    let tot = pool.reduce((s, o) => s + o.w, 0), r = Math.random()*tot, chosen = pool[0];
+    for (const o of pool) { r -= o.w; if (r <= 0) { chosen = o; break; } }
+    const line = pick(T[chosen.k]);
+    const fill = s => s.replace(/\{(\w+)\}/g, (m, k) => chosen.v[k] != null ? chosen.v[k] : m);
+    say(G, [fill(line[0]), fill(line[1])], 'pax');
+    G.__brakes = 0; G.__rough *= .3;
+    G.__talkT = 26 + Math.random()*34;                       /* never chatty enough to annoy */
+  }
+  /* measure how rough the ride actually is */
+  function comfortTick(G, dt){
+    const car = G.car; if (!car) return;
+    const j = Math.abs((car.vx - (G.__lastVx ?? car.vx))/Math.max(.001, dt));
+    G.__lastVx = car.vx;
+    G.__rough = (G.__rough || 0)*Math.exp(-dt*.25) + (j > 6 ? (j - 6)*dt*.6 : 0) + (Math.abs(car.vy || 0) > 1.4 ? dt : 0);
+    if (car.brk > .8 && Math.abs(car.vx)*3.6 > 25 && !(G.__bt > G.clock)) { G.__bt = G.clock + 1.2; G.__brakes = (G.__brakes || 0) + 1; }
+  }
+
+  /* ================= 3. RAIN ================= */
+  const drops = []; let wiper = 0, wiperT = 6;
+  function rainFX(G){
+    const wx = RD.wx != null ? RD.wx : 1, heavy = (G.weather === 'rain') ? wx : 0;
+    if (heavy < .06) { if (drops.length) drops.length = 0; return; }
+    const c = RD.ctx, cv = c.canvas, W = cv.width, H = cv.height, dpr = W/Math.max(1, RD.Ws || W);
+    const t = performance.now()/1000, spd = Math.min(1, Math.abs(G.car.vx)/28);
+    c.save(); c.setTransform(1, 0, 0, 1, 0, 0);
+    /* three depths of rain, leaning with speed */
+    for (let l = 0; l < 3; l++) {
+      const n = Math.round((l === 0 ? 34 : l === 1 ? 26 : 18)*heavy*(W/1200)), len = (14 + l*16)*dpr,
+            slant = (0.22 + spd*.9 + l*.05), sp = (900 + l*700)*dpr;
+      c.strokeStyle = `rgba(200,220,245,${(.10 + l*.07)*heavy})`; c.lineWidth = (l < 2 ? 1 : 1.6)*dpr;
+      c.beginPath();
+      for (let i = 0; i < n; i++) {
+        const seed = i*97.3 + l*31.7;
+        const x = ((seed*53 + t*sp*(.6 + l*.2)*slant) % (W + 300)) - 150;
+        const y = ((seed*29 + t*sp) % (H + 200)) - 100;
+        c.moveTo(x, y); c.lineTo(x - len*slant, y + len);
+      }
+      c.stroke();
+    }
+    /* spray kicked up off the tarmac */
+    const road = (RD.ROADY || H*.6)*dpr*(RD.zoom ? 1/RD.zoom : 1);
+    const g = c.createLinearGradient(0, road - 40*dpr, 0, road + 30*dpr);
+    g.addColorStop(0, `rgba(190,205,225,0)`); g.addColorStop(.5, `rgba(190,205,225,${.10*heavy*(.3 + spd)})`); g.addColorStop(1, 'rgba(190,205,225,0)');
+    c.fillStyle = g; c.fillRect(0, road - 40*dpr, W, 70*dpr);
+    /* drops sitting on the glass, wiped now and then */
+    if (drops.length < 46*heavy) drops.push({x:Math.random()*W, y:Math.random()*H*.75, r:(1.6 + Math.random()*3.4)*dpr, v:0, born:t});
+    wiperT -= 1/60;
+    if (wiperT <= 0) { wiper = 1; wiperT = 5 + Math.random()*5; }
+    if (wiper > 0) { wiper -= .022; const wx2 = (1 - wiper)*W*1.25 - W*.12;
+      c.save(); c.globalCompositeOperation = 'destination-out'; c.restore();
+      for (let i = drops.length - 1; i >= 0; i--) if (drops[i].x < wx2) drops.splice(i, 1);
+      c.strokeStyle = `rgba(255,255,255,${.05*heavy})`; c.lineWidth = 8*dpr;
+      c.beginPath(); c.moveTo(wx2, 0); c.lineTo(wx2 - 30*dpr, H); c.stroke();
+    }
+    for (const d of drops) {
+      d.v += .012; d.y += d.v*dpr*(.5 + spd);
+      if (d.y > H) { d.y = -5; d.x = Math.random()*W; d.v = 0; }
+      c.fillStyle = `rgba(215,230,250,${.18*heavy})`;
+      c.beginPath(); c.ellipse(d.x, d.y, d.r*.8, d.r, 0, 0, 6.28); c.fill();
+      c.strokeStyle = `rgba(255,255,255,${.12*heavy})`; c.lineWidth = dpr*.6;
+      c.beginPath(); c.arc(d.x - d.r*.25, d.y - d.r*.3, d.r*.45, 3.4, 5.2); c.stroke();
+    }
+    c.restore();
+  }
+
+  /* ================= hooks ================= */
+  if (typeof updateGame === 'function') {
+    const _ug = updateGame;
+    updateGame = function(G, dt, inp){
+      const out = _ug.apply(this, arguments);
+      try { comfortTick(G, dt); restBreakTick(G, dt); talkTick(G, dt); } catch(e) { if (window.OG_report) OG_report(e, 'rest/talk'); }
+      return out;
+    };
+  }
+  if (typeof renderScene === 'function') {
+    const _rs = renderScene;
+    renderScene = function(G){
+      const out = _rs.apply(this, arguments);
+      try { const g = G || GAME.G; if (g && GAME.state === 'play') { drawRestPed(g); rainFX(g); } } catch(e) {}
       return out;
     };
   }
