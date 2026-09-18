@@ -9163,7 +9163,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
   RD.drawO2Frontage = function(world, blds){
     if (!ok(PANO)) return false;
     const c = this.ctx, P = this.PPM, S = seqFor(world), k = S.k, em = this._o2em = [];
-    const SL = RD.mirror ? 1e9 : 3;                         /* metres per slice so the row follows the road grade */
+    const SL = RD.mirror ? 1e9 : 6;                         /* metres per slice: half the draw calls, same look */
     for (const b of blds) {
       const bx0 = b.x, bx1 = b.x + b.w; seqCover(S, bx1 + 2);
       for (const seg of S.list) {
@@ -9185,7 +9185,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
   /* replace the procedural facades on old-city streets with the Ogra II frontage */
   const _dnb = RD.drawNearBack;
   RD.drawNearBack = function(world){
-    const all = world.bld, vl = this.camL - 60, vr = this.camL + this.W/this.PPM + 60, mine = [], rest = [];
+    const all = world.bld, vl = this.camL - 25, vr = this.camL + this.W/this.PPM + 30, mine = [], rest = [];
     for (const b of all) { if (b.x + b.w >= vl && b.x <= vr && usePano(b)) mine.push(b); else rest.push(b); }
     if (mine.length && ok(PANO)) {
       /* the distant mid-rise layer shows through the frontage's sky, soften it */
@@ -9488,7 +9488,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-18f';
+window.OGRA_BUILD = '2026-09-18h';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
@@ -10192,8 +10192,8 @@ window.OGRA_BUILD = '2026-09-18f';
     const raw = W.h.bind(W); let lastGood = 0;
     W.h = function(x){
       if (!fin(x)) return lastGood;
-      const a = raw(x - 6), b = raw(x), c = raw(x + 6), a2 = raw(x - 2.5), c2 = raw(x + 2.5);
-      let v = fin(a) && fin(c) && fin(a2) && fin(c2) ? (a + 2*a2 + 4*b + 2*c2 + c)/10 : b;          /* soften the step at segment joins */
+      const a = raw(x - 1.1), b = raw(x), c = raw(x + 1.1), a2 = b, c2 = b;
+      let v = b;                                     /* pass-through: shaping happens in one place */          /* soften the step at segment joins */
       if (!fin(v)) return lastGood;
       lastGood = v; return v;
     };
@@ -11612,7 +11612,7 @@ window.OGRA_BUILD = '2026-09-18f';
           const raw = W.h.bind(W); let last = 0;
           W.h = function(x, lane){
             if (!Number.isFinite(x)) return last;
-            const s = [-12, -6, -2.5, 0, 2.5, 6, 12], w = [.5, 1, 2, 3, 2, 1, .5];
+            const s = [0], w = [1];                        /* pass-through: one smoothing stage is enough */
             let sum = 0, tot = 0;
             for (let i = 0; i < s.length; i++) { const v = raw(x + s[i], lane); if (Number.isFinite(v)) { sum += v*w[i]; tot += w[i]; } }
             const out = tot ? sum/tot : raw(x, lane);
@@ -12212,6 +12212,108 @@ window.OGRA_BUILD = '2026-09-18f';
   if (typeof renderScene === 'function') {
     const _rs2 = renderScene;
     renderScene = function(){ window.OG_blurBudget = coarse ? 0 : 5; return _rs2.apply(this, arguments); };
+  }
+})();
+</script>
+<script>
+/* =====================================================================
+   REAL WEAR (so the workshop has something to fix) + SMOOTHER AT SPEED
+   ===================================================================== */
+(function(){
+  if (typeof GAME === 'undefined') return;
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+  /* ---------- wear and damage that the mechanic can see ---------- */
+  function wear(G, dt){
+    const car = G.car, own = G.own; if (!car || !own || !own.cond) return;
+    const c = own.cond, kmh = Math.abs(car.vx)*3.6;
+    /* a knock: a sudden loss of speed that is not braking */
+    const dv = (G.__wv == null ? car.vx : G.__wv) - car.vx; G.__wv = car.vx;
+    if (dv > 2.2 && car.brk < .4) {
+      const hit = clamp(dv*2.2, 2, 18);
+      c.body = clamp((c.body ?? 100) - hit, 0, 100);
+      c.susp = clamp((c.susp ?? 100) - hit*.35, 0, 100);
+      if (Math.random() < .3) c.tires = clamp((c.tires ?? 100) - hit*.3, 0, 100);
+      G.__wearMsg = true;
+    }
+    /* ordinary use: potholes, braking, revs, heat */
+    if (kmh > 3) {
+      const rough = Math.min(2, G.__rough || 0);
+      c.susp = clamp((c.susp ?? 100) - dt*(0.004 + rough*0.01), 0, 100);
+      c.tires = clamp((c.tires ?? 100) - dt*(0.003 + kmh/9000), 0, 100);
+      if (car.brk > .5) c.brakes = clamp((c.brakes ?? 100) - dt*(0.012 + kmh/6000), 0, 100);
+      const rpmN = car.rpm && car.E && car.E.rpmMax ? car.rpm/car.E.rpmMax : 0;
+      if (rpmN > .92 || (car.heat || 0) > 105) c.engine = clamp((c.engine ?? 100) - dt*0.03, 0, 100);
+      c.gearbox = clamp((c.gearbox ?? 100) - dt*0.0015, 0, 100);
+      c.body = clamp((c.body ?? 100) - dt*0.0008, 0, 100);
+    }
+  }
+  if (typeof updateGame === 'function') {
+    const _ug = updateGame;
+    updateGame = function(G, dt, inp){ const out = _ug.apply(this, arguments); try { wear(G, dt); } catch(e) {} return out; };
+  }
+  /* tell the driver when a knock has done damage */
+  setInterval(() => {
+    try { const G = GAME.G; if (G && G.__wearMsg) { G.__wearMsg = false;
+      G.feedAdd && G.feedAdd('dmg_hit', {}, 'bad'); } } catch(e) {}
+  }, 900);
+})();
+</script>
+<script>
+/* =====================================================================
+   BUMPS YOU CAN FEEL · STEADY FUEL WINDOW · WALKERS FACING THE RIGHT WAY
+   ===================================================================== */
+(function(){
+  if (typeof GAME === 'undefined') return;
+
+  /* ---------- 1. keep the humps, kill the steps ----------
+     The wide smoothing that removed the toll-gate steps was also flattening
+     the road humps. Now the road is barely smoothed, and only a genuine step
+     (a big change over a short distance) gets blended away. */
+  function reshape(W){
+    if (!W || W.__hFeel) return;
+    const base = W.__rawH || W.h.bind(W);
+    W.__rawH = base;
+    W.h = function(x, lane){
+      if (lane !== undefined) return base(x, lane);
+      if (!Number.isFinite(x)) return 0;
+      const a = base(x - 0.55), b = base(x), c = base(x + 0.55);
+      if (!Number.isFinite(b)) return 0;
+      let v = (Number.isFinite(a) && Number.isFinite(c)) ? (a + 4*b + c)/6 : b;
+      const far = base(x + 6), near = base(x - 6);
+      if (Number.isFinite(far) && Number.isFinite(near) && Math.abs(far - near) > 1.4) {
+        v = (v + (far + near)/2)/2;                       /* only a real step gets ironed out */
+      }
+      return Number.isFinite(v) ? v : b;
+    };
+    W.__hFeel = true;
+  }
+  if (typeof newSession === 'function') { const _ns = newSession; newSession = function(){ const G = _ns.apply(this, arguments); try { reshape(G.world); } catch(e) {} return G; }; }
+  setInterval(() => { try { reshape(GAME.G && GAME.G.world); } catch(e) {} }, 1500);
+
+  /* ---------- 2. the fuel window stops jiggling ---------- */
+  document.head.insertAdjacentHTML('beforeend', `<style>
+    #modal > .pn{min-width:min(92vw, 520px)}
+    #modal .num, #modal .svcrow span, #modal .lbl{font-variant-numeric:tabular-nums}
+    #modal .svcrow{min-height:2.6em}
+  </style>`);
+
+  /* ---------- 3. pedestrians face the way they walk, and keep walking ---------- */
+  if (typeof updPeople === 'function') {
+    const _up = updPeople;
+    updPeople = function(G, dt){
+      const r = _up.apply(this, arguments);
+      try {
+        for (const p of G.walkers || []) {
+          if (!p) continue;
+          if (p.v) p.face = p.v > 0 ? 1 : -1;              /* never moonwalk */
+          p.walk = Math.abs(p.v || 0) > .05;
+          if (p.walk) p.ph = (p.ph || 0) + dt*6.2;         /* the legs keep time with the feet */
+        }
+        for (const p of G.peds || []) { if (p && p.walk && p.walkTo != null) p.face = (p.walkTo - p.x) >= 0 ? 1 : -1; }
+      } catch(e) {}
+      return r;
+    };
   }
 })();
 </script>
