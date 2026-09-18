@@ -4242,7 +4242,7 @@ function renderScene(G, dt){ const c = RD.ctx, W = G.world, car = G.car, set = G
   const vw = RD.W/RD.PPM, minF = (L/2 + 1.2)/vw; let frac;
   if (G.mode === 'attract') frac = .34; else if (car.vx < -.5 || car.gear < 0) frac = Math.max(.55, 1 - minF - .05); else if (behind) frac = clamp((car.x - behind.x)/vw, minF + .02, .36); else frac = Math.max(0.12, minF*0.9);   /* vehicle rides nearer the left edge */
   G.camFrac = G.camFrac ?? frac; G.camFrac = lerp(G.camFrac, frac, 1 - Math.exp(-dt*(frac > G.camFrac ? 1.6 : .7)));
-  RD.camL = G.mode === 'attract' ? lerp(RD.camL, car.x - vw*G.camFrac, 1 - Math.exp(-dt*3.2)) : car.x - vw*G.camFrac; RD.camY = lerp(RD.camY, W.h(car.x), 1 - Math.exp(-dt*2.5));
+  RD.camL = G.mode === 'attract' ? lerp(RD.camL, car.x - vw*G.camFrac, 1 - Math.exp(-dt*3.2)) : car.x - vw*G.camFrac; if (G.mode !== 'attract' && !(car.vx < -.4 || car.gear < 0)) { if (RD._fwd != null && RD.camL < RD._fwd - .004) RD.camL = RD._fwd; RD._fwd = RD.camL; } else RD._fwd = null; RD.camY = lerp(RD.camY, W.h(car.x), 1 - Math.exp(-dt*2.5));
   const sh = set.shake ? (Math.random() - .5)*RD.shake*7 : 0; RD.shake *= Math.exp(-dt*5);
   RD.mirror = !!set.mirror; c.setTransform((RD.mirror ? -1 : 1)*DPR*z, 0, 0, DPR*z, RD.mirror ? RD.Ws*DPR : 0, sh*DPR); c.clearRect(-20, -40, RD.W + 40, RD.H + 80);
   RD.drawSky(W); RD.drawClouds2(W, G); RD.drawFar(W); RD.drawMid(W); RD.drawMist(W, G); RD.drawNearBack(W); RD.drawRoad(W, G); RD.drawProps(W, G); RD.drawEnvProps(W, G); RD.drawSites(W, G); RD.drawShops(W, G); RD.drawFestive(W, G);
@@ -9479,7 +9479,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-17k';
+window.OGRA_BUILD = '2026-09-17m';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
@@ -9902,10 +9902,27 @@ window.OGRA_BUILD = '2026-09-17k';
     if (!im) { im = IMG[name] = new Image(); im.decoding = 'async'; im.src = 'assets/bg_' + name + '.webp'; }
     return im.complete && im.naturalWidth ? im : null;
   };
+  const NIGHT = {};
+  function nightCopy(name, im){
+    let c = NIGHT[name];
+    if (c === undefined) {
+      try {
+        c = document.createElement('canvas'); c.width = im.naturalWidth; c.height = im.naturalHeight;
+        const x = c.getContext('2d'); if (!x) throw 0;
+        x.drawImage(im, 0, 0);
+        x.globalCompositeOperation = 'source-atop';
+        x.fillStyle = 'rgba(6,12,28,.62)'; x.fillRect(0, 0, c.width, c.height);   /* dusk wash over the skyline only */
+        x.fillStyle = 'rgba(40,60,110,.18)'; x.fillRect(0, 0, c.width, c.height);
+      } catch(e) { c = null; }
+      NIGHT[name] = c;
+    }
+    return c;
+  }
   const preload = world => { try { (world.segs || []).forEach(s => { const n = MAP[s.theme]; if (n) get(n); }); } catch(e) {} };
 
   function drawLoop(c, name, theme, alpha){
-    const im = get(name); if (!im || alpha <= .01) return false;
+    let im = get(name); if (!im || alpha <= .01) return false;
+    if (RD.night > .25) im = nightCopy(name, im) || im;
     const P = RD.PPM, H = RD.H || innerHeight;
     const k = Math.max(.8, Math.min(2.1, Math.max(78, Math.min(200, H*.25))/MEDIAN));
     const sw = LOOPS[name][0]*k, sh = LOOPS[name][1]*k;
@@ -10119,6 +10136,185 @@ window.OGRA_BUILD = '2026-09-17k';
     if (typeof window[fn] === 'function' || typeof eval(fn) === 'function') {
       try { const orig = eval(fn); eval(fn + ' = function(G){ try { return orig.apply(this, arguments); } catch(e) { try { clean(G); } catch(_) {} try { (window.OG_report||function(){})(e, "' + fn + '"); } catch(_) {} } }'); } catch(e) {}
     }
+  }
+})();
+</script>
+<script>
+/* =====================================================================
+   DRIVING AND CROWD TUNING  (+ a firewall against broken numbers)
+   ===================================================================== */
+(function(){
+  const fin = v => typeof v === 'number' && Number.isFinite(v);
+  const AR = () => typeof LANG !== 'undefined' && LANG.cur === 'ar';
+
+  /* ---------- 1. never let a broken number stop the game ----------
+     A single NaN used to spread from the road height into the car, the
+     sound and the drawing, which froze the picture with "non-finite value". */
+  try {
+    const AP = window.AudioParam && AudioParam.prototype;
+    if (AP && !AP.__ogGuard) {
+      for (const m of ['setValueAtTime','setTargetAtTime','linearRampToValueAtTime','exponentialRampToValueAtTime']) {
+        const o = AP[m]; if (!o) continue;
+        AP[m] = function(v, t, c){ if (!fin(v) || !fin(t) || (c !== undefined && !fin(c))) return this; if (m[0] === 'e' && v <= 0) v = 1e-4; try { return o.apply(this, arguments); } catch(e) { return this; } };
+      }
+      const d = Object.getOwnPropertyDescriptor(AP, 'value');
+      if (d && d.set) Object.defineProperty(AP, 'value', {get:d.get, set(v){ if (fin(v)) d.set.call(this, v); }, configurable:true});
+      AP.__ogGuard = true;
+    }
+  } catch(e) {}
+
+  const CARN = ['x','y','vx','vy','a','w','lane','lp','laneT','thr','brk','rpm','heat','fuel','s0'];
+  function repair(G){
+    if (!G || !G.car) return false;
+    const c = G.car; let bad = false;
+    for (const k of CARN) if (k in c && !fin(c[k])) { bad = true; c[k] = (k === 'x') ? (fin(G.lastGoodX) ? G.lastGoodX : 0) : (k === 'y') ? (G.world ? G.world.h(fin(G.lastGoodX) ? G.lastGoodX : 0) : 0) : 0; }
+    if (bad) {
+      try { c.vx = 0; c.vy = 0; (c.axles || []).forEach(ax => { for (const k of ['wx','wy','yw','om','wa','cp','comp','vyw']) if (!fin(ax[k])) ax[k] = 0; });
+        if (typeof snapCam === 'function') snapCam(G); } catch(e) {}
+      if (window.OG_report) OG_report({message:'a road value went out of range and was repaired'}, 'auto-repair');
+    }
+    if (!fin(G.towTo)) G.towTo = null;
+    return bad;
+  }
+
+  /* smooth, sane ground: no sudden steps, no NaN */
+  function guardWorld(W){
+    if (!W || W.__ogH) return W;
+    const raw = W.h.bind(W); let lastGood = 0;
+    W.h = function(x){
+      if (!fin(x)) return lastGood;
+      const a = raw(x - 2.4), b = raw(x), c = raw(x + 2.4);
+      let v = fin(a) && fin(c) ? (a + 2*b + c)/4 : b;          /* soften the step at segment joins */
+      if (!fin(v)) return lastGood;
+      lastGood = v; return v;
+    };
+    W.__ogH = true; return W;
+  }
+  if (typeof newSession === 'function') { const _ns = newSession; newSession = function(){ const G = _ns.apply(this, arguments); try { guardWorld(G.world); } catch(e) {} return G; }; }
+  try { if (GAME.G) guardWorld(GAME.G.world); } catch(e) {}
+
+  /* ---------- 2. traffic that keeps to the speed limit ---------- */
+  const limAt = (G, x) => { try { const s = G.world.segAt(x); return (s && s.lim) || 60; } catch(e) { return 60; } };
+  if (typeof mkAI === 'function') {
+    const _mk = mkAI;
+    mkAI = function(G, type, x, lane, v){
+      const o = _mk.apply(this, arguments);
+      try {
+        if (o && !o.__void && !o.parked && !o.isTow && !o.broke) {
+          const lim = limAt(G, o.x), ms = lim/3.6, fast = lim >= 90;
+          if (fast && (type === 'donkey' || type === 'tuktuk' || type === 'tram' || type === 'cart')) { o.__void = true; o.x = -1e9; o.parked = true; return o; }
+          if (o.v0 > .5 && !o.jamV) {
+            const share = type === 'truck' ? .88 : type === 'bus' || type === 'coach' ? .95 : 1;
+            o.v0 = ms*share*(.95 + Math.random()*.12);        /* everyone cruises near the limit */
+            if (!fin(o.v) || o.v < ms*.5) o.v = o.v0*(.9 + Math.random()*.1);
+          }
+        }
+      } catch(e) {}
+      return o;
+    };
+  }
+  /* nobody crawls in front of you on an open road */
+  function trafficTick(G, dt){
+    const lim = limAt(G, G.car.x), ms = lim/3.6;
+    if (lim < 90) return;
+    for (const o of G.traffic) {
+      if (!o || o.__void || o.parked || o.isTow || o.broke || o.dead) continue;
+      if (o.x > G.car.x && o.v0 < ms*.85) o.v0 = ms*(.9 + Math.random()*.1);
+    }
+  }
+
+  /* ---------- 3. no one walks along a motorway ---------- */
+  if (typeof updPeople === 'function') {
+    const _up = updPeople;
+    updPeople = function(G, dt){
+      _up.apply(this, arguments);
+      try {
+        if (limAt(G, G.car.x) >= 80) { if (G.walkers && G.walkers.length) G.walkers.length = 0; }
+        trafficTick(G, dt);
+      } catch(e) {}
+    };
+  }
+
+  /* ---------- 4. rain: quieter and muffled ---------- */
+  if (typeof AU !== 'undefined' && AU.roadTick) {
+    const _rt = AU.roadTick;
+    AU.roadTick = function(v, surf, slip, wet, rain, inside){
+      const r = _rt.call(this, v, surf, slip, wet, (rain || 0)*.4, inside);
+      try { const rd = this.road, t = this.ctx && this.ctx.currentTime;
+        if (rd && t != null) { if (rd.rhp) rd.rhp.frequency.setTargetAtTime(inside ? 160 : 260, t, .8);
+          if (rd.rlp) rd.rlp.frequency.setTargetAtTime(inside ? 900 : 1500, t, .8); } } catch(e) {}
+      return r;
+    };
+  }
+
+  /* ---------- 5. calmer passengers ---------- */
+  function moodTick(G, dt){
+    for (const p of G.onboard || []) {
+      if (p.mood == null) continue;
+      if (p.mood0 == null) p.mood0 = Math.max(p.mood, p.mood > 3 ? 100 : 1);
+      const big = p.mood0 > 3;                                  /* moods are kept either 0-1 or 0-100 */
+      p.mood = Math.min(p.mood0, p.mood + dt*(big ? 2.2 : .035));   /* they forgive a bump after a while */
+      const floor = big ? 35 : .35;
+      if (p.mood < floor) p.mood = floor;                       /* nobody turns furious over one mistake */
+    }
+  }
+
+  /* ---------- 6. long trips: they stay until the end, and ask for a rest stop ---------- */
+  const REST_ASK = [
+    ['يا أسطى ممكن نقف عند أول استراحة؟', 'Boss, can we stop at the next rest house?'],
+    ['ريحنا شوية في الاستراحة الجاية لو سمحت', 'Give us a short break at the next stop, please'],
+    ['محتاجين نقف نشرب شاي يا ريس', 'We could use a tea stop, chief'],
+    ['الاستراحة قربت.. نقف خمس دقايق؟', 'The rest house is close — five minutes?'],
+    ['عايزين ندخل الحمام يا أسطى', 'We need a bathroom break, boss']
+  ];
+  function restAsk(G, dt){
+    const R = G.route; if (!R || R.len !== 'long' || !(G.onboard || []).length) return;
+    const car = G.car, W = G.world;
+    const site = (W.shops || []).concat(W.rest || []).find(s => s && (s.t === 'rest' || s.t === 'cafe') && s.x > car.x + 120 && s.x < car.x + 900);
+    if (!site) return;
+    if (G.__restAsk && G.clock - G.__restAsk < 420) return;
+    if (site.__asked) return;
+    site.__asked = true; G.__restAsk = G.clock;
+    const l = REST_ASK[Math.floor(Math.random()*REST_ASK.length)];
+    try { G.bubble(AR() ? l[0] : l[1]); if (AU.ding) AU.ding(); } catch(e) {}
+  }
+  if (typeof alight === 'function') {
+    const _al = alight;
+    alight = function(G, p, mid){
+      try { if (mid && G.route && G.route.len === 'long' && Math.random() > .05) return; } catch(e) {}   /* almost nobody gets out mid-desert */
+      return _al.apply(this, arguments);
+    };
+  }
+
+  /* ---------- 7. camera: more road ahead, and it never slides backwards ---------- */
+  let lastCam = null;
+  if (typeof renderScene === 'function') {
+    const _rs = renderScene;
+    renderScene = function(G){
+      try {
+        const g = G || GAME.G;
+        if (g && g.mode !== 'attract' && g.car) {
+          const kmh = Math.abs(g.car.vx)*3.6, rev = g.car.vx < -.4 || g.car.gear < 0;
+          if (!rev && kmh > 25 && fin(g.camFrac)) g.camFrac = Math.max(.08, g.camFrac*(1 - Math.min(.28, (kmh - 25)/300)));
+        }
+      } catch(e) {}
+      const out = _rs.apply(this, arguments);
+      return out;
+    };
+  }
+  if (typeof updateGame === 'function') {
+    const _ug = updateGame;
+    updateGame = function(G, dt, inp){
+      const out = _ug.apply(this, arguments);
+      try { repair(G); moodTick(G, dt); restAsk(G, dt);
+        if (limAt(G, G.car.x) >= 80 && G.walkers && G.walkers.length) G.walkers.length = 0;
+        trafficTick(G, dt);
+        if (G && G.car && fin(G.car.x)) G.lastGoodX = G.car.x;
+        const rev = G.car.vx < -.4 || G.car.gear < 0;
+
+      } catch(e) {}
+      return out;
+    };
   }
 })();
 </script>
