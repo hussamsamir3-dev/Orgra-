@@ -4214,7 +4214,7 @@ function bindUI(){ const del = (root) => root.addEventListener('click', e => { c
 
 /* =================== RENDER =================== */
 let DPR = 1;
-function resize(){ const q = GAME.save && GAME.save.set.q === 'low'; DPR = q ? 1 : Math.min(2, devicePixelRatio || 1); const cv = RD.cv; RD.Ws = innerWidth; RD.Hs = innerHeight; cv.width = Math.round(RD.Ws*DPR); cv.height = Math.round(RD.Hs*DPR); RD.DPR = DPR;
+function resize(){ const q = GAME.save && GAME.save.set.q === 'low'; DPR = q ? 1 : Math.min(matchMedia('(pointer:coarse)').matches ? 1.6 : 2, devicePixelRatio || 1); const cv = RD.cv; RD.Ws = innerWidth; RD.Hs = innerHeight; cv.width = Math.round(RD.Ws*DPR); cv.height = Math.round(RD.Hs*DPR); RD.DPR = DPR;
   RD.portrait = RD.Hs > RD.Ws; RD.coarse = matchMedia('(pointer:coarse)').matches; RD.PPM = RD.portrait ? clamp(RD.Ws/(RD.coarse ? 17 : 19), 14, 42) : clamp(RD.Hs/720*(RD.coarse ? 52 : 44), 17, 64); RD.RYs = Math.round(RD.Hs*(RD.portrait ? .42 : .6)); RD.W = RD.Ws; RD.H = RD.Hs; RD.ROADY = RD.RYs; if (UI.sizeCl) setTimeout(() => UI.sizeCl(), 50); }
 function pedDepth(l){ return l < -.5 ? DEP.walk + (l + 1)*.35 : l*DEP.lane1; }
 function drawPeople(G, onRoad){ const W = G.world, car = G.car, vl = RD.camL - 5, vr = RD.camL + RD.W/RD.PPM + 5;
@@ -9488,7 +9488,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-17u';
+window.OGRA_BUILD = '2026-09-17v';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
@@ -10537,7 +10537,8 @@ window.OGRA_BUILD = '2026-09-17u';
     const t = performance.now()/1000, spd = Math.min(1, Math.abs(G.car.vx)/28);
     c.save(); c.setTransform(1, 0, 0, 1, 0, 0);
     /* three depths of rain, leaning with speed */
-    for (let l = 0; l < 3; l++) {
+    const layers = (window.OG_fx && !OG_fx()) ? 1 : 3;
+    for (let l = 0; l < layers; l++) {
       const n = Math.round((l === 0 ? 34 : l === 1 ? 26 : 18)*heavy*(W/1200)), len = (14 + l*16)*dpr,
             slant = (0.22 + spd*.9 + l*.05), sp = (900 + l*700)*dpr;
       c.strokeStyle = `rgba(200,220,245,${(.10 + l*.07)*heavy})`; c.lineWidth = (l < 2 ? 1 : 1.6)*dpr;
@@ -10556,7 +10557,7 @@ window.OGRA_BUILD = '2026-09-17u';
     g.addColorStop(0, `rgba(190,205,225,0)`); g.addColorStop(.5, `rgba(190,205,225,${.10*heavy*(.3 + spd)})`); g.addColorStop(1, 'rgba(190,205,225,0)');
     c.fillStyle = g; c.fillRect(0, road - 40*dpr, W, 70*dpr);
     /* drops sitting on the glass, wiped now and then */
-    if (drops.length < 46*heavy) drops.push({x:Math.random()*W, y:Math.random()*H*.75, r:(1.6 + Math.random()*3.4)*dpr, v:0, born:t});
+    if (drops.length < (window.OG_fx && !OG_fx() ? 12 : 46)*heavy) drops.push({x:Math.random()*W, y:Math.random()*H*.75, r:(1.6 + Math.random()*3.4)*dpr, v:0, born:t});
     wiperT -= 1/60;
     if (wiperT <= 0) { wiper = 1; wiperT = 5 + Math.random()*5; }
     if (wiper > 0) { wiper -= .022; const wx2 = (1 - wiper)*W*1.25 - W*.12;
@@ -10916,7 +10917,7 @@ window.OGRA_BUILD = '2026-09-17u';
     RD.vehicle = function(o, s, sx, sy, sc){
       let rel = 0;
       try { const G = GAME.G; if (G && o && !o.parked && G.car) rel = Math.abs((o.v || 0) - (o.lane === 1 ? -G.car.vx : G.car.vx)); } catch(e) {}
-      if (rel > 11 && GAME.save && GAME.save.set.particles !== false) {
+      if (rel > 11 && GAME.save && GAME.save.set.particles !== false && (!window.OG_fx || OG_fx())) {
         const c = this.ctx, n = rel > 22 ? 3 : 2, step = Math.min(14, rel*.35)*(o.lane === 1 ? 1 : -1);
         c.save();
         for (let i = n; i >= 1; i--) { c.globalAlpha = .1 + .05*(n - i); _veh.call(this, o, s, sx + step*i, sy, sc); }
@@ -10930,7 +10931,7 @@ window.OGRA_BUILD = '2026-09-17u';
     RD.person = function(L, x, fy, sc, ph, walking, wave, face){
       try {
         const G = GAME.G, kmh = G ? Math.abs(G.car.vx)*3.6 : 0;
-        if (kmh > 55 && GAME.save && GAME.save.set.particles !== false) {
+        if (kmh > 55 && GAME.save && GAME.save.set.particles !== false && (!window.OG_fx || OG_fx())) {
           const c = this.ctx, step = Math.min(18, kmh*.18);
           c.save(); c.globalAlpha = .16; _p.call(this, L, x + step, fy, sc, ph, walking, wave, face); c.restore();
         }
@@ -11463,6 +11464,121 @@ window.OGRA_BUILD = '2026-09-17u';
     #hRoute{overflow:visible!important}
     #hRoute .rt-line{overflow:visible!important}
   </style>`);
+})();
+</script>
+<script>
+/* =====================================================================
+   WALLET AT THE COUNTER · AC PANEL THAT CLOSES · SOFTER SUSPENSION ·
+   ICONS BELOW THE LINE · HANDBRAKE ON AT THE START · PERFORMANCE MODE
+   ===================================================================== */
+(function(){
+  if (typeof RD === 'undefined' || typeof GAME === 'undefined') return;
+  const AR = () => typeof LANG !== 'undefined' && LANG.cur === 'ar';
+
+  /* ---------- 1. the wallet, large, at the top of the rest house ---------- */
+  document.head.insertAdjacentHTML('beforeend', `<style>
+    #rhWalletTop{position:absolute;top:calc(var(--u)*1.2);inset-inline-start:calc(var(--u)*1.6);z-index:5;
+      padding:6px 12px;border-radius:12px;background:rgba(8,14,26,.9);border:1px solid rgba(255,182,39,.45);
+      color:#ffd98a;font:800 15px Cairo,system-ui;white-space:nowrap}
+    /* route icons hang under the line, clear of the text above it */
+    #hRoute .ogPoi{bottom:auto!important;top:112%!important;font-size:13px!important;line-height:1!important;opacity:1!important;
+      text-shadow:0 1px 3px rgba(0,0,0,.9)}
+    html.ogShort #hRoute .ogPoi{font-size:11px!important}
+    #hRoute .rt-line{overflow:visible!important;margin-bottom:14px}
+  </style>`);
+  setInterval(() => {
+    try {
+      const scr = document.getElementById('rhScreen'); if (!scr) return;
+      let w = document.getElementById('rhWalletTop');
+      if (!w) { w = document.createElement('div'); w.id = 'rhWalletTop'; scr.appendChild(w); }
+      const cash = (window.OG_cash ? OG_cash() : (S().cash || 0));
+      w.textContent = (AR() ? '💰 محفظتك: ' : '💰 Wallet: ') + cash.toLocaleString('en-US') + (AR() ? ' ج' : ' EGP');
+    } catch(e) {}
+  }, 600);
+
+  /* ---------- 2. the AC panel closes itself once you have chosen ---------- */
+  let closeT = 0;
+  document.addEventListener('click', e => {
+    const p = document.getElementById('acPanel2'); if (!p) return;
+    if (p.contains(e.target)) { clearTimeout(closeT); closeT = setTimeout(() => { const q = document.getElementById('acPanel2'); if (q) q.remove(); }, 2600); return; }
+    if (!e.target.closest('#acBtn')) p.remove();          /* tapping anywhere else closes it */
+  }, true);
+  document.addEventListener('touchend', e => {
+    const p = document.getElementById('acPanel2'); if (!p) return;
+    if (p.contains(e.target)) { clearTimeout(closeT); closeT = setTimeout(() => { const q = document.getElementById('acPanel2'); if (q) q.remove(); }, 2600); }
+  }, true);
+
+  /* ---------- 3. softer, more settled suspension ---------- */
+  function suspension(G){
+    const car = G && G.car; if (!car || !car.E || car.__susp) return;
+    car.__susp = true;
+    if (car.E.susZ) car.E.susZ = Math.min(1.0, car.E.susZ*1.22);        /* more damping: the body settles instead of bouncing */
+    if (car.E.susTravel) car.E.susTravel = car.E.susTravel*1.25;         /* longer travel: bumps are absorbed, not banged through */
+    if (car.E.comfort != null) car.E.comfort = Math.min(1.4, car.E.comfort*1.1);
+  }
+
+  /* ---------- 4. handbrake on when a shift begins ---------- */
+  function startBrake(G){
+    try { if (G && G.car && !G.__brakeSet) { G.__brakeSet = true; G.car.park = true; G.car.sel = 'N'; G.car.gear = 0; } } catch(e) {}
+  }
+
+  /* ---------- 5. performance mode ---------- */
+  const PERF = {fps:60, low:false, samples:[], last:performance.now()};
+  function perfTick(){
+    const now = performance.now(), dt = now - PERF.last; PERF.last = now;
+    if (dt > 0 && dt < 500) { PERF.samples.push(1000/dt); if (PERF.samples.length > 90) PERF.samples.shift(); }
+    if (PERF.samples.length >= 60) {
+      const avg = PERF.samples.reduce((a, b) => a + b, 0)/PERF.samples.length;
+      PERF.fps = avg;
+      if (!PERF.low && avg < 38) setLow(true);
+      else if (PERF.low && avg > 52) setLow(false);
+      PERF.samples.length = 0;
+    }
+    requestAnimationFrame(perfTick);
+  }
+  function setLow(on){
+    PERF.low = on;
+    try {
+      const s = GAME.save && GAME.save.set; if (!s) return;
+      if (on) {
+        PERF.keep = {q:s.q, particles:s.particles, clouds:s.clouds};
+        s.q = 'low'; s.particles = false; s.clouds = false;      /* fewer layers, smaller canvas */
+        if (typeof resize === 'function') resize();
+        if (window.OG_report) OG_report({message:AR() ? 'شغّلنا وضع الأداء عشان اللعب يبقى سلس' : 'Performance mode on: fewer effects for a smoother ride'}, 'performance');
+      } else if (PERF.keep) {
+        s.q = PERF.keep.q; s.particles = PERF.keep.particles; s.clouds = PERF.keep.clouds;
+        if (typeof resize === 'function') resize();
+      }
+    } catch(e) {}
+  }
+  requestAnimationFrame(perfTick);
+  window.OG_perf = PERF;
+
+  /* trim the load every frame when we are running low */
+  function trim(G){
+    if (!PERF.low || !G) return;
+    try {
+      if (G.traffic && G.traffic.length > 20) G.traffic.length = 20;
+      if (G.walkers && G.walkers.length > 5) G.walkers.length = 5;
+      if (G.peds && G.peds.length > 8) G.peds.length = 8;
+      if (G.parts && G.parts.length > 20) G.parts.length = 20;
+      if (G.fx && G.fx.length > 12) G.fx.length = 12;
+      if (G.debris && G.debris.length > 8) G.debris.length = 8;
+    } catch(e) {}
+  }
+  /* motion blur and rain drops are the first things to go */
+  const bumpQuality = () => { try { return !PERF.low; } catch(e) { return true; } };
+  window.OG_fx = bumpQuality;
+
+  if (typeof updateGame === 'function') {
+    const _ug = updateGame;
+    updateGame = function(G, dt, inp){
+      const out = _ug.apply(this, arguments);
+      try { suspension(G); startBrake(G); trim(G); } catch(e) {}
+      return out;
+    };
+  }
+  if (typeof newSession === 'function') { const _ns = newSession; newSession = function(){ const G = _ns.apply(this, arguments); try { G.__brakeSet = false; startBrake(G); } catch(e) {} return G; }; }
 })();
 </script>
 <script>
