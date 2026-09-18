@@ -4240,7 +4240,7 @@ function renderScene(G, dt){ const c = RD.ctx, W = G.world, car = G.car, set = G
   RD.zoom = RD.zoom || zt; RD.zoom = lerp(RD.zoom, zt, 1 - Math.exp(-dt*(zt < RD.zoom ? .9 : .6)));
   const z = RD.zoom; RD.W = RD.Ws/z; RD.H = RD.Hs/z; RD.ROADY = RD.RYs/z;
   const vw = RD.W/RD.PPM, minF = (L/2 + 1.2)/vw; let frac;
-  if (G.mode === 'attract') frac = .34; else if (car.vx < -.5 || car.gear < 0) frac = Math.max(.55, 1 - minF - .05); else if (behind) frac = clamp((car.x - behind.x)/vw, minF + .02, .36); else frac = Math.max(0.12, minF*0.9);   /* vehicle rides nearer the left edge */
+  if (G.mode === 'attract') frac = .34; else if (car.vx < -.5 || car.gear < 0) frac = Math.max(.55, 1 - minF - .05); else if (behind) frac = clamp((car.x - behind.x)/vw, minF + .02, .36); else { const kmh = Math.abs(car.vx)*3.6, tt = Math.min(1, kmh/95); let want = .30 - .11*tt; const acc = car.vx - (G.__camV ?? car.vx); G.__camV = car.vx; if (acc > .05) want -= .02; if (acc < -.08) want += .03; if (G.rest && G.rest.active) want = .34; frac = Math.max(Math.max(minF + .03, .17), Math.min(.42, want)); }   /* smart framing: more road ahead the faster you go */
   G.camFrac = G.camFrac ?? frac; G.camFrac = lerp(G.camFrac, frac, 1 - Math.exp(-dt*(frac > G.camFrac ? 1.6 : .7)));
   RD.camL = G.mode === 'attract' ? lerp(RD.camL, car.x - vw*G.camFrac, 1 - Math.exp(-dt*3.2)) : car.x - vw*G.camFrac; if (G.mode !== 'attract' && !(car.vx < -.4 || car.gear < 0)) { if (RD._fwd != null && RD.camL < RD._fwd - .004) RD.camL = RD._fwd; RD._fwd = RD.camL; } else RD._fwd = null; RD.camY = lerp(RD.camY, W.h(car.x), 1 - Math.exp(-dt*2.5));
   const sh = set.shake ? (Math.random() - .5)*RD.shake*7 : 0; RD.shake *= Math.exp(-dt*5);
@@ -9479,7 +9479,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-17n';
+window.OGRA_BUILD = '2026-09-17p';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
@@ -10295,7 +10295,7 @@ window.OGRA_BUILD = '2026-09-17n';
         const g = G || GAME.G;
         if (g && g.mode !== 'attract' && g.car) {
           const kmh = Math.abs(g.car.vx)*3.6, rev = g.car.vx < -.4 || g.car.gear < 0;
-          if (!rev && kmh > 25 && fin(g.camFrac)) g.camFrac = Math.max(.08, g.camFrac*(1 - Math.min(.28, (kmh - 25)/300)));
+          /* framing is handled by the smart camera below */
         }
       } catch(e) {}
       const out = _rs.apply(this, arguments);
@@ -10368,7 +10368,7 @@ window.OGRA_BUILD = '2026-09-17n';
     });
     try { G.feedAdd('rest_in', {}, 'info'); AU.door && AU.door('bus'); } catch(e) {}
     say(G, pick(OUT_LINES), 'pax');
-    G.rest.minT = 18;                                     /* they need at least this long */
+    G.rest.minT = 8;                                     /* they need at least this long */
   }
   function finishBreak(G, lost){
     const R = G.rest; if (!R) return;
@@ -10580,9 +10580,162 @@ window.OGRA_BUILD = '2026-09-17n';
     const _rs = renderScene;
     renderScene = function(G){
       const out = _rs.apply(this, arguments);
-      try { const g = G || GAME.G; if (g && GAME.state === 'play') { drawRestPed(g); rainFX(g); } } catch(e) {}
+      try { const g = G || GAME.G; if (g && GAME.state === 'play') { if (!window.__ogRestDrawn) drawRestPed(g); rainFX(g); } } catch(e) {}
       return out;
     };
+  }
+})();
+</script>
+<script>
+/* =====================================================================
+   REST HOUSE (screen + ambience + real head-count), SMARTER CAMERA,
+   CHECKPOINTS THAT ACTUALLY HOLD YOU
+   ===================================================================== */
+(function(){
+  if (typeof RD === 'undefined' || typeof GAME === 'undefined') return;
+  const AR = () => typeof LANG !== 'undefined' && LANG.cur === 'ar';
+  const say = (G, pair) => { try { G.bubble(AR() ? pair[0] : pair[1]); } catch(e) {} };
+
+  /* ---------- 1. café ambience ---------- */
+  let amb = null;
+  function ambience(on){
+    try {
+      if (on) {
+        if (!amb) { amb = new Audio('assets/cafe_ambience.mp3'); amb.loop = true; amb.preload = 'auto'; }
+        const s = GAME.save && GAME.save.set, vol = s && s.vol ? (s.vol.master ?? 1)*(s.vol.city ?? s.vol.sfx ?? 1) : .6;
+        amb.volume = 0; amb.play().catch(() => {});
+        const tgt = Math.max(0, Math.min(1, .55*vol));
+        clearInterval(amb.__f); amb.__f = setInterval(() => { amb.volume = Math.min(tgt, amb.volume + .05); if (amb.volume >= tgt) clearInterval(amb.__f); }, 90);
+      } else if (amb) {
+        clearInterval(amb.__f);
+        amb.__f = setInterval(() => { amb.volume = Math.max(0, amb.volume - .06); if (amb.volume <= 0) { clearInterval(amb.__f); try { amb.pause(); } catch(e) {} } }, 80);
+      }
+    } catch(e) {}
+  }
+
+  /* ---------- 2. the head-count really drops while they are outside ---------- */
+  function takeOut(G, p){
+    const i = G.onboard.indexOf(p); if (i >= 0) G.onboard.splice(i, 1);
+    G.rest.outPax = G.rest.outPax || []; G.rest.outPax.push(p);
+  }
+  function putBack(G){
+    const R = G.rest; if (!R || !R.outPax) return;
+    R.outPax.forEach(p => { p.out = false; if (G.onboard.indexOf(p) < 0) G.onboard.push(p); });
+    R.outPax = [];
+  }
+  /* hook the break that was added earlier */
+  const waitFor = (name, fn) => { try { fn(); } catch(e) {} };
+  if (typeof updateGame === 'function') {
+    const _ug = updateGame;
+    updateGame = function(G, dt, inp){
+      const out = _ug.apply(this, arguments);
+      try {
+        const R = G && G.rest;
+        if (R && R.active && !R.__wired) {
+          R.__wired = true;
+          (G.onboard || []).filter(p => p.out).forEach(p => takeOut(G, p));   /* they leave the seat count */
+          if (typeof rhOpen === 'function' && !document.getElementById('rhScreen')) { try { rhOpen(G); } catch(e) {} }
+          ambience(true);
+        }
+        if (R && !R.active && R.__wired) {
+          R.__wired = false;
+          if ((R.outPax || []).length) putBack(G);
+          ambience(false);
+          const el = document.getElementById('rhScreen'); if (el) el.remove();
+        }
+        /* the horn also closes the rest-house screen, so honking always works */
+        if (R && R.active && G.horn && R.t > 3 && document.getElementById('rhScreen')) { const el = document.getElementById('rhScreen'); if (el) el.remove(); ambience(false); }
+      } catch(e) { if (window.OG_report) OG_report(e, 'rest house'); }
+      return out;
+    };
+  }
+  /* if the player opens the rest house on his own, the same break starts */
+  if (typeof rhOpen === 'function') {
+    const _rh = rhOpen;
+    rhOpen = function(G){ const r = _rh.apply(this, arguments); try { ambience(true); } catch(e) {} return r; };
+  }
+
+  /* ---------- 3. draw them BEHIND the bus, on the pavement layer ---------- */
+  if (typeof drawPeople === 'function') {
+    const _dp = drawPeople;
+    drawPeople = function(G, onRoad){
+      const r = _dp.apply(this, arguments);
+      try {
+        if (!onRoad && G.rest && G.rest.active && G.restPed) {
+          const W = G.world, vl = RD.camL - 6, vr = RD.camL + RD.W/RD.PPM + 6;
+          for (const q of G.restPed) {
+            if (q.st === 'aboard' || q.x < vl || q.x > vr) continue;
+            const d = -.86;                       /* pavement depth: behind the vehicles */
+            RD.person(q.look, RD.sx(q.x), RD.sy(W.h(q.x), d), 1 + d*.06, q.ph, Math.abs(q.v) > .05, false, q.face);
+          }
+        }
+      } catch(e) {}
+      return r;
+    };
+    if (typeof renderScene === 'function') {                 /* stop the old on-top drawing */
+      window.__ogRestDrawn = true;
+    }
+  }
+
+  /* ---------- 4. a camera with some sense ---------- */
+  if (typeof renderScene === 'function') {
+    const _rs = renderScene;
+    renderScene = function(G){
+      try {
+        const g = G || GAME.G, car = g && g.car;
+        if (g && car && g.mode !== 'attract') {
+          const kmh = Math.abs(car.vx)*3.6, rev = car.vx < -.4 || car.gear < 0;
+          if (!rev) {
+            const t = Math.min(1, kmh/95);
+            let want = 0.30 - 0.11*t;                        /* stopped: bus a third in; fast: more road ahead */
+            const acc = car.vx - (g.__camV ?? car.vx); g.__camV = car.vx;
+            if (acc > .05) want -= .02;                      /* lean forward while pulling away */
+            if (acc < -.08) want += .03;                     /* ease back under braking */
+            if (g.rest && g.rest.active) want = .34;         /* at a rest stop, show the crowd */
+            want = Math.max(.17, Math.min(.42, want));
+            g.camFrac = g.camFrac == null ? want : g.camFrac + (want - g.camFrac)*0.06;
+          }
+        }
+      } catch(e) {}
+      return _rs.apply(this, arguments);
+    };
+  }
+
+  /* ---------- 5. checkpoints that hold you, and punish running them ---------- */
+  const CP_STOP = [
+    ['قف يا أسطى، الظابط بيشاور لك', 'Pull over, the officer is waving you in'],
+    ['كمين! خفّف وقف على جنب', 'Checkpoint! Slow down and pull in']
+  ];
+  if (typeof cpPlayer === 'function') {
+    const _cp = cpPlayer;
+    cpPlayer = function(G, dt){
+      const cp = G.cp;
+      try {
+        if (cp && !cp.playerDone && cp.wantPlayer) {
+          const car = G.car, d = cp.x - car.x, kmh = Math.abs(car.vx)*3.6;
+          if (d < 55 && d > 6 && !cp.__told) { cp.__told = true; say(G, CP_STOP[Math.floor(Math.random()*CP_STOP.length)]); }
+          /* a forgiving stop window: anywhere beside the officer, at walking pace */
+          if (!cp.open && d < 9 && d > -7 && kmh < 6) {
+            cp.open = true; GAME.paused = true;
+            try { cpDialog(G, 0); } catch(e) {}
+          }
+          /* ran the checkpoint */
+          if (!cp.open && !cp.__ran && d < -9) {
+            cp.__ran = true; cp.playerDone = true;
+            try { G.fine('fine_check', 1500); } catch(e) { try { G.trip.fines += 1500; } catch(_) {} }
+            try { licPoints(S(), 3); saveGame(); } catch(e) {}
+            try { AU.siren && AU.siren(true); setTimeout(() => { try { AU.siren(false); } catch(e) {} }, 6000); } catch(e) {}
+            say(G, ['عدّيت الكمين من غير ما تقف.. مخالفة!', 'You ran the checkpoint — that is a fine!']);
+          }
+        }
+      } catch(e) {}
+      return _cp.apply(this, arguments);
+    };
+    /* re-hook, because the game calls it through updPeople */
+    if (typeof updPeople === 'function') {
+      const _up = updPeople;
+      updPeople = function(G, dt){ const r = _up.apply(this, arguments); try { if (G.cp && !G.cp.playerDone) cpPlayer(G, dt); } catch(e) {} return r; };
+    }
   }
 })();
 </script>
