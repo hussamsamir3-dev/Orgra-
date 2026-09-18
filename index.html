@@ -9488,7 +9488,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-17y';
+window.OGRA_BUILD = '2026-09-17z';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
@@ -11929,6 +11929,130 @@ window.OGRA_BUILD = '2026-09-17y';
   window.OG_acToggle = open;
   /* the old floating strip is gone for good */
   setInterval(() => { const p = document.getElementById('acPanel2') || document.getElementById('acPanel'); if (p) p.remove(); }, 500);
+})();
+</script>
+<script>
+/* =====================================================================
+   AIR-CONDITIONING PANEL — the real photo, with live controls on top,
+   opened like the radio. Greyed out on vehicles that have no AC.
+   ===================================================================== */
+(function(){
+  if (typeof RD === 'undefined' || typeof GAME === 'undefined') return;
+  const AR = () => typeof LANG !== 'undefined' && LANG.cur === 'ar';
+  /* hotspots measured from the panel artwork: x, y, width, height as fractions */
+  const HS = {
+    screen:[0.044, 0.225, 0.285, 0.322],
+    tdown: [0.041, 0.601, 0.137, 0.314],
+    tup:   [0.195, 0.601, 0.137, 0.314],
+    fdown: [0.381, 0.601, 0.137, 0.314],
+    fup:   [0.537, 0.601, 0.137, 0.314],
+    auto:  [0.723, 0.110, 0.240, 0.375],
+    ac:    [0.723, 0.536, 0.240, 0.377]
+  };
+  const IMG = 'assets/ac_panel.webp', RATIO = 547/1602;
+
+  document.head.insertAdjacentHTML('beforeend', `<style>
+    #acWrap{position:fixed;inset:0;z-index:2147482600;display:grid;place-items:center;padding:12px;
+      background:rgba(3,6,12,.6);opacity:0;transition:opacity .18s}
+    #acWrap.in{opacity:1}
+    #acUnit{position:relative;width:min(94vw, 720px, calc((100vh - 40px)/${RATIO}));aspect-ratio:1602/547;
+      background:url('${IMG}') center/100% 100% no-repeat;filter:drop-shadow(0 20px 46px rgba(0,0,0,.6));
+      transform:scale(.95);transition:transform .18s;direction:ltr}
+    #acWrap.in #acUnit{transform:scale(1)}
+    #acUnit .hs{position:absolute;background:transparent;border:0;border-radius:2.2%;cursor:pointer;-webkit-tap-highlight-color:transparent}
+    #acUnit .hs:active{background:rgba(255,255,255,.14)}
+    #acUnit .ovl{position:absolute;pointer-events:none;display:grid;place-items:center;text-align:center;
+      font-family:Rajdhani,system-ui,sans-serif;color:#7fe7ff}
+    #acUnit .tval{font-weight:700;font-size:min(5.2vw,42px);line-height:1;text-shadow:0 0 14px rgba(120,220,255,.5)}
+    #acUnit .tsub{font:600 min(2.1vw,15px)/1.2 Cairo,system-ui;color:#9aa3ad;margin-top:.25em}
+    #acUnit .bars{position:absolute;display:flex;gap:4px;pointer-events:none}
+    #acUnit .bars i{flex:1;height:100%;border-radius:3px;background:rgba(255,255,255,.18)}
+    #acUnit .bars i.on{background:#7fe7ff;box-shadow:0 0 10px rgba(120,220,255,.75)}
+    #acUnit .led{position:absolute;border-radius:99px;background:#3ff05a;box-shadow:0 0 12px #3ff05a;opacity:0;transition:opacity .15s}
+    #acUnit .led.on{opacity:1}
+    #acUnit .foot{position:absolute;left:0;right:0;top:104%;display:flex;justify-content:space-between;align-items:center;gap:10px;
+      color:#cfd8e6;font:700 min(2.4vw,15px)/1.2 Cairo,system-ui}
+    #acUnit .foot button{pointer-events:auto;border:1px solid rgba(140,190,255,.35);background:rgba(10,16,28,.9);color:#e8eefc;
+      border-radius:10px;padding:.45em 1em;font:800 min(2.4vw,15px) Cairo,system-ui;cursor:pointer}
+    #acBtn.dead{opacity:.38;filter:grayscale(1)}
+  </style>`);
+
+  const box = k => { const [x, y, w, h] = HS[k]; return `left:${x*100}%;top:${y*100}%;width:${w*100}%;height:${h*100}%`; };
+  let wrap = null;
+  const A = () => (GAME.G && GAME.G.ac) || null;
+  function close(){ if (!wrap) return; const w = wrap; wrap = null; w.classList.remove('in'); setTimeout(() => w.remove(), 200); }
+  function open(){
+    const a = A(); if (!a) return;
+    if (wrap) return close();
+    wrap = document.createElement('div'); wrap.id = 'acWrap';
+    wrap.innerHTML = `<div id="acUnit">
+      ${Object.keys(HS).filter(k => k !== 'screen').map(k => `<button class="hs" data-ac="${k}" style="${box(k)}"></button>`).join('')}
+      <div class="ovl" style="${box('screen')}"><div><div class="tval" id="acVal">--</div><div class="tsub" id="acSub"></div></div></div>
+      <div class="bars" id="acBars" style="left:${(HS.fdown[0])*100}%;top:31%;width:${(HS.fup[0] + HS.fup[2] - HS.fdown[0])*100}%;height:7%"></div>
+      <div class="led" id="ledAuto" style="left:${(HS.auto[0] + HS.auto[2]*.28)*100}%;top:${(HS.auto[1] + HS.auto[3]*.12)*100}%;width:${HS.auto[2]*.44*100}%;height:${HS.auto[3]*.14*100}%"></div>
+      <div class="led" id="ledAc" style="left:${(HS.ac[0] + HS.ac[2]*.28)*100}%;top:${(HS.ac[1] + HS.ac[3]*.08)*100}%;width:${HS.ac[2]*.44*100}%;height:${HS.ac[3]*.12*100}%"></div>
+      <div class="foot"><span id="acInfo"></span><button data-ac="close">${AR() ? 'إغلاق' : 'CLOSE'}</button></div>
+    </div>`;
+    document.body.appendChild(wrap);
+    requestAnimationFrame(() => wrap && wrap.classList.add('in'));
+    const hit = e => {
+      const b = e.target.closest('[data-ac]');
+      if (!b) { if (e.target === wrap) close(); return; }
+      e.preventDefault(); e.stopPropagation();
+      const a2 = A(), k = b.dataset.ac;
+      if (k === 'close') return close();
+      if (!a2 || !a2.has) return;
+      if (k === 'ac') { a2.on = !a2.on; if (a2.on && !a2.lvl) a2.lvl = 2; }
+      else if (k === 'auto') { a2.auto = a2.auto === false; if (a2.auto) a2.on = true; }
+      else if (k === 'tup') a2.target = Math.min(28, (a2.target ?? 23) + .5);
+      else if (k === 'tdown') a2.target = Math.max(16, (a2.target ?? 23) - .5);
+      else if (k === 'fup') { a2.auto = false; a2.on = true; a2.lvl = Math.min(3, (a2.lvl || 1) + 1); }
+      else if (k === 'fdown') { a2.auto = false; a2.lvl = Math.max(1, (a2.lvl || 1) - 1); }
+      try { AU.ui && AU.ui('open'); AU.haptic && AU.haptic(12); } catch(_) {}
+      paint();
+    };
+    wrap.addEventListener('click', hit);
+    wrap.addEventListener('touchend', hit, {passive:false});
+    paint();
+  }
+  function paint(){
+    if (!wrap) return;
+    const a = A(); if (!a) return close();
+    const q = s => wrap.querySelector(s);
+    const has = !!a.has;
+    q('#acVal').textContent = has ? String((a.target ?? 23).toFixed(1)).replace('.0', '') + '°' : '--';
+    q('#acSub').textContent = has
+      ? (AR() ? `جوه ${Math.round(a.cabin)}° · برّه ${Math.round(a.out)}°` : `cabin ${Math.round(a.cabin)}° · out ${Math.round(a.out)}°`)
+      : (AR() ? 'العربية دي مفيهاش تكييف' : 'no air conditioning');
+    q('#acBars').innerHTML = has ? [1, 2, 3].map(i => `<i class="${a.on && a.lvl >= i ? 'on' : ''}"></i>`).join('') : '';
+    q('#ledAuto').classList.toggle('on', has && a.auto !== false);
+    q('#ledAc').classList.toggle('on', has && !!a.on);
+    q('#acInfo').textContent = has
+      ? (AR() ? `صرف البنزين ${(a.load || 0).toFixed(2)} لتر/ساعة${a.on && !GAME.G.car.on ? ' · الموتور مطفي' : ''}`
+              : `fuel ${(a.load || 0).toFixed(2)} L/h${a.on && !GAME.G.car.on ? ' · engine off' : ''}`)
+      : '';
+  }
+  setInterval(() => { if (wrap) paint(); }, 700);
+  addEventListener('keydown', e => { if (e.key === 'Escape' && wrap) close(); });
+  window.OG_acToggle = open;
+
+  /* the HUD key: rebound to this panel, and greyed out with no AC fitted */
+  setInterval(() => {
+    try {
+      const b = document.getElementById('acBtn'); if (!b) return;
+      if (!b.__rebound) {                                  /* drop any older handler */
+        const n = b.cloneNode(true); n.id = 'acBtn'; n.__rebound = 1;
+        const go = e => { e.preventDefault(); e.stopPropagation(); const a = A(); if (a && a.has) open(); else {
+          try { GAME.G.bubble(AR() ? 'العربية دي مفيهاش تكييف' : 'This vehicle has no air conditioning'); } catch(_) {} } };
+        n.addEventListener('click', go); n.addEventListener('touchend', go, {passive:false});
+        b.replaceWith(n);
+        return;
+      }
+      const a = A();
+      b.classList.toggle('dead', !(a && a.has));
+      b.innerHTML = `<span style="font-size:1.05em">❄</span><small style="display:block;font-size:.58em;line-height:1">${a && a.has ? (a.on ? Math.round(a.target ?? 23) + '°' : 'off') : '—'}</small>`;
+    } catch(e) {}
+  }, 700);
 })();
 </script>
 <script>
