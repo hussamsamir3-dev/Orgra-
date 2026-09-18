@@ -4214,7 +4214,7 @@ function bindUI(){ const del = (root) => root.addEventListener('click', e => { c
 
 /* =================== RENDER =================== */
 let DPR = 1;
-function resize(){ const q = GAME.save && GAME.save.set.q === 'low'; DPR = q ? (matchMedia('(pointer:coarse)').matches ? .85 : 1) : Math.min(matchMedia('(pointer:coarse)').matches ? 1.5 : 2, devicePixelRatio || 1); const cv = RD.cv; RD.Ws = innerWidth; RD.Hs = innerHeight; cv.width = Math.round(RD.Ws*DPR); cv.height = Math.round(RD.Hs*DPR); RD.DPR = DPR;
+function resize(){ const q = false;   /* the low-quality path is retired: it cost frames instead of saving them */ DPR = q ? 1 : Math.min(2, devicePixelRatio || 1); const cv = RD.cv; RD.Ws = innerWidth; RD.Hs = innerHeight; cv.width = Math.round(RD.Ws*DPR); cv.height = Math.round(RD.Hs*DPR); RD.DPR = DPR;
   RD.portrait = RD.Hs > RD.Ws; RD.coarse = matchMedia('(pointer:coarse)').matches; RD.PPM = RD.portrait ? clamp(RD.Ws/(RD.coarse ? 17 : 19), 14, 42) : clamp(RD.Hs/720*(RD.coarse ? 52 : 44), 17, 64); RD.RYs = Math.round(RD.Hs*(RD.portrait ? .42 : .6)); RD.W = RD.Ws; RD.H = RD.Hs; RD.ROADY = RD.RYs; if (UI.sizeCl) setTimeout(() => UI.sizeCl(), 50); }
 function pedDepth(l){ return l < -.5 ? DEP.walk + (l + 1)*.35 : l*DEP.lane1; }
 function drawPeople(G, onRoad){ const W = G.world, car = G.car, vl = RD.camL - 5, vr = RD.camL + RD.W/RD.PPM + 5;
@@ -9488,7 +9488,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-17x';
+window.OGRA_BUILD = '2026-09-17y';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
@@ -11546,7 +11546,7 @@ window.OGRA_BUILD = '2026-09-17x';
     }
     requestAnimationFrame(perfTick);
   }
-  function setLow(on){
+  function setLow(on){ return;   /* performance mode retired */
     PERF.low = on;
     try {
       const s = GAME.save && GAME.save.set; if (!s) return;
@@ -11780,6 +11780,155 @@ window.OGRA_BUILD = '2026-09-17x';
       return out;
     };
   }
+})();
+</script>
+<script>
+/* =====================================================================
+   PERFORMANCE MODE OFF (it cost more than it saved)
+   AIR-CONDITIONING CONTROL PANEL — a proper pop-up, like the radio
+   ===================================================================== */
+(function(){
+  if (typeof RD === 'undefined' || typeof GAME === 'undefined') return;
+  const AR = () => typeof LANG !== 'undefined' && LANG.cur === 'ar';
+
+  /* ---------- 1. no more automatic quality dropping ---------- */
+  try {
+    if (window.OG_perf) {
+      const P = window.OG_perf;
+      P.low = false; P.disabled = true;
+      Object.defineProperty(P, 'low', {get(){ return false; }, set(){}, configurable:true});
+      const fix = () => { const s = GAME.save && GAME.save.set; if (!s || s.__qFix) return;
+        s.__qFix = 1;                                  /* one-off: undo what the old performance mode left behind */
+        if (s.q === 'low') s.q = 'high';
+        if (s.particles === false) s.particles = true;
+        if (s.clouds === false) s.clouds = true;
+        try { saveGame && saveGame(); } catch(_) {}
+        if (typeof resize === 'function') resize(); };
+      fix(); setTimeout(fix, 1500); setTimeout(fix, 5000);
+    }
+    window.OG_fx = () => true;                      /* effects stay on */
+  } catch(e) {}
+
+  /* ---------- 2. the AC control panel ---------- */
+  document.head.insertAdjacentHTML('beforeend', `<style>
+    #acWrap{position:fixed;inset:0;z-index:2147482600;display:grid;place-items:center;background:rgba(3,6,12,.55);
+      -webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);opacity:0;transition:opacity .2s}
+    #acWrap.in{opacity:1}
+    #acUnit{--w:min(92vw, 560px, 150vh);width:var(--w);padding:calc(var(--w)*.035);border-radius:calc(var(--w)*.045);
+      background:linear-gradient(180deg,#22242a,#121316);border:calc(var(--w)*.008) solid #8b9097;
+      box-shadow:0 24px 60px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.08);
+      display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:calc(var(--w)*.03);color:#f2f4f7;
+      font-family:Rajdhani,Cairo,system-ui,sans-serif;transform:scale(.94);transition:transform .2s}
+    #acWrap.in #acUnit{transform:scale(1)}
+    #acUnit .col{display:grid;gap:calc(var(--w)*.022);align-content:start}
+    #acUnit .col + .col{border-inline-start:1px solid #3a3d44;padding-inline-start:calc(var(--w)*.03)}
+    #acUnit .cap{text-align:center;font-weight:700;letter-spacing:.12em;font-size:calc(var(--w)*.045);color:#dfe3e9}
+    #acUnit .screen{background:#08090b;border:1px solid #4a4e55;border-radius:calc(var(--w)*.018);
+      padding:calc(var(--w)*.02);text-align:center;min-height:calc(var(--w)*.14);display:grid;align-content:center}
+    #acUnit .screen b{font-size:calc(var(--w)*.105);line-height:1;color:#7fe7ff;text-shadow:0 0 12px rgba(120,220,255,.45)}
+    #acUnit .screen small{display:block;font-size:calc(var(--w)*.032);color:#9aa3ad;margin-top:.25em;font-family:Cairo,system-ui}
+    #acUnit .pad{display:grid;grid-template-columns:1fr 1fr;gap:calc(var(--w)*.02)}
+    #acUnit button{-webkit-tap-highlight-color:transparent;border:1px solid #585d66;border-radius:calc(var(--w)*.018);
+      background:linear-gradient(180deg,#2b2e35,#1a1c21);color:#f2f4f7;font:700 calc(var(--w)*.06)/1 Rajdhani,system-ui;
+      min-height:calc(var(--w)*.13);cursor:pointer;display:grid;place-items:center;transition:transform .07s,filter .15s}
+    #acUnit button:active{transform:scale(.95);filter:brightness(1.25)}
+    #acUnit button.cold span{color:#38a0ff} #acUnit button.hot span{color:#ff4646}
+    #acUnit .led{width:60%;height:calc(var(--w)*.02);border-radius:99px;background:#2a3b2c;margin:0 auto calc(var(--w)*.014);
+      box-shadow:inset 0 0 4px #000}
+    #acUnit .on .led{background:#3ff05a;box-shadow:0 0 10px #3ff05a}
+    #acUnit .big{font-size:calc(var(--w)*.075)}
+    #acUnit .fan{display:grid;place-items:center;font-size:calc(var(--w)*.06);color:#eef1f5}
+    #acUnit .bars{display:flex;gap:3px;justify-content:center;margin-top:.2em}
+    #acUnit .bars i{width:calc(var(--w)*.03);height:calc(var(--w)*.022);border-radius:3px;background:#3a3d44}
+    #acUnit .bars i.on{background:#7fe7ff;box-shadow:0 0 8px rgba(120,220,255,.6)}
+    #acUnit .foot{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;gap:8px;
+      color:#9aa3ad;font:600 calc(var(--w)*.032)/1.3 Cairo,system-ui;padding-top:calc(var(--w)*.01)}
+    #acUnit .foot button{min-height:calc(var(--w)*.085);padding:0 calc(var(--w)*.04);font-size:calc(var(--w)*.04)}
+    @media (max-height:430px){ #acUnit{--w:min(74vw, 460px)} }
+  </style>`);
+
+  let wrap = null;
+  function close(){ if (!wrap) return; wrap.classList.remove('in'); const w = wrap; wrap = null; setTimeout(() => w.remove(), 220); }
+  function open(){
+    const G = GAME.G, A = G && G.ac;
+    if (!A) return;
+    if (wrap) return close();
+    wrap = document.createElement('div'); wrap.id = 'acWrap';
+    wrap.innerHTML = `<div id="acUnit">
+      <div class="col">
+        <div class="cap">TEMP</div>
+        <div class="screen"><b id="acT">--</b><small id="acSub"></small></div>
+        <div class="pad">
+          <button data-ac="down" class="cold"><span>−</span></button>
+          <button data-ac="up" class="hot"><span>+</span></button>
+        </div>
+      </div>
+      <div class="col">
+        <div class="cap fan">✤</div>
+        <div class="screen" style="min-height:auto"><div class="bars" id="acBars"></div></div>
+        <div class="pad">
+          <button data-ac="fandown"><span>−</span></button>
+          <button data-ac="fanup"><span>+</span></button>
+        </div>
+      </div>
+      <div class="col">
+        <button data-ac="auto" id="acAuto" class="big"><div><div class="led"></div>AUTO</div></button>
+        <button data-ac="power" id="acPow" class="big"><div><div class="led"></div>A/C</div></button>
+        <button data-ac="recirc" id="acRec" style="font-size:calc(var(--w)*.038)">${AR() ? 'تدوير الهواء' : 'RECIRC'}</button>
+      </div>
+      <div class="foot">
+        <span id="acInfo"></span>
+        <button data-ac="close">${AR() ? 'إغلاق' : 'CLOSE'}</button>
+      </div></div>`;
+    document.body.appendChild(wrap);
+    requestAnimationFrame(() => wrap && wrap.classList.add('in'));
+    const hit = e => {
+      const b = e.target.closest('[data-ac]');
+      if (!b) { if (e.target === wrap) close(); return; }
+      e.preventDefault(); e.stopPropagation();
+      const A2 = GAME.G.ac, k = b.dataset.ac;
+      if (k === 'close') return close();
+      if (!A2.has && k !== 'close') return;
+      if (k === 'power') { A2.on = !A2.on; if (A2.on && !A2.lvl) A2.lvl = 2; }
+      else if (k === 'up') A2.target = Math.min(28, (A2.target ?? 23) + 0.5);
+      else if (k === 'down') A2.target = Math.max(16, (A2.target ?? 23) - 0.5);
+      else if (k === 'fanup') { A2.auto = false; A2.on = true; A2.lvl = Math.min(3, (A2.lvl || 1) + 1); }
+      else if (k === 'fandown') { A2.auto = false; A2.lvl = Math.max(1, (A2.lvl || 1) - 1); if (A2.lvl === 1 && !A2.on) A2.on = true; }
+      else if (k === 'auto') A2.auto = A2.auto === false;
+      else if (k === 'recirc') A2.recirc = !A2.recirc;
+      try { AU.ui && AU.ui('open'); AU.haptic && AU.haptic(12); } catch(_) {}
+      paint();
+    };
+    wrap.addEventListener('click', hit);
+    wrap.addEventListener('touchend', hit, {passive:false});
+    paint();
+  }
+  function paint(){
+    if (!wrap) return;
+    const A = GAME.G && GAME.G.ac; if (!A) return close();
+    const q = s => wrap.querySelector(s);
+    if (!A.has) {
+      q('#acT').textContent = '--';
+      q('#acSub').textContent = AR() ? 'العربية دي مفيهاش تكييف' : 'no air conditioning fitted';
+      q('#acInfo').textContent = '';
+      return;
+    }
+    q('#acT').innerHTML = `${(A.target ?? 23).toFixed(1).replace('.0', '')}<span style="font-size:.5em">°C</span>`;
+    q('#acSub').textContent = AR() ? `جوه ${Math.round(A.cabin)}° · برّه ${Math.round(A.out)}°` : `cabin ${Math.round(A.cabin)}° · outside ${Math.round(A.out)}°`;
+    q('#acBars').innerHTML = [1, 2, 3].map(i => `<i class="${A.on && A.lvl >= i ? 'on' : ''}"></i>`).join('');
+    q('#acAuto').classList.toggle('on', A.auto !== false);
+    q('#acPow').classList.toggle('on', !!A.on);
+    q('#acRec').classList.toggle('on', !!A.recirc);
+    q('#acRec').style.borderColor = A.recirc ? '#3ff05a' : '';
+    q('#acInfo').textContent = AR()
+      ? `صرف البنزين ${(A.load || 0).toFixed(2)} لتر/ساعة${A.on && !GAME.G.car.on ? ' · الموتور مطفي' : ''}`
+      : `fuel ${(A.load || 0).toFixed(2)} L/h${A.on && !GAME.G.car.on ? ' · engine off' : ''}`;
+  }
+  setInterval(() => { if (wrap) paint(); }, 700);
+  addEventListener('keydown', e => { if (e.key === 'Escape' && wrap) close(); });
+  window.OG_acToggle = open;
+  /* the old floating strip is gone for good */
+  setInterval(() => { const p = document.getElementById('acPanel2') || document.getElementById('acPanel'); if (p) p.remove(); }, 500);
 })();
 </script>
 <script>
