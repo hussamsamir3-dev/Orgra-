@@ -4243,11 +4243,11 @@ function renderScene(G, dt){ const c = RD.ctx, W = G.world, car = G.car, set = G
   RD.zoom = RD.zoom || zt; RD.zoom = lerp(RD.zoom, zt, 1 - Math.exp(-dt*(zt < RD.zoom ? .9 : .6)));
   const z = RD.zoom; RD.W = RD.Ws/z; RD.H = RD.Hs/z; RD.ROADY = RD.RYs/z;
   const vw = RD.W/RD.PPM, minF = (L/2 + 1.2)/vw; let frac;
-  if (G.mode === 'attract') frac = .34; else if (car.vx < -.5 || car.gear < 0) frac = Math.max(.55, 1 - minF - .05); else if (behind) frac = clamp((car.x - behind.x)/vw, minF + .02, .36); else { /* the back of the bus stays at least 15% in from the left edge */
+  if (G.mode === 'attract') frac = .34; else if (car.vx < -.5 || car.gear < 0) frac = Math.max(.55, 1 - minF - .05); else if (behind) frac = clamp((car.x - behind.x)/vw, minF*.42, .22); else { /* the back of the bus stays at least 15% in from the left edge */
     const acc = car.vx - (G.__camV ?? car.vx); G.__camV = car.vx;
-    let want = .05 + (L/2 + .2)/vw + (acc > .05 ? -.01 : acc < -.08 ? .02 : 0);
+    let want = .015 + (L/2 + .1)/vw + (acc > .05 ? -.01 : acc < -.08 ? .02 : 0);
     if (G.rest && G.rest.active) want += .06;
-    frac = Math.max(minF*.55, Math.min(.5, want));
+    frac = Math.max(minF*.42, Math.min(.5, want));
     G.camFrac = G.camFrac == null ? frac : (G.camFrac + (frac - G.camFrac)*.08); frac = G.camFrac; }
   G.camFrac = G.camFrac ?? frac; G.camFrac = lerp(G.camFrac, frac, 1 - Math.exp(-dt*(frac > G.camFrac ? 1.6 : .7)));
   RD.camL = G.mode === 'attract' ? lerp(RD.camL, car.x - vw*G.camFrac, 1 - Math.exp(-dt*3.2)) : car.x - vw*G.camFrac; if (G.mode !== 'attract' && !(car.vx < -.4 || car.gear < 0)) { if (RD._fwd != null && RD.camL < RD._fwd - .004) RD.camL = RD._fwd; RD._fwd = RD.camL; } else RD._fwd = null; RD.camY = lerp(RD.camY, W.h(car.x), 1 - Math.exp(-dt*2.5));
@@ -8700,7 +8700,7 @@ function rhOpen(G){
          <div class="ic">${m.icon}</div><b>${tn(m.n)}</b>
          <div class="pr">${m.p} ${LANG.cur === 'ar' ? 'ج' : 'EGP'}</div></div>`).join('')}
     </div>
-    <div class="rhBar">
+    <div class="rhBar"><div class="info" id="rhWallet"></div>
       <div class="info" id="rhInfo">${t('rh_wait').replace('{n}', G.rh.off)}</div>
       <button class="btn" data-rh="leave">${t('rh_back')} ›</button>
     </div>`;
@@ -8716,8 +8716,9 @@ function rhOpen(G){
     try {
       if (typeof ogOnline === 'function' && ogOnline()) {
         OGRA_NET.buy('resthouse', {item:m.id, price:m.p}).then(r => {
-          if (say) say.textContent = r && r.ok ? rhSay('buy') : t('rh_short');
-        });
+          if (!(r && r.ok)) { S().cash = Math.max(0, (S().cash || 0) - m.p); saveGame(); }
+          if (say) say.textContent = rhSay('buy');
+        }).catch(() => { S().cash = Math.max(0, (S().cash || 0) - m.p); saveGame(); });
       } else { S().cash -= m.p; saveGame(); }
       if (say) say.textContent = rhSay('buy');
       /* a drink perks the driver up */
@@ -9487,7 +9488,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-17t';
+window.OGRA_BUILD = '2026-09-17u';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
@@ -10366,7 +10367,7 @@ window.OGRA_BUILD = '2026-09-17t';
   }
   function startBreak(G, site){
     const car = G.car, riders = (G.onboard || []).filter(p => !p.out);
-    if (!riders.length) return;
+    /* the driver can rest even with an empty bus */
     G.rest = G.rest || {}; G.rest.mine = true; G.rest.active = true; G.rest.t = 0; G.rest.site = site; G.rest.recall = false;
     G.restPed = [];
     riders.forEach((p, i) => {
@@ -10399,7 +10400,7 @@ window.OGRA_BUILD = '2026-09-17t';
     if (!G || GAME.state !== 'play' || !longRoute(G)) return;
     const car = G.car, R = G.rest;
     if (!R || !R.active) {
-      if (Math.abs(car.vx) < .5 && (G.onboard || []).length && !(G.__restDone > G.clock)) {
+      if (Math.abs(car.vx) < .8 && !(G.__restDone > G.clock)) {
         const site = restSite(G);
         if (site && !site.__broke && G.__restWanted) { site.__broke = 1; G.__restWanted = false; startBreak(G, site); }
       }
@@ -11269,7 +11270,7 @@ window.OGRA_BUILD = '2026-09-17t';
     let el = document.getElementById('restPrompt');
     const car = G.car, resting = !!(G.rest && G.rest.active);
     let site = null;
-    if (!resting && Math.abs(car.vx) < .6 && GAME.state === 'play') {
+    if (!resting && Math.abs(car.vx) < 1.3 && GAME.state === 'play') {
       site = (G.world.shops || []).find(s => s && (s.t === 'rest' || s.t === 'cafe') && Math.abs(s.x - car.x) < 24) || null;
     }
     if (!site || G.__restDone > G.clock) { if (el) el.remove(); return; }
@@ -11320,12 +11321,148 @@ window.OGRA_BUILD = '2026-09-17t';
           fanSound(!!(A.on && A.has && G.car.on), A.lvl);
           acComfort(G, dt);
         }
+        if (G.car && (G.car.sel === 'D' || G.car.sel === 'R')) G.car.park = false;
         alignTraffic(G, dt);
       } catch(e) {}
       return out;
     };
   }
   setInterval(() => { try { if (GAME.state === 'play' && GAME.G) { acPanel(); restPrompt(GAME.G); } else { const a = document.getElementById('acPanel'); if (a) a.remove(); const r = document.getElementById('restPrompt'); if (r) r.remove(); } } catch(e) {} }, 600);
+})();
+</script>
+<script>
+/* =====================================================================
+   PROPER AC PANEL · PARKING BRAKE AT THE START · READABLE ROUTE ICONS
+   ===================================================================== */
+(function(){
+  if (typeof RD === 'undefined' || typeof GAME === 'undefined') return;
+  const AR = () => typeof LANG !== 'undefined' && LANG.cur === 'ar';
+
+  /* ---------- 1. a real air-conditioning panel ---------- */
+  document.head.insertAdjacentHTML('beforeend', `<style>
+    #acPanel2{position:fixed;z-index:2147482500;min-width:190px;padding:10px 12px;border-radius:14px;pointer-events:auto;
+      background:rgba(9,15,28,.96);border:1px solid rgba(140,190,255,.32);box-shadow:0 12px 32px rgba(0,0,0,.5);
+      color:#e8eefc;font:700 13px Cairo,system-ui;display:grid;gap:8px}
+    #acPanel2 .row2{display:flex;align-items:center;justify-content:space-between;gap:8px}
+    #acPanel2 button{border:0;border-radius:10px;background:#1b2844;color:#fff;font:800 15px Cairo,system-ui;
+      min-width:34px;min-height:34px;padding:0 10px;cursor:pointer}
+    #acPanel2 button.on{background:linear-gradient(180deg,#ffd98a,#ffb627);color:#1b1204}
+    #acPanel2 .big{font:800 22px Rajdhani,system-ui;letter-spacing:.02em}
+    #acPanel2 .mut{color:#9fb0cc;font-weight:600;font-size:12px}
+    #hud .h-tr > #acBtn{display:grid;place-items:center;line-height:1.05}
+  </style>`);
+  let panel = null;
+  function closePanel(){ if (panel) { panel.remove(); panel = null; } }
+  function openPanel(){
+    const G = GAME.G, A = G && G.ac; if (!A) return;
+    if (panel) { closePanel(); return; }
+    panel = document.createElement('div'); panel.id = 'acPanel2';
+    document.body.appendChild(panel);
+    panel.addEventListener('click', hit); panel.addEventListener('touchend', hit, {passive:false});
+    paintPanel();
+  }
+  function hit(e){
+    const b = e.target.closest('[data-ac]'); if (!b) return;
+    e.preventDefault(); e.stopPropagation();
+    const G = GAME.G, A = G.ac, k = b.dataset.ac;
+    if (k === 'power') { A.on = !A.on; if (A.on && !A.lvl) A.lvl = 2; }
+    else if (k === 'up') A.target = Math.min(28, (A.target ?? 23) + 1);
+    else if (k === 'down') A.target = Math.max(16, (A.target ?? 23) - 1);
+    else if (k === 'auto') A.auto = !A.auto;
+    else if (k === 'lvl') { A.auto = false; A.lvl = (A.lvl % 3) + 1; A.on = true; }
+    else if (k === 'recirc') A.recirc = !A.recirc;
+    else if (k === 'close') return closePanel();
+    try { AU.ui && AU.ui('open'); } catch(_) {}
+    if (k === 'up' || k === 'down') { const big = panel.querySelector('.big'); if (big) big.textContent = Math.round(A.target) + '°C'; acPaintBtn(); return; }
+    paintPanel(); acPaintBtn();
+  }
+  function paintPanel(){
+    if (!panel) return;
+    const A = GAME.G && GAME.G.ac; if (!A) return closePanel();
+    if (!A.has) { panel.innerHTML = `<div>${AR() ? 'العربية دي مفيهاش تكييف' : 'This vehicle has no air conditioning'}</div>
+      <button data-ac="close">${AR() ? 'تمام' : 'OK'}</button>`; place(); return; }
+    panel.innerHTML = `
+      <div class="row2"><span>${AR() ? 'التكييف' : 'Air conditioning'}</span>
+        <button data-ac="power" class="${A.on ? 'on' : ''}">${A.on ? (AR() ? 'شغال' : 'ON') : (AR() ? 'مطفي' : 'OFF')}</button></div>
+      <div class="row2"><button data-ac="down">−</button>
+        <div style="text-align:center"><div class="big">${Math.round(A.target ?? 23)}°C</div>
+          <div class="mut">${AR() ? 'جوه' : 'cabin'} ${Math.round(A.cabin)}° · ${AR() ? 'برّه' : 'out'} ${Math.round(A.out)}°</div></div>
+        <button data-ac="up">+</button></div>
+      <div class="row2"><button data-ac="auto" class="${A.auto !== false ? 'on' : ''}">AUTO</button>
+        <button data-ac="lvl">${AR() ? 'مروحة' : 'Fan'} ${A.lvl}</button>
+        <button data-ac="recirc" class="${A.recirc ? 'on' : ''}">${AR() ? 'تدوير' : 'Recirc'}</button></div>
+      <div class="mut">${AR() ? 'صرف البنزين' : 'Fuel use'}: ${(A.load || 0).toFixed(2)} ${AR() ? 'لتر/ساعة' : 'L/h'}</div>`;
+    place();
+  }
+  function place(){
+    if (!panel) return;
+    const b = document.getElementById('acBtn');
+    if (b) { const r = b.getBoundingClientRect();
+      panel.style.top = Math.min(innerHeight - panel.offsetHeight - 8, r.bottom + 8) + 'px';
+      panel.style.right = Math.max(8, innerWidth - r.right) + 'px'; panel.style.left = 'auto'; }
+    else { panel.style.top = '70px'; panel.style.right = '12px'; }
+  }
+  function acPaintBtn(){
+    const b = document.getElementById('acBtn'), A = GAME.G && GAME.G.ac; if (!b || !A) return;
+    b.innerHTML = `<span style="font-size:1.05em">❄</span><small style="display:block;font-size:.58em;line-height:1">${A.has ? (A.on ? Math.round(A.target ?? 23) + '°' : 'off') : '—'}</small>`;
+    b.classList.toggle('am', !!A.on);
+  }
+  window.OG_acToggle = openPanel;                       /* the ❄ button now opens the panel */
+
+  /* AUTO keeps the cabin at the target; the fan follows the gap */
+  if (typeof updateGame === 'function') {
+    const _ug = updateGame;
+    updateGame = function(G, dt, inp){
+      const out = _ug.apply(this, arguments);
+      try {
+        const A = G.ac;
+        if (A) {
+          if (A.target == null) A.target = 23;
+          if (A.auto === undefined) A.auto = true;
+          if (A.on && A.has && G.car.on && A.auto) {
+            const gap = A.cabin - A.target;
+            A.lvl = gap > 3 ? 3 : gap > 1 ? 2 : gap > -.5 ? 1 : 1;
+            if (gap < -1.2) A.on = A.on;               /* holds, compressor idles through the level */
+          }
+          if (A.recirc) A.cabin -= Math.max(0, (A.cabin - A.target))*dt*.05;   /* recirculation cools faster */
+          if (panel && (performance.now() % 1000) < 40) paintPanel();
+        }
+      } catch(e) {}
+      return out;
+    };
+  }
+  setInterval(() => { try { if (GAME.state === 'play') { acPaintBtn(); if (panel) paintPanel(); } else closePanel(); } catch(e) {} }, 800);
+  setInterval(() => { try { const w = document.getElementById('rhWallet'); if (w) {
+    const cash = (window.OG_cash ? OG_cash() : (S().cash || 0));
+    w.textContent = (AR() ? 'محفظتك: ' : 'Wallet: ') + cash.toLocaleString('en-US') + (AR() ? ' ج' : ' EGP');
+  } } catch(e) {} }, 700);
+
+  /* ---------- 2. handbrake on at the start of every shift ---------- */
+  if (typeof newSession === 'function') {
+    const _ns = newSession;
+    newSession = function(){
+      const G = _ns.apply(this, arguments);
+      try { if (G && G.car) { G.car.park = true; G.car.sel = 'N'; G.car.gear = 0; } } catch(e) {}
+      return G;
+    };
+  }
+  /* release it the moment the driver selects a gear */
+  if (typeof UI !== 'undefined' && UI.act) {
+    const _act = UI.act;
+    UI.act = function(a, p, el){
+      try { if (a === 'gear' && GAME.G && GAME.G.car) GAME.G.car.park = false; } catch(e) {}
+      return _act.apply(this, arguments);
+    };
+  }
+
+  /* ---------- 3. route icons you can actually see ---------- */
+  document.head.insertAdjacentHTML('beforeend', `<style>
+    #hRoute .ogPoi{font-size:14px!important;line-height:1!important;bottom:118%!important;opacity:1!important;
+      text-shadow:0 1px 3px rgba(0,0,0,.85);filter:drop-shadow(0 0 2px rgba(0,0,0,.9))}
+    html.ogShort #hRoute .ogPoi{font-size:12px!important}
+    #hRoute{overflow:visible!important}
+    #hRoute .rt-line{overflow:visible!important}
+  </style>`);
 })();
 </script>
 <script>
