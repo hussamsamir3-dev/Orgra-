@@ -3199,7 +3199,7 @@ UI.siteModal = function(G, site){ UI.site = site; GAME.paused = true; const car 
     else if (tb === 'b') body = tabs + row(tn(SVC.air.n), SVC.air.p, 'svc', 'air') + row(tn(SVC.patch.n), SVC.patch.p, 'svc', 'patch', !car.axles.some(a => a.flat)) + row(tn(SVC.oil.n), SVC.oil.p, 'svc', 'oil', own.cond.engine > 95) + row(tn(SVC.coolant.n), SVC.coolant.p, 'svc', 'coolant') + row(tn(SVC.wash.n), Math.round(SVC.wash.p*(CATMUL[cat] || 1)), 'svc', 'wash', own.dirt < .05) + row(tn(SVC.quick.n), SVC.quick.p, 'svc', 'quick', own.cond.body > 92);
     else body = tabs + `<div class="menu">${MENU.filter(m => !m.rest).map(m => `<div class="card" data-a="eat" data-p="${m.id}"><div class="em">${m.i}</div><b>${tn(m.n)}</b><div class="lbl">${money(m.p)}</div></div>`).join('')}</div>`; }
   else if (site.t === 'mech') { const br = FEAT.brokenList(own), rc = k => Math.round((100 - own.cond[k])*REPAIR_PER[k]*(CATMUL[cat] || 1)*1.15), pc = k => Math.round(PART_COST[k]*(CATMUL[cat] || 1)*1.15);
-    body = `<div class="scroll" style="max-height:50vh;margin-top:1em">${COND.filter(k => own.cond[k] < 99).map(k => row(`${t('c_' + k)} <span class="num lbl">${Math.round(own.cond[k])}%</span>`, rc(k), 'rsvc', 'c:' + k)).join('')}${br.map(k => row(`${t('pt_' + k)} <span class="tag r">✕</span>`, pc(k), 'rsvc', 'p:' + k)).join('')}${!br.length && COND.every(k => own.cond[k] >= 99) ? `<div class="lbl">${t('perfect')} ✓</div>` : ''}</div>`; }
+    body = `<div class="scroll" style="max-height:50vh;margin-top:1em">${COND.filter(k => own.cond[k] < 99.5).map(k => row(`${t('c_' + k)} <span class="num lbl">${Math.round(own.cond[k])}%</span>`, rc(k), 'rsvc', 'c:' + k)).join('')}${br.map(k => row(`${t('pt_' + k)} <span class="tag r">✕</span>`, pc(k), 'rsvc', 'p:' + k)).join('')}${!br.length && COND.every(k => own.cond[k] >= 99) ? `<div class="lbl">${t('perfect')} ✓</div>` : ''}</div>`; }
   else if (site.t === 'tire') body = `<div style="margin-top:1em">${row(tn(SVC.air.n), SVC.air.p, 'svc', 'air')}${row(tn(SVC.patch.n), SVC.patch.p, 'svc', 'patch', !car.axles.some(a => a.flat))}${row(`${t('new_tires')} <span class="num lbl">${Math.round(own.cond.tires)}%</span>`, Math.round((100 - own.cond.tires)*REPAIR_PER.tires*(CATMUL[cat] || 1)*1.1), 'rsvc', 'c:tires', own.cond.tires > 98)}</div>`;
   else body = `<div class="menu" style="margin-top:1em">${MENU.filter(m => !m.rest || site.t === 'rest').map(m => `<div class="card" data-a="eat" data-p="${m.id}"><div class="em">${m.i}</div><b>${tn(m.n)}</b><div class="lbl">${money(m.p)}</div></div>`).join('')}</div>${site.t === 'rest' ? `<button class="btn cy" style="margin-top:1em" data-a="rest15">🛋 ${t('rest15')}</button>` : ''}`;
   UI.modalShow(head + body + `<div class="mrow"><button class="btn gh" data-a="siteLeave">${t('leave')} ›</button></div>`); };
@@ -4214,7 +4214,7 @@ function bindUI(){ const del = (root) => root.addEventListener('click', e => { c
 
 /* =================== RENDER =================== */
 let DPR = 1;
-function resize(){ const q = GAME.save && GAME.save.set.q === 'low'; DPR = q ? 1 : Math.min(matchMedia('(pointer:coarse)').matches ? 1.6 : 2, devicePixelRatio || 1); const cv = RD.cv; RD.Ws = innerWidth; RD.Hs = innerHeight; cv.width = Math.round(RD.Ws*DPR); cv.height = Math.round(RD.Hs*DPR); RD.DPR = DPR;
+function resize(){ const q = GAME.save && GAME.save.set.q === 'low'; DPR = q ? (matchMedia('(pointer:coarse)').matches ? .85 : 1) : Math.min(matchMedia('(pointer:coarse)').matches ? 1.5 : 2, devicePixelRatio || 1); const cv = RD.cv; RD.Ws = innerWidth; RD.Hs = innerHeight; cv.width = Math.round(RD.Ws*DPR); cv.height = Math.round(RD.Hs*DPR); RD.DPR = DPR;
   RD.portrait = RD.Hs > RD.Ws; RD.coarse = matchMedia('(pointer:coarse)').matches; RD.PPM = RD.portrait ? clamp(RD.Ws/(RD.coarse ? 17 : 19), 14, 42) : clamp(RD.Hs/720*(RD.coarse ? 52 : 44), 17, 64); RD.RYs = Math.round(RD.Hs*(RD.portrait ? .42 : .6)); RD.W = RD.Ws; RD.H = RD.Hs; RD.ROADY = RD.RYs; if (UI.sizeCl) setTimeout(() => UI.sizeCl(), 50); }
 function pedDepth(l){ return l < -.5 ? DEP.walk + (l + 1)*.35 : l*DEP.lane1; }
 function drawPeople(G, onRoad){ const W = G.world, car = G.car, vl = RD.camL - 5, vr = RD.camL + RD.W/RD.PPM + 5;
@@ -4240,7 +4240,7 @@ function renderScene(G, dt){ const c = RD.ctx, W = G.world, car = G.car, set = G
   let zt = lerp(zNear, zFar, clamp((spd - 5)/25, 0, 1));   /* fully pulled back by 30 km/h */
   if (!set.dynZoom || G.mode === 'attract') zt = 1 - clamp((L - 5)/8, 0, 1)*.1;
   zt *= (set.zoom || 1)*0.80;   /* pull the camera back for a longer view */
-  RD.zoom = RD.zoom || zt; RD.zoom = lerp(RD.zoom, zt, 1 - Math.exp(-dt*(zt < RD.zoom ? .9 : .6)));
+  RD.zoom = RD.zoom || zt; RD.zoom = lerp(RD.zoom, zt, 1 - Math.exp(-dt*(zt < RD.zoom ? .55 : .4)));
   const z = RD.zoom; RD.W = RD.Ws/z; RD.H = RD.Hs/z; RD.ROADY = RD.RYs/z;
   const vw = RD.W/RD.PPM, minF = (L/2 + 1.2)/vw; let frac;
   if (G.mode === 'attract') frac = .34; else if (car.vx < -.5 || car.gear < 0) frac = Math.max(.55, 1 - minF - .05); else if (behind) frac = clamp((car.x - behind.x)/vw, minF*.42, .22); else { /* the back of the bus stays at least 15% in from the left edge */
@@ -4248,7 +4248,7 @@ function renderScene(G, dt){ const c = RD.ctx, W = G.world, car = G.car, set = G
     let want = .015 + (L/2 + .1)/vw + (acc > .05 ? -.01 : acc < -.08 ? .02 : 0);
     if (G.rest && G.rest.active) want += .06;
     frac = Math.max(minF*.42, Math.min(.5, want));
-    G.camFrac = G.camFrac == null ? frac : (G.camFrac + (frac - G.camFrac)*.08); frac = G.camFrac; }
+    G.camFrac = G.camFrac == null ? frac : (G.camFrac + (frac - G.camFrac)*(1 - Math.exp(-dt*2.4))); frac = G.camFrac; }
   G.camFrac = G.camFrac ?? frac; G.camFrac = lerp(G.camFrac, frac, 1 - Math.exp(-dt*(frac > G.camFrac ? 1.6 : .7)));
   RD.camL = G.mode === 'attract' ? lerp(RD.camL, car.x - vw*G.camFrac, 1 - Math.exp(-dt*3.2)) : car.x - vw*G.camFrac; if (G.mode !== 'attract' && !(car.vx < -.4 || car.gear < 0)) { if (RD._fwd != null && RD.camL < RD._fwd - .004) RD.camL = RD._fwd; RD._fwd = RD.camL; } else RD._fwd = null; RD.camY = lerp(RD.camY, W.h(car.x), 1 - Math.exp(-dt*2.5));
   const sh = set.shake ? (Math.random() - .5)*RD.shake*7 : 0; RD.shake *= Math.exp(-dt*5);
@@ -9488,7 +9488,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-17v';
+window.OGRA_BUILD = '2026-09-17x';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
@@ -11322,7 +11322,7 @@ window.OGRA_BUILD = '2026-09-17v';
           fanSound(!!(A.on && A.has && G.car.on), A.lvl);
           acComfort(G, dt);
         }
-        if (G.car && (G.car.sel === 'D' || G.car.sel === 'R')) G.car.park = false;
+        if (G.car && (G.car.sel === 'D' || G.car.sel === 'R') && !G.car.hand) G.car.park = false;
         alignTraffic(G, dt);
       } catch(e) {}
       return out;
@@ -11519,7 +11519,17 @@ window.OGRA_BUILD = '2026-09-17v';
 
   /* ---------- 4. handbrake on when a shift begins ---------- */
   function startBrake(G){
-    try { if (G && G.car && !G.__brakeSet) { G.__brakeSet = true; G.car.park = true; G.car.sel = 'N'; G.car.gear = 0; } } catch(e) {}
+    try {
+      if (G && G.car && !G.__brakeSet) {
+        G.__brakeSet = true;
+        G.car.hand = true;                       /* the real handbrake the physics reads */
+        G.car.park = true; G.car.sel = 'N'; G.car.gear = 0;
+        try { G.feedAdd && G.feedAdd('hand_set', {}, 'warn'); } catch(_) {}
+        setTimeout(() => { try { G.bubble((typeof LANG !== 'undefined' && LANG.cur === 'ar')
+          ? 'الفرملة اليدوية مرفوعة — اضغط (P) أو B عشان تنزلها'
+          : 'Handbrake is on — press (P) or B to release it'); } catch(_) {} }, 1200);
+      }
+    } catch(e) {}
   }
 
   /* ---------- 5. performance mode ---------- */
@@ -11579,6 +11589,197 @@ window.OGRA_BUILD = '2026-09-17v';
     };
   }
   if (typeof newSession === 'function') { const _ns = newSession; newSession = function(){ const G = _ns.apply(this, arguments); try { G.__brakeSet = false; startBrake(G); } catch(e) {} return G; }; }
+})();
+</script>
+<script>
+/* =====================================================================
+   SMOOTHER GROUND · STEADY AC · CLOSEABLE WINDOWS · HONEST MECHANIC ·
+   GLIDING CAMERA · GEAR REQUIRED · LOUDER MIX · AI WITH WEIGHT ·
+   SHARPER PASSENGERS · MORE PERFORMANCE HEADROOM
+   ===================================================================== */
+(function(){
+  if (typeof RD === 'undefined' || typeof GAME === 'undefined') return;
+  const AR = () => typeof LANG !== 'undefined' && LANG.cur === 'ar';
+  const pick = a => a[Math.floor(Math.random()*a.length)];
+
+  /* ---------- 1. ground without steps ---------- */
+  if (typeof newSession === 'function') {
+    const _ns = newSession;
+    newSession = function(){
+      const G = _ns.apply(this, arguments);
+      try {
+        const W = G.world;
+        if (W && !W.__smooth5) {
+          const raw = W.h.bind(W); let last = 0;
+          W.h = function(x, lane){
+            if (!Number.isFinite(x)) return last;
+            const s = [-12, -6, -2.5, 0, 2.5, 6, 12], w = [.5, 1, 2, 3, 2, 1, .5];
+            let sum = 0, tot = 0;
+            for (let i = 0; i < s.length; i++) { const v = raw(x + s[i], lane); if (Number.isFinite(v)) { sum += v*w[i]; tot += w[i]; } }
+            const out = tot ? sum/tot : raw(x, lane);
+            if (!Number.isFinite(out)) return last;
+            last = out; return out;
+          };
+          W.__smooth5 = true;
+        }
+      } catch(e) {}
+      return G;
+    };
+  }
+
+  /* ---------- 2. air conditioning that holds steady ---------- */
+  if (typeof updateGame === 'function') {
+    const _ug = updateGame;
+    updateGame = function(G, dt, inp){
+      const out = _ug.apply(this, arguments);
+      try {
+        const A = G.ac, car = G.car;
+        if (A && A.has) {
+          if (A.target == null) A.target = 23;
+          A.__t = (A.__t || 0) + dt;
+          if (A.on && car.on && A.auto !== false) {
+            const gap = A.cabin - A.target;
+            if (A.__t > 6) {                                  /* the fan only steps every six seconds */
+              const want = gap > 3.5 ? 3 : gap > 1.5 ? 2 : 1;
+              if (want !== A.lvl) { A.lvl = want; A.__t = 0; }
+            }
+          }
+        }
+        /* a gear is required before the bus will pull away */
+        if (car && car.sel === 'N') { car.thr = 0; if (car.gear > 0) car.gear = 0; }
+        /* AI vehicles lean under their own power and braking */
+        for (const o of G.traffic || []) {
+          if (!o || o.__void) continue;
+          const prev = (o.__pv == null ? (o.v || 0) : o.__pv); const a = ((o.v || 0) - prev)/Math.max(.001, dt); o.__pv = o.v || 0;
+          o.dynPitch = (o.dynPitch || 0)*(1 - Math.min(1, dt*4)) + Math.max(-.05, Math.min(.05, -a*0.006));
+          o.pitch = (o.pitch || 0) + o.dynPitch*0.6;
+          o.squat = o.dynPitch;
+        }
+      } catch(e) {}
+      return out;
+    };
+  }
+  /* the temperature panel fades away after three idle seconds */
+  document.head.insertAdjacentHTML('beforeend', `<style>
+    #acPanel2{transition:opacity .45s ease}
+    #acPanel2.fade{opacity:0}
+    /* every in-game window can be closed, and its buttons stay reachable */
+    #modal > .pn{position:relative}
+    #modal .ogX{position:absolute;top:8px;inset-inline-end:8px;width:34px;height:34px;border-radius:10px;
+      background:rgba(10,16,28,.9);border:1px solid rgba(140,190,255,.3);color:#e8eefc;font:800 16px system-ui;z-index:5}
+    #modal .ogActs{position:sticky;bottom:0;background:linear-gradient(180deg,rgba(12,18,32,0),rgba(12,18,32,.96) 35%);padding-top:8px}
+  </style>`);
+  let acT = 0;
+  function acIdle(){
+    const p = document.getElementById('acPanel2'); if (!p) return;
+    clearTimeout(acT); p.classList.remove('fade');
+    acT = setTimeout(() => { const q = document.getElementById('acPanel2'); if (q) { q.classList.add('fade'); setTimeout(() => { const z = document.getElementById('acPanel2'); if (z) z.remove(); }, 480); } }, 3000);
+  }
+  ['click','touchend','pointerdown'].forEach(ev => document.addEventListener(ev, e => { if (document.getElementById('acPanel2')) acIdle(); }, true));
+  setInterval(() => { const p = document.getElementById('acPanel2'); if (p && !p.__armed) { p.__armed = 1; acIdle(); } }, 300);
+
+  /* ---------- 3. windows you can always close ---------- */
+  function fixModal(){
+    const m = document.getElementById('modal'); if (!m || m.classList.contains('hidden')) return;
+    const pn = m.querySelector('.pn'); if (!pn || pn.__fixed) return;
+    pn.__fixed = 1;
+    const row = pn.querySelector('.mrow');
+    if (row) row.classList.add('ogActs');
+    if (!pn.querySelector('.ogX')) {
+      const x = document.createElement('button'); x.className = 'ogX'; x.textContent = '✕';
+      const close = e => { e.preventDefault(); e.stopPropagation();
+        const leave = pn.querySelector('[data-a="siteLeave"], [data-a="resume"], [data-a="close"], [data-a="summaryOk"]');
+        if (leave) leave.click(); else { try { UI.modalHide(); GAME.paused = false; } catch(_) { m.classList.add('hidden'); } } };
+      x.addEventListener('click', close); x.addEventListener('touchend', close, {passive:false});
+      pn.appendChild(x);
+    }
+  }
+  setInterval(fixModal, 400);
+  addEventListener('keydown', e => { if (e.key === 'Escape') { const x = document.querySelector('#modal .ogX'); if (x) x.click(); } });
+
+  /* ---------- 4. the mechanic tells you the truth ---------- */
+  if (typeof UI !== 'undefined' && UI.siteModal) {
+    const _sm = UI.siteModal;
+    UI.siteModal = function(G, site){
+      try {
+        if (site && site.t === 'mech' && G && G.own && G.own.cond) {
+          const c = G.own.cond;
+          /* a crash writes its damage into the logbook, so the workshop can see it */
+          if (G.car && G.car.__crashDmg) { c.body = Math.max(0, Math.min(c.body, 100 - G.car.__crashDmg)); G.car.__crashDmg = 0; }
+          for (const k in c) if (c[k] > 99.4 && c[k] < 100) c[k] = 100;
+        }
+      } catch(e) {}
+      return _sm.apply(this, arguments);
+    };
+  }
+  /* record crash damage as it happens */
+  if (typeof AU !== 'undefined' && AU.crash) {
+    const _c = AU.crash;
+    AU.crash = function(f){
+      try { const G = GAME.G; if (G && G.car) G.car.__crashDmg = Math.max(G.car.__crashDmg || 0, Math.min(35, (f || .2)*45)); } catch(e) {}
+      return _c.apply(this, arguments);
+    };
+  }
+
+  /* ---------- 5. louder overall mix ---------- */
+  try {
+    const s = GAME.save && GAME.save.set;
+    if (s && s.vol && !s.__boosted) { s.__boosted = 1;
+      for (const k in s.vol) if (typeof s.vol[k] === 'number') s.vol[k] = Math.min(1, s.vol[k]*1.5);
+      try { AU.setVol && AU.setVol(); } catch(e) {}
+    }
+  } catch(e) {}
+
+  /* ---------- 6. more performance headroom ---------- */
+  try {
+    if (window.OG_perf) {
+      const P = window.OG_perf;
+      setInterval(() => {
+        try {
+          if (P.fps < 45 && !P.low) { /* the watchdog will trip soon; help it early */ }
+          if (P.low) {
+            const s = GAME.save && GAME.save.set;
+            if (s && s.q !== 'low') { s.q = 'low'; if (typeof resize === 'function') resize(); }
+          }
+        } catch(e) {}
+      }, 2000);
+    }
+  } catch(e) {}
+
+  /* ---------- 7. passengers with more to say ---------- */
+  const EXTRA = {
+    ac_thanks:[['التكييف بقى حلو كده، ربنا يكرمك', 'The AC feels right now, bless you']],
+    hand:[['الفرملة اليدوية لسه مرفوعة يا أسطى', 'The handbrake is still on, boss']],
+    check:[['كمين قدامك، ورّي ورقك', 'Checkpoint ahead, have your papers ready']],
+    door:[['الباب مفتوح يا أسطى', 'The door is still open, boss']],
+    stop_near:[['أنا نازل الجاية لو سمحت', 'I am getting off at the next one, please']],
+    night_drive:[['الطريق ضلمة، خلي بالك من المطبات', 'Dark road, watch for the humps']],
+    fuel_low:[['البنزين على الآخر.. تحب نقف؟', 'Fuel is low, shall we stop?']]
+  };
+  if (typeof updateGame === 'function') {
+    const _ug2 = updateGame;
+    updateGame = function(G, dt, inp){
+      const out = _ug2.apply(this, arguments);
+      try {
+        if (GAME.state === 'play' && (G.onboard || []).length) {
+          G.__xT = (G.__xT || 0) - dt;
+          if (G.__xT <= 0) {
+            G.__xT = 22 + Math.random()*26;
+            const car = G.car, A = G.ac, opts = [];
+            if (car.hand && Math.abs(car.vx) > 1) opts.push('hand');
+            if (car.door) opts.push('door');
+            if (G.cp && !G.cp.playerDone && G.cp.x - car.x < 220 && G.cp.x > car.x) opts.push('check');
+            if (A && A.on && A.cabin >= 21 && A.cabin <= 26) opts.push('ac_thanks');
+            if (car.fuel != null && car.E && car.fuel/car.E.tank < .15) opts.push('fuel_low');
+            if (RD.night > .6) opts.push('night_drive');
+            if (opts.length) { const k = pick(opts), l = pick(EXTRA[k]);
+              if (G.__lastX !== k) { G.__lastX = k; G.bubble(AR() ? l[0] : l[1]); } }
+          }
+        }
+      } catch(e) {}
+      return out;
+    };
+  }
 })();
 </script>
 <script>
