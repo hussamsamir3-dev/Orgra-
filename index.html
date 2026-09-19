@@ -9488,7 +9488,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-18j';
+window.OGRA_BUILD = '2026-09-18k';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
@@ -12384,6 +12384,37 @@ window.OGRA_BUILD = '2026-09-18j';
   }
   if (typeof newSession === 'function') { const _ns = newSession; newSession = function(){ const G = _ns.apply(this, arguments); guard(G); return G; }; }
   setInterval(() => { try { guard(GAME.G); } catch(e) {} }, 1200);
+})();
+</script>
+<script>
+/* =====================================================================
+   A deleted account must not stay logged in on the device
+   ===================================================================== */
+(function(){
+  let checking = false, told = false;
+  async function verify(){
+    if (checking) return; checking = true;
+    try {
+      const N = window.OGRA_NET, sb = N && N.sb;
+      if (!sb || !navigator.onLine) return;
+      const s = await sb.auth.getSession();
+      if (!s || !s.data || !s.data.session) return;                 /* not signed in: nothing to check */
+      const u = await sb.auth.getUser();                            /* this one asks the server, not the device */
+      const gone = !u || u.error || !u.data || !u.data.user;
+      if (!gone) return;
+      const msg = String((u && u.error && u.error.message) || '');
+      if (/network|fetch|timeout/i.test(msg)) return;               /* a dropped connection is not a deleted account */
+      try { await sb.auth.signOut(); } catch(e) {}
+      try { localStorage.removeItem('ogra_prof'); } catch(e) {}
+      if (!told) { told = true;
+        try { (window.OG_report || function(){})({message:'This account no longer exists on the server, so you have been signed out.'}, 'account'); } catch(e) {}
+      }
+      setTimeout(() => location.reload(), 1800);
+    } catch(e) {} finally { checking = false; }
+  }
+  setTimeout(verify, 4000);
+  setInterval(verify, 300000);                                      /* and every five minutes after that */
+  addEventListener('online', () => setTimeout(verify, 2000));
 })();
 </script>
 <script>
