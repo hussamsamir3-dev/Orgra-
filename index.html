@@ -9488,7 +9488,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-19f';
+window.OGRA_BUILD = '2026-09-19g';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
@@ -13221,6 +13221,53 @@ window.OGRA_BUILD = '2026-09-19f';
     } catch(e) {}
   }, 250);
   addEventListener('keydown', e => { if (e.key === 'Escape' && el) act('resume'); });
+})();
+</script>
+<script>
+/* =====================================================================
+   PAUSE BREADCRUMBS
+   The freeze happens somewhere inside the pause sequence and takes the
+   whole page with it, so nothing can be reported at the time. Each step
+   is written to storage as it is reached. If the game is killed mid-way,
+   the next time it opens it says exactly which step it never came back
+   from. Nothing else changes.
+   ===================================================================== */
+(function(){
+  if (typeof GAME === 'undefined') return;
+  const KEY = 'ogra_pause_trace';
+  const mark = s => { try { localStorage.setItem(KEY, s + ' @' + new Date().toLocaleTimeString()); } catch(e) {} };
+  const clear = () => { try { localStorage.removeItem(KEY); } catch(e) {} };
+
+  /* on start-up, report an unfinished pause from last time */
+  setTimeout(() => {
+    try {
+      const last = localStorage.getItem(KEY);
+      if (last && window.OG_report) OG_report({message:'last time the game stopped during pause at step: ' + last}, 'pause trace');
+      clear();
+    } catch(e) {}
+  }, 3500);
+
+  /* wrap the steps of the pause sequence */
+  try {
+    if (typeof AU !== 'undefined' && AU.pauseGame && !AU.pauseGame.__traced) {
+      const f = AU.pauseGame.bind(AU);
+      const w = function(p){ if (p) mark('1 audio-suspend'); const r = f(p); if (p) mark('2 audio-done'); return r; };
+      w.__traced = 1; AU.pauseGame = w;
+    }
+    if (typeof UI !== 'undefined' && UI.modalShow && !UI.modalShow.__traced) {
+      const f = UI.modalShow.bind(UI);
+      const w = function(h){ const paused = GAME.paused; if (paused) mark('3 window-build'); const r = f(h); if (paused) mark('4 window-shown'); return r; };
+      w.__traced = 1; UI.modalShow = w;
+    }
+    if (typeof UI !== 'undefined' && UI.hudAct && !UI.hudAct.__traced) {
+      const f = UI.hudAct.bind(UI);
+      const w = function(a, p, el){ if (a === 'pause') mark('0 pause-pressed'); const r = f(a, p, el); if (a === 'pause') mark('5 pause-handler-returned'); return r; };
+      w.__traced = 1; UI.hudAct = w;
+    }
+  } catch(e) {}
+  /* a frame after the pause means the page is alive: clear the trace */
+  let alive = 0;
+  setInterval(() => { try { if (GAME.paused) { if (++alive >= 3) { clear(); alive = 0; } } else alive = 0; } catch(e) {} }, 700);
 })();
 </script>
 <script>
