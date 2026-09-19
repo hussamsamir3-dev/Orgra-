@@ -9488,7 +9488,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-18w';
+window.OGRA_BUILD = '2026-09-18x';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
@@ -13203,6 +13203,106 @@ window.OGRA_BUILD = '2026-09-18w';
     } catch(e) {}
   }
   setInterval(dressMenu, 900);
+})();
+</script>
+<script>
+/* =====================================================================
+   THE HUB, REBUILT
+   A hero panel for tonight's trip, a row of live stat tiles, quick tiles
+   for the garage and showroom, and a big animated Start. The original
+   buttons are reused, so everything still works.
+   ===================================================================== */
+(function(){
+  if (typeof UI === 'undefined' || !UI.show) return;
+  const AR = () => typeof LANG !== 'undefined' && LANG.cur === 'ar';
+  const T = (ar, en) => AR() ? ar : en;
+
+  document.head.insertAdjacentHTML('beforeend', `<style>
+  @keyframes hbIn{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+  @keyframes hbPulse{0%,100%{box-shadow:0 10px 30px rgba(255,182,39,.25)}50%{box-shadow:0 14px 46px rgba(255,182,39,.5)}}
+  @keyframes hbShine{to{background-position:300% 0}}
+  body.menuUI .scr .hb2{display:grid;gap:calc(var(--u)*1.4);grid-template-columns:1.35fr .9fr;align-items:start;
+    padding:calc(var(--u)*.4) 0 calc(var(--u)*2)}
+  body.menuUI .scr .hb2 > *{animation:hbIn .4s cubic-bezier(.2,.9,.3,1) both}
+  body.menuUI .scr .hb2 > :nth-child(2){animation-delay:.06s}
+  body.menuUI .scr .hb2 > :nth-child(3){animation-delay:.12s}
+  .hbHero{position:relative;overflow:hidden;border-radius:20px;padding:calc(var(--u)*2.2);
+    background:linear-gradient(135deg,rgba(28,40,66,.95),rgba(12,18,31,.95));
+    border:1px solid rgba(255,182,39,.35);box-shadow:0 18px 44px rgba(0,0,0,.5)}
+  .hbHero::before{content:"";position:absolute;inset:-40% -10% auto auto;width:60%;height:180%;
+    background:radial-gradient(closest-side,rgba(255,182,39,.18),transparent);pointer-events:none}
+  .hbHero .kicker{color:#ffd98a;font:800 calc(var(--u)*1.7) Cairo,system-ui;letter-spacing:.04em}
+  .hbHero .title{font:900 calc(var(--u)*3.6)/1.15 Cairo,system-ui;margin:.15em 0 .35em;
+    background:linear-gradient(90deg,#fff,#ffd98a,#fff);background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:hbShine 8s linear infinite}
+  .hbHero .facts{display:flex;gap:calc(var(--u)*1.6);flex-wrap:wrap;color:#cfd8e6;font:700 calc(var(--u)*1.9) Cairo,system-ui}
+  .hbHero .facts b{color:#fff}
+  .hbTiles{display:grid;grid-template-columns:repeat(2,1fr);gap:calc(var(--u)*1.1)}
+  .hbTile{position:relative;border-radius:16px;padding:calc(var(--u)*1.3);overflow:hidden;
+    background:linear-gradient(180deg,rgba(20,29,48,.94),rgba(12,18,31,.94));border:1px solid rgba(140,190,255,.18)}
+  .hbTile small{display:block;color:#9fb0cc;font:700 calc(var(--u)*1.5) Cairo,system-ui}
+  .hbTile b{display:block;font:900 calc(var(--u)*2.8)/1.1 Rajdhani,Cairo,system-ui;margin-top:.15em}
+  .hbTile .bar{height:6px;border-radius:6px;background:rgba(255,255,255,.12);margin-top:.5em;overflow:hidden}
+  .hbTile .bar i{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,#ffb627,#ffe9bd)}
+  .hbTile.go{cursor:pointer;transition:transform .14s,border-color .2s,box-shadow .2s}
+  .hbTile.go:hover{transform:translateY(-3px);border-color:rgba(255,182,39,.5);box-shadow:0 12px 30px rgba(0,0,0,.45)}
+  .hbTile .ic{font-size:calc(var(--u)*3)}
+  .hbStart{grid-column:1/-1;display:flex;gap:calc(var(--u)*1.2);align-items:center;flex-wrap:wrap}
+  .hbStart .go{flex:1;min-width:min(100%,260px);animation:hbPulse 2.6s ease-in-out infinite}
+  @media (max-width:900px), (max-height:540px){ body.menuUI .scr .hb2{grid-template-columns:1fr} }
+  @media (prefers-reduced-motion:reduce){ body.menuUI .scr .hb2 *{animation:none!important} }
+  </style>`);
+
+  function build(){
+    try {
+      if (UI.cur && UI.cur.name !== 'hub') return;
+      const scr = document.querySelector('#screens .scr'); if (!scr || scr.querySelector('.hb2')) return;
+      const left = scr.querySelector('.hbLeft'), right = scr.querySelector('.hbRight');
+      if (!left || !right) return;
+      const G = GAME.G, s = S(), R = (typeof routeById === 'function') && routeById(UI.sel.route);
+      const own = s.owned && s.owned[s.veh] || {};
+      const spec = (typeof vehById === 'function') && vehById(s.veh);
+      const cond = own.cond || {};
+      const health = Math.round(['engine','gearbox','brakes','susp','tires','body']
+        .reduce((a, k) => a + (cond[k] ?? 100), 0)/6);
+      const fuel = Math.round(((own.fuel ?? 0)/((spec && spec.tank) || 45))*100);
+      const need = (typeof xpNeed === 'function') ? xpNeed(s.lvl || 1) : 220;
+      const xpPct = Math.min(100, Math.round(((s.xp || 0) % need)/need*100));
+
+      const wrap = document.createElement('div'); wrap.className = 'hb2';
+      wrap.innerHTML = `
+        <div class="hbHero">
+          <div class="kicker">${T('رحلة الليلة', "Tonight's trip")}</div>
+          <div class="title">${R ? tn(R.n) : ''}</div>
+          <div class="facts">
+            <span>🛣️ <b>${R ? (R.realKm || 0) : 0}</b> ${T('كم', 'km')}</span>
+            <span>🚏 <b>${R ? (R.st ? R.st.length : 0) : 0}</b> ${T('محطة', 'stops')}</span>
+            <span>🪙 <b>${R ? R.fare : 0}</b> ${T('ج للراكب', 'EGP a seat')}</span>
+            <span>🚐 <b>${spec ? tn(spec.n) : ''}</b></span>
+          </div>
+        </div>
+        <div class="hbTiles">
+          <div class="hbTile"><small>${T('المستوى', 'Level')}</small><b>${s.lvl || 1}</b><div class="bar"><i style="width:${xpPct}%"></i></div></div>
+          <div class="hbTile"><small>${T('نقودك', 'Wallet')}</small><b>${(s.cash || 0).toLocaleString('en-US')}</b></div>
+          <div class="hbTile"><small>${T('حالة المركبة', 'Condition')}</small><b>${health}%</b><div class="bar"><i style="width:${health}%;background:${health > 70 ? 'linear-gradient(90deg,#39f28b,#b6ffd8)' : 'linear-gradient(90deg,#ff7a4d,#ffb627)'}"></i></div></div>
+          <div class="hbTile"><small>${T('الوقود', 'Fuel')}</small><b>${fuel}%</b><div class="bar"><i style="width:${fuel}%;background:linear-gradient(90deg,#2ee6ff,#9df3ff)"></i></div></div>
+          <div class="hbTile go" data-a="nav" data-p="workshop"><span class="ic">🔧</span><small>${T('المرآب', 'Garage')}</small></div>
+          <div class="hbTile go" data-a="nav" data-p="showroom"><span class="ic">🚐</span><small>${T('المعرض', 'Showroom')}</small></div>
+        </div>
+        <div class="hbStart"></div>`;
+
+      /* move the real buttons across, so their actions keep working */
+      const startBtn = right.querySelector('[data-a="hubGo"]');
+      const lens = [...right.querySelectorAll('[data-a="hlen"]')];
+      const bar = wrap.querySelector('.hbStart');
+      if (startBtn) { startBtn.classList.add('go'); bar.appendChild(startBtn); }
+      lens.forEach(b => bar.appendChild(b));
+      left.style.display = 'none'; right.style.display = 'none';
+      scr.insertBefore(wrap, scr.firstChild);
+    } catch(e) { if (window.OG_report) OG_report(e, 'hub'); }
+  }
+  const _s = UI.show;
+  UI.show = function(n){ const r = _s.apply(this, arguments); if ((UI.cur && UI.cur.name) === 'hub') setTimeout(build, 30); return r; };
+  setInterval(() => { try { if (UI.cur && UI.cur.name === 'hub' && GAME.state === 'hub') build(); } catch(e) {} }, 1200);
 })();
 </script>
 <script>
