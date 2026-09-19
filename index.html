@@ -9488,7 +9488,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-19p';
+window.OGRA_BUILD = '2026-09-19q';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
@@ -13571,20 +13571,34 @@ window.OGRA_BUILD = '2026-09-19p';
   if (typeof GAME === 'undefined') return;
   const K = 'ogra_hb';
   let last = '', n = 0;
-  const beat = tag => { try { if (tag !== last || (n++ % 8) === 0) { last = tag; localStorage.setItem(K, tag + ' #' + n); } } catch(e) {} };
+  let log = [];
+  const beat = tag => {
+    try {
+      if (tag === last && (n++ % 12)) return;
+      last = tag; n++;
+      log.push({t:tag, ms:Date.now()});
+      if (log.length > 14) log.shift();
+      localStorage.setItem(K, tag);
+      localStorage.setItem('ogra_hb_log', JSON.stringify(log));
+    } catch(e) {}
+  };
   window.OG_beat = beat;
 
   /* report the last activity from a previous run that never finished */
   setTimeout(() => {
     try {
-      const v = localStorage.getItem(K);
-      if (v && window.OG_report) OG_report({message:'the game last got stuck inside: ' + v}, 'stuck at');
+      const raw = localStorage.getItem('ogra_hb_log');
+      if (raw && window.OG_report) {
+        const log = JSON.parse(raw), t0 = Date.now();
+        const lines = log.slice(-6).map(e => e.t + '  ' + Math.round((t0 - e.ms)/1000) + 's ago').join('\n');
+        OG_report({message:'last things the game was doing before it stopped:\n' + lines}, 'trace');
+      }
+      localStorage.removeItem('ogra_hb_log');
       localStorage.removeItem(K);
     } catch(e) {}
   }, 3200);
   /* a clean shutdown clears it */
-  addEventListener('pagehide', () => { try { localStorage.removeItem(K); } catch(e) {} });
-  addEventListener('beforeunload', () => { try { localStorage.removeItem(K); } catch(e) {} });
+  /* nothing is erased on close: that is exactly when we need it */
 
   /* name the big pieces as they run */
   const wrap = (owner, name, tag) => {
