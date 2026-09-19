@@ -9488,7 +9488,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-19k';
+window.OGRA_BUILD = '2026-09-19m';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
@@ -13426,6 +13426,73 @@ window.OGRA_BUILD = '2026-09-19k';
       if ($('pz')) GAME.paused = true;                 /* nothing may quietly un-pause us */
     } catch(e) {}
   }, 200);
+})();
+</script>
+<script>
+/* =====================================================================
+   PAUSING WHILE ONLINE
+   Locally the radio, the music and the server connection are absent, so
+   pausing was always safe. Live, pausing touched all three at once. Each
+   of those is now wrapped, given its own breadcrumb, and none of them can
+   hold up the pause.
+   ===================================================================== */
+(function(){
+  if (typeof GAME === 'undefined') return;
+  const mark = s => { try { localStorage.setItem('ogra_pause_trace', s + ' @' + new Date().toLocaleTimeString()); } catch(e) {} };
+  const safe = (label, fn) => { try { mark(label); fn(); } catch(e) { try { (window.OG_report || function(){})(e, label); } catch(_) {} } };
+
+  /* 1. the radio keeps streaming through a pause: it is only turned down.
+        Stopping and restarting a live stream is what can lock up Safari. */
+  try {
+    if (window.RADIO && RADIO.el && !RADIO.__pauseSafe) {
+      RADIO.__pauseSafe = 1;
+      let was = null;
+      window.OG_radioDuck = on => {
+        try {
+          const el = RADIO.el; if (!el) return;
+          if (on) { if (was === null) was = el.volume; el.volume = 0; }
+          else if (was !== null) { el.volume = was; was = null; }
+        } catch(e) {}
+      };
+    }
+  } catch(e) {}
+
+  /* 2. pausing runs each part separately, so one failure cannot stop the rest */
+  if (typeof AU !== 'undefined' && AU.pauseGame && !AU.pauseGame.__split) {
+    const orig = AU.pauseGame.bind(AU);
+    const w = function(p){
+      safe(p ? 'A radio-duck' : 'A radio-restore', () => { if (window.OG_radioDuck) OG_radioDuck(!!p); });
+      safe(p ? 'B audio-buses' : 'B audio-restore', () => orig(p));
+      safe(p ? 'C done' : 'C resumed', () => {});
+      if (!p) { try { localStorage.removeItem('ogra_pause_trace'); } catch(e) {} }
+    };
+    w.__split = 1; AU.pauseGame = w;
+  }
+
+  /* 3. nothing is saved to the server while the game is paused: the save is
+        held until play resumes, so a slow network cannot freeze the menu */
+  try {
+    if (typeof saveGame === 'function' && !saveGame.__deferred) {
+      const orig = saveGame;
+      let pending = false;
+      const w = function(){
+        if (GAME.paused && GAME.state === 'play') { pending = true; return; }
+        return orig.apply(this, arguments);
+      };
+      w.__deferred = 1;
+      saveGame = w;
+      setInterval(() => { try { if (pending && !GAME.paused) { pending = false; orig(); } } catch(e) {} }, 1500);
+    }
+  } catch(e) {}
+
+  /* 4. and the music manager is never asked to start or stop mid-pause */
+  try {
+    if (typeof MUSIC !== 'undefined' && MUSIC.want && !MUSIC.want.__guard) {
+      const orig = MUSIC.want.bind(MUSIC);
+      const w = function(on){ if (GAME.paused && GAME.state === 'play') return; return orig(on); };
+      w.__guard = 1; MUSIC.want = w;
+    }
+  } catch(e) {}
 })();
 </script>
 <script>
