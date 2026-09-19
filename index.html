@@ -9488,7 +9488,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-19m';
+window.OGRA_BUILD = '2026-09-19n';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
@@ -13493,6 +13493,70 @@ window.OGRA_BUILD = '2026-09-19m';
       w.__guard = 1; MUSIC.want = w;
     }
   } catch(e) {}
+})();
+</script>
+<script>
+/* =====================================================================
+   PAUSE: STOP EVERYTHING
+   While the panel is open the game does no work at all — no drawing, no
+   animation frames, no audio graph, no radio. If the game is ever killed
+   during a pause twice in a row, the radio is switched off by itself,
+   since a live stream is the likeliest thing left that can lock Safari.
+   ===================================================================== */
+(function(){
+  if (typeof GAME === 'undefined') return;
+  const AR = () => typeof LANG !== 'undefined' && LANG.cur === 'ar';
+  const K = 'ogra_pause_hang';
+
+  /* count how often the game died during a pause */
+  try {
+    const n = +(localStorage.getItem(K) || 0);
+    if (n >= 2 && GAME.save) {
+      const st = GAME.save.set || (GAME.save.set = {});
+      st.radioOff = true;
+      localStorage.setItem(K, '0');
+      setTimeout(() => { try { (window.OG_report || function(){})({message:AR()
+        ? 'قفلنا الراديو مؤقتاً عشان اللعبة كانت بتعلّق عند الوقفة.'
+        : 'The radio has been switched off, because the game kept locking up on pause.'}, 'radio'); } catch(e) {} }, 3000);
+    }
+  } catch(e) {}
+
+  let raf = null, canvasWas = null;
+  function freeze(){
+    try {
+      /* 1. no more frames */
+      if (!raf) { raf = window.requestAnimationFrame; window.requestAnimationFrame = function(cb){ return raf.call(window, function(t){ try { if (document.getElementById('pz')) return; } catch(e) {} return cb(t); }); }; }
+      /* 2. the canvas stops being composited */
+      const cv = document.querySelector('canvas#cv') || document.querySelector('canvas');
+      if (cv && canvasWas === null) { canvasWas = cv.style.visibility || ''; cv.style.visibility = 'hidden'; }
+      /* 3. the radio and the sound engine go quiet without being torn down */
+      try { if (window.RADIO && RADIO.el) RADIO.el.volume = 0; } catch(e) {}
+      try { if (AU.ctx && AU.ctx.state === 'running' && AU.ctx.suspend) AU.ctx.suspend(); } catch(e) {}
+      localStorage.setItem(K, String(+(localStorage.getItem(K) || 0) + 1));
+    } catch(e) {}
+  }
+  function thaw(){
+    try {
+      const cv = document.querySelector('canvas#cv') || document.querySelector('canvas');
+      if (cv && canvasWas !== null) { cv.style.visibility = canvasWas; canvasWas = null; }
+      try { if (AU.ctx && AU.ctx.state === 'suspended' && AU.ctx.resume) AU.ctx.resume(); } catch(e) {}
+      try { if (window.RADIO && RADIO.el && !(GAME.save && GAME.save.set && GAME.save.set.radioOff)) RADIO.el.volume = 1; } catch(e) {}
+      localStorage.setItem(K, '0');                   /* we came back: not a hang */
+    } catch(e) {}
+  }
+
+  let on = false;
+  setInterval(() => {
+    try {
+      const open = !!document.getElementById('pz');
+      if (open && !on) { on = true; freeze(); }
+      else if (!open && on) { on = false; thaw(); }
+      /* the radio stays off if it was switched off for us */
+      if (GAME.save && GAME.save.set && GAME.save.set.radioOff && window.RADIO && RADIO.on) {
+        try { RADIO.power(); } catch(e) {}
+      }
+    } catch(e) {}
+  }, 150);
 })();
 </script>
 <script>
