@@ -43,19 +43,131 @@
   .cta:active{background:rgba(230,180,85,.2)}
   @keyframes breathe{0%,100%{box-shadow:0 0 0 rgba(230,180,85,0)}50%{box-shadow:0 0 34px rgba(230,180,85,.28)}}
   .curtain{position:absolute;inset:0;background:#05070d;z-index:5;opacity:0;pointer-events:none;transition:opacity .45s}
-  #logo{position:fixed;inset:0;z-index:9;overflow:hidden;
-    background:#05070d url('assets/company_logo.svg') center/cover no-repeat;
-    opacity:0;animation:logoIn 1s ease forwards, logoOut .9s ease 3s forwards}
-  #logo img{display:none}                       /* the artwork is the layer itself, edge to edge */
-  #logo{animation:logoIn 1s ease forwards, logoOut .9s ease 3s forwards, logoZoom 4.2s ease-out both}
+  #logo{position:fixed;inset:0;z-index:9;overflow:hidden;perspective:1200px;
+    background:radial-gradient(75% 60% at 50% 45%,#0e1526 0%,#060a15 55%,#02040a 100%);
+    opacity:0;animation:logoIn .5s ease forwards, logoOut .9s ease 5.2s forwards}
   @keyframes logoIn{to{opacity:1}}
   @keyframes logoOut{to{opacity:0;visibility:hidden}}
-  @keyframes logoZoom{from{transform:scale(1.06)}to{transform:scale(1)}}
+  #logo .stage{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:clamp(8px,1.8vmin,20px);direction:ltr;padding:4vmin;transform-style:preserve-3d;
+    animation:push 6s ease-out both}
+  @keyframes push{from{transform:scale(1.06)}to{transform:scale(1)}}
+  #logo .vig2{position:absolute;inset:0;background:radial-gradient(60% 52% at 50% 46%,transparent 30%,rgba(1,2,6,.92) 100%);z-index:4;pointer-events:none}
+  #logo .grain{position:absolute;inset:-50%;z-index:5;pointer-events:none;opacity:.05;
+    background-image:repeating-conic-gradient(#fff 0% 0.0009%,transparent 0% 0.002%);animation:grain .5s steps(2) infinite}
+  @keyframes grain{50%{transform:translate3d(-2%,1%,0)}}
+  #logo .rays{position:absolute;inset:0;display:grid;place-items:center;z-index:1;opacity:0;animation:byIn 1.1s ease .95s forwards}
+  #logo .rays i{position:absolute;width:3vmin;height:150vmax;transform-origin:50% 0;
+    background:linear-gradient(180deg,rgba(238,189,92,.22),transparent 60%);filter:blur(14px)}
+  #logo .rays i:nth-child(1){transform:rotate(-38deg)}#logo .rays i:nth-child(2){transform:rotate(-20deg)}
+  #logo .rays i:nth-child(3){transform:rotate(-7deg)} #logo .rays i:nth-child(4){transform:rotate(9deg)}
+  #logo .rays i:nth-child(5){transform:rotate(23deg)} #logo .rays i:nth-child(6){transform:rotate(41deg)}
+  #logo .streak{position:absolute;top:50%;left:-40%;width:180%;height:2px;z-index:3;
+    background:linear-gradient(90deg,transparent,rgba(255,255,255,.95),transparent);
+    box-shadow:0 0 30px rgba(255,245,210,.8);opacity:0;animation:streak 1.1s cubic-bezier(.2,.9,.2,1) .15s both}
+  @keyframes streak{0%{opacity:0;transform:translateX(-60%) scaleY(.4)}
+    20%{opacity:1}60%{opacity:1;transform:translateX(10%) scaleY(1.6)}100%{opacity:0;transform:translateX(40%) scaleY(.2)}}
+  #logo .shock{position:absolute;top:50%;left:50%;width:14vmin;height:14vmin;margin:-7vmin 0 0 -7vmin;border-radius:50%;
+    border:2px solid rgba(238,189,92,.8);z-index:2;opacity:0}
+  #logo .s1{animation:shock 1.5s cubic-bezier(.16,1,.3,1) 1.05s both}
+  #logo .s2{animation:shock 1.7s cubic-bezier(.16,1,.3,1) 1.2s both}
+  @keyframes shock{0%{opacity:.9;transform:scale(.2)}100%{opacity:0;transform:scale(7)}}
+  #logo .sparks i{position:absolute;width:3px;height:3px;border-radius:50%;background:#ffe6ab;z-index:3;
+    box-shadow:0 0 10px #ffd27a;opacity:0}
+  @keyframes spark{0%{opacity:0;transform:translate(0,0) scale(1)}
+    12%{opacity:1}100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(.3)}}
+  #logo .seal{position:relative;order:1;width:min(30vmin,230px);aspect-ratio:1;transform-style:preserve-3d;z-index:3;
+    animation:sealIn 1.5s cubic-bezier(.16,1,.3,1) .35s both, float 6s ease-in-out 1.9s infinite}
+  @keyframes sealIn{0%{opacity:0;transform:translateZ(-560px) rotateY(-220deg) rotateX(26deg) scale(.5)}
+    55%{opacity:1}100%{opacity:1;transform:none}}
+  @keyframes float{0%,100%{transform:translateY(0) rotateY(-5deg)}50%{transform:translateY(-9px) rotateY(5deg)}}
+  #logo .emblem{width:100%;height:100%;filter:drop-shadow(0 22px 44px rgba(0,0,0,.7)) drop-shadow(0 0 26px rgba(238,189,92,.4))}
+  #logo .ring{transform-origin:110px 110px}
+  #logo .r1{animation:spin 16s linear infinite}
+  #logo .r2{animation:spinR 22s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}@keyframes spinR{to{transform:rotate(-360deg)}}
+  #logo .wings,#logo .core,#logo .tip{opacity:0;animation:byIn .5s ease 1.15s forwards}
+  #logo .shine{animation:sweep 3.4s ease-in-out 1.7s infinite}
+  @keyframes sweep{0%{transform:translateX(0)}55%,100%{transform:translateX(380px)}}
+  #logo .halo{position:absolute;inset:-22%;border-radius:50%;pointer-events:none;
+    background:radial-gradient(closest-side,rgba(238,189,92,.3),transparent 70%);opacity:0;
+    animation:halo 2.4s ease 1.05s forwards}
+  @keyframes halo{0%{opacity:0;transform:scale(.6)}45%{opacity:1}100%{opacity:.55;transform:scale(1.2)}}
+  #logo .flare{position:absolute;left:50%;top:38%;width:70%;height:6px;transform:translate(-50%,-50%);
+    background:radial-gradient(closest-side,rgba(255,255,255,.9),transparent);filter:blur(3px);opacity:0;
+    animation:flare 1.2s ease 1.05s both}
+  @keyframes flare{0%{opacity:0;transform:translate(-50%,-50%) scaleX(.2)}30%{opacity:1}100%{opacity:0;transform:translate(-50%,-50%) scaleX(1.5)}}
+  #logo .floor{order:2;width:0;height:2px;background:linear-gradient(90deg,transparent,rgba(238,189,92,.85),transparent);
+    animation:rule .9s cubic-bezier(.2,1,.3,1) 1.55s forwards}
+  @keyframes rule{to{width:min(54vmin,440px)}}
+  #logo .word{order:3;display:flex;gap:.06em;direction:ltr;
+    font:800 clamp(26px,6.6vmin,66px)/1 'Rajdhani',Cairo,system-ui;letter-spacing:.18em;text-indent:.18em}
+  #logo .word span{display:inline-block;opacity:0;transform:translateY(40px) rotateX(-85deg) scale(1.3);
+    background:linear-gradient(180deg,#fffaf0 0%,#f0c368 42%,#8e621a 66%,#ffe9b5 100%);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    text-shadow:0 3px 0 rgba(0,0,0,.4);animation:slam .5s cubic-bezier(.2,1.3,.3,1) forwards}
+  #logo .word .sp{width:.45em;background:none}
+  #logo .word span:nth-child(1){animation-delay:1.62s}#logo .word span:nth-child(2){animation-delay:1.70s}
+  #logo .word span:nth-child(3){animation-delay:1.78s}#logo .word span:nth-child(5){animation-delay:1.90s}
+  #logo .word span:nth-child(6){animation-delay:1.98s}#logo .word span:nth-child(7){animation-delay:2.06s}
+  #logo .word span:nth-child(8){animation-delay:2.14s}
+  @keyframes slam{to{opacity:1;transform:none}}
+  #logo .byline{order:4;color:#cfdbec;letter-spacing:.2em;opacity:0;
+    font:600 clamp(10px,2vmin,16px) Cairo,system-ui;animation:byIn .9s ease 2.5s forwards}
+  #logo .byline b{color:#f3dba4;font-weight:800}
+  @keyframes byIn{to{opacity:1}}
+  #logo .flash{position:absolute;inset:0;background:#fff;opacity:0;z-index:6;pointer-events:none;
+    animation:flash .5s ease 1.05s both, flash2 .8s ease 5.1s both}
+  @keyframes flash{0%{opacity:0}18%{opacity:.75}100%{opacity:0}}
+  @keyframes flash2{0%{opacity:0}40%{opacity:.5}100%{opacity:0}}
+  @media (prefers-reduced-motion:reduce){#logo *{animation:none!important;opacity:1!important}}
   .curtain.on{opacity:1}
   @media (prefers-reduced-motion:reduce){*{animation:none!important}}
 </style></head>
 <body>
-<div id="logo"><img src="assets/company_logo.svg" alt=""></div>
+<div id="logo">
+  <div class="vig2"></div><div class="grain"></div>
+  <div class="rays"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  <div class="streak"></div>
+  <div class="shock s1"></div><div class="shock s2"></div>
+  <div class="sparks" id="sparks"></div>
+  <div class="stage">
+    <div class="seal">
+      <svg viewBox="0 0 220 220" class="emblem">
+        <defs>
+          <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#fff6dd"/><stop offset="26%" stop-color="#eebd5c"/>
+            <stop offset="50%" stop-color="#8a5f18"/><stop offset="68%" stop-color="#ffe6ab"/>
+            <stop offset="100%" stop-color="#6b4510"/></linearGradient>
+          <linearGradient id="steel" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#4a5871"/><stop offset="50%" stop-color="#121a2b"/><stop offset="100%" stop-color="#39455c"/></linearGradient>
+          <radialGradient id="core"><stop offset="0%" stop-color="#fff2cd"/><stop offset="100%" stop-color="#c8891f"/></radialGradient>
+          <linearGradient id="sheen" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="rgba(255,255,255,0)"/><stop offset="48%" stop-color="rgba(255,255,255,.9)"/>
+            <stop offset="52%" stop-color="rgba(255,255,255,.9)"/><stop offset="100%" stop-color="rgba(255,255,255,0)"/></linearGradient>
+        </defs>
+        <circle class="ring r0" cx="110" cy="110" r="104" fill="none" stroke="url(#steel)" stroke-width="10"/>
+        <circle class="ring r1" cx="110" cy="110" r="98"  fill="none" stroke="url(#gold)" stroke-width="4"
+                stroke-dasharray="26 14" stroke-linecap="round"/>
+        <circle class="ring r2" cx="110" cy="110" r="86"  fill="none" stroke="rgba(238,189,92,.5)" stroke-width="1.6"
+                stroke-dasharray="4 9"/>
+        <g class="wings">
+          <path d="M110 66 C76 66 48 82 32 104 C58 95 84 92 110 92 C136 92 162 95 188 104 C172 82 144 66 110 66 Z" fill="url(#gold)"/>
+          <path d="M110 104 C84 104 60 108 40 118 C64 113 86 111 110 111 C134 111 156 113 180 118 C160 108 136 104 110 104 Z" fill="url(#gold)" opacity=".85"/>
+        </g>
+        <ellipse class="core" cx="110" cy="134" rx="24" ry="28" fill="url(#core)"/>
+        <ellipse cx="110" cy="123" rx="9.5" ry="11" fill="#2b1c05" opacity=".5"/>
+        <path class="tip" d="M110 164 L101 186 L110 179 L119 186 Z" fill="url(#gold)"/>
+        <rect class="shine" x="-140" y="0" width="100" height="220" fill="url(#sheen)" opacity=".6"/>
+      </svg>
+      <div class="halo"></div><div class="flare"></div>
+    </div>
+    <div class="floor"></div>
+    <div class="word"><span>E</span><span>G</span><span>Y</span><span class="sp"></span><span>S</span><span>E</span><span>A</span><span>L</span></div>
+    <div class="byline">by <b>Hossam Hegazi</b></div>
+  </div>
+  <div class="flash"></div>
+</div>
 <div id="sp">
   <div class="fallback"></div>
   <div class="shot" id="shot"></div>
@@ -78,6 +190,21 @@
   <div class="curtain" id="curtain"></div>
 </div>
 <script>
+  (function(){ var d = document.getElementById('sparks'); if (!d) return;
+    for (var i = 0; i < 34; i++) { var x = document.createElement('i');
+      var a = Math.random()*Math.PI*2, r = 90 + Math.random()*320;
+      x.style.left = '50%'; x.style.top = '46%';
+      x.style.setProperty('--dx', (Math.cos(a)*r).toFixed(0) + 'px');
+      x.style.setProperty('--dy', (Math.sin(a)*r*0.7).toFixed(0) + 'px');
+      x.style.animation = 'spark ' + (1.1 + Math.random()*1.3).toFixed(2) + 's ease-out ' + (1.05 + Math.random()*0.35).toFixed(2) + 's both';
+      d.appendChild(x); } })();
+  (function(){ var d = document.getElementById('dust'); if (!d) return;
+    for (var i = 0; i < 26; i++) { var x = document.createElement('i');
+      x.style.left = (Math.random()*100).toFixed(1) + '%';
+      x.style.top = (55 + Math.random()*40).toFixed(1) + '%';
+      x.style.animationDelay = (Math.random()*6).toFixed(2) + 's';
+      x.style.animationDuration = (4.5 + Math.random()*4).toFixed(1) + 's';
+      d.appendChild(x); } })();
   var p = 6, ready = false, done = false;
   var fill = document.getElementById('fill'), pct = document.getElementById('pct'),
       stage = document.getElementById('stage'), cta = document.getElementById('cta'),
@@ -98,7 +225,7 @@
     setTimeout(function(){ try { parent.postMessage('ogra:splash-done', '*'); } catch(e) {} }, 420);
   }
   var logoUp = true;
-  setTimeout(function(){ logoUp = false; var l = document.getElementById('logo'); if (l) l.style.display = 'none'; }, 3900);
+  setTimeout(function(){ logoUp = false; var l = document.getElementById('logo'); if (l) l.style.display = 'none'; }, 6100);
   function guard(fn){ return function(e){ if (logoUp) { if (e && e.preventDefault) e.preventDefault(); return; } fn(); }; }
   document.getElementById('sp').addEventListener('click', guard(go));
   document.getElementById('sp').addEventListener('touchend', guard(function(){ go(); }), {passive:false});

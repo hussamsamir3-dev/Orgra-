@@ -8893,12 +8893,8 @@ function seedArt(G){
 { const _up = updPeople; updPeople = function(G, dt){ _up(G, dt);
     try { if (GAME.state === 'play') { seedArt(G);
       /* advance the walkers */
-      for (const q of G.props) if (q.t === 'artW') {
-        /* stride and speed tied together, so nobody moonwalks */
-        const stride = 0.62;                       /* metres per frame */
-        q.ph = (q.ph + dt * q.sp * 5.2) % 8;
-        q.x += q.dir * dt * q.sp * 5.2 * (stride / 8) * 8 * 0.32;
-      } } } catch(e) {} }; }
+      /* the walk cycle is handled by the walker module further down */
+      } } catch(e) {} }; }
 
 
 document.head.insertAdjacentHTML('beforeend', `<style>
@@ -9499,7 +9495,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-20g';
+window.OGRA_BUILD = '2026-09-20h';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
@@ -14669,6 +14665,88 @@ window.OGRA_BUILD = '2026-09-20g';
     #mx .card,#mx .pod{overflow:hidden}
     #mx .page{contain:layout}
   </style>`);
+})();
+</script>
+<script>
+/* =====================================================================
+   WALK CYCLES, DONE PROPERLY
+   Both sets of people — the sprite sheet in assets/peds.webp and the
+   32 painted frames in assets/new — now share one rule: eight frames per
+   stride, timed to the ground they actually cover, never skipping a frame,
+   and always facing the way they move.
+   ===================================================================== */
+(function(){
+  if (typeof GAME === 'undefined' || typeof RD === 'undefined') return;
+  const STRIDE = 1.45;            /* metres per full eight-frame cycle */
+  const MAXFPS = 9;               /* a walk, never a sprint */
+
+  /* ---- the painted walkers (assets/new/walkA_*, walkB_*) ---- */
+  function artWalk(G, dt){
+    for (const q of (G.props || [])) {
+      if (!q || q.t !== 'artW') continue;
+      if (q.sp == null) q.sp = 0.8 + Math.random()*0.5;
+      const v = q.sp*1.05;                               /* metres a second, a normal pace */
+      q.x += (q.dir || 1)*v*dt;
+      const fps = Math.min(MAXFPS, (v/STRIDE)*8);        /* frames a second follow the stride */
+      const step = fps*dt;
+      q.ph = (q.ph || 0) + Math.min(1, step);            /* never more than one frame per draw */
+      if (q.ph >= 8) q.ph -= 8;
+      q.flip = (q.dir || 1) < 0;                          /* face the way you walk */
+    }
+  }
+
+  /* ---- the sprite-sheet crowd ---- */
+  function sheetWalk(list, dt){
+    for (const p of (list || [])) {
+      if (!p) continue;
+      const v = Math.abs(p.v || 0);
+      if (v > .03) {
+        const fps = Math.min(MAXFPS, (v/STRIDE)*8);
+        const step = Math.min(1, fps*dt);                 /* one frame at a time, in order */
+        p.ph = (p.ph || 0) + step*(6.2832/8);
+        p.face = (p.v > 0) ? 1 : -1;
+        p.walk = true;
+      } else { p.walk = false; }
+    }
+  }
+
+  if (typeof updateGame === 'function') {
+    const _ug = updateGame;
+    updateGame = function(G, dt, inp){
+      const out = _ug.apply(this, arguments);
+      try { artWalk(G, dt); sheetWalk(G.walkers, dt); sheetWalk(G.peds, dt); } catch(e) {}
+      return out;
+    };
+  }
+
+  /* the sheet crowd is drawn from its own phase, so the frame can never jump */
+  if (typeof RD.person === 'function') {
+    const _p = RD.person;
+    RD.person = function(Lk, x, fy, sc, ph, walking, wave, face){
+      try {
+        if (Lk) {
+          const now = performance.now();
+          if (Lk.__lx != null && now - (Lk.__lt || 0) < 350) {
+            const dx = x - Lk.__lx;
+            if (Math.abs(dx) > .25) { Lk.__face = dx > 0 ? 1 : -1; Lk.__moved = now; }
+          }
+          Lk.__lx = x; Lk.__lt = now;
+          if (Lk.__face) face = Lk.__face;
+          walking = walking || (now - (Lk.__moved || 0) < 250);
+          /* keep the cycle continuous even if the caller resets its phase */
+          if (walking) {
+            const prev = Lk.__ph == null ? ph : Lk.__ph;
+            let d = ph - prev;
+            while (d > 3.1416) d -= 6.2832; while (d < -3.1416) d += 6.2832;
+            if (d < 0) d = 0;                                  /* never run the legs backwards */
+            Lk.__ph = prev + Math.min(d, 0.9);                 /* and never skip a frame */
+            ph = Lk.__ph;
+          }
+        }
+      } catch(e) {}
+      return _p.call(this, Lk, x, fy, sc, ph, walking, wave, face);
+    };
+  }
 })();
 </script>
 <script>
