@@ -9495,7 +9495,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-20p';
+window.OGRA_BUILD = '2026-09-20r';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
@@ -12582,6 +12582,7 @@ window.OGRA_BUILD = '2026-09-20p';
 
   /* ---------- 6. pedestrians: smooth legs, correct facing ---------- */
   function fixWalk(list, dt){
+    return;   /* retired: one walk controller owns every character now */
     for (const p of list || []) {
       if (!p || !p.look) continue;
       const v = p.v || 0;
@@ -14526,17 +14527,7 @@ window.OGRA_BUILD = '2026-09-20p';
       </div>`;
   }
 
-  function lic(){
-    const S0 = s(), L = (typeof licState === 'function') ? licState(S0) : {cls:'none', left:0, expired:true};
-    const state = L.cls === 'none' ? T('مفيش رخصة','No licence') : L.expired ? T('منتهية','Expired') : T('سارية','Valid');
-    return `<div class="hd"><h2>${T('المرور','Licence')}</h2><span class="sub">${T('من أجل طريق آمن','For a safe road')}</span></div>
-      <div class="g g2">
-        <div class="card"><b>${T('حالة الرخصة','Status')}</b><p style="font:900 clamp(15px,2vw,20px) Cairo;margin:.3em 0">${state}</p>
-          <div class="sub">${T('النوع','Class')}: ${L.cls || '—'} · ${T('باقي','Left')}: ${Math.max(0, L.left || 0)} ${T('يوم','days')}</div>
-          <div class="sub">${T('النقاط','Points')}: ${(S0.lic && S0.lic.pts) || 0}</div></div>
-        <div class="card"><b>${T('المكتب','The office')}</b><p class="sub">${T('جدّد رخصتك أو خُد امتحان','Renew or sit the test')}</p>
-          <button class="btn go" data-x="oldscr" data-k="dmv">${T('ادخل المرور','Open the office')}</button></div></div>`;
-  }
+  function lic(){ return window.OG_licPage ? OG_licPage() : ''; }
 
   function settings(){
     const S0 = s(), st = S0.set || {};
@@ -14652,6 +14643,7 @@ window.OGRA_BUILD = '2026-09-20p';
   }
   /* pace: one full stride cycle per 1.35 m walked, so the legs match the ground */
   function pace(list, dt){
+    return;   /* retired: one walk controller owns every character now */
     for (const p of list || []) {
       if (!p) continue;
       const v = Math.abs(p.v || 0);
@@ -14708,6 +14700,7 @@ window.OGRA_BUILD = '2026-09-20p';
 
   /* ---- the painted walkers (assets/new/walkA_*, walkB_*) ---- */
   function artWalk(G, dt){
+    return;   /* retired: one walk controller owns every character now */
     for (const q of (G.props || [])) {
       if (!q || q.t !== 'artW') continue;
       if (q.sp == null) q.sp = 0.8 + Math.random()*0.5;
@@ -14723,6 +14716,7 @@ window.OGRA_BUILD = '2026-09-20p';
 
   /* ---- the sprite-sheet crowd ---- */
   function sheetWalk(list, dt){
+    return;   /* retired: one walk controller owns every character now */
     for (const p of (list || [])) {
       if (!p) continue;
       const v = Math.abs(p.v || 0);
@@ -14898,6 +14892,7 @@ window.OGRA_BUILD = '2026-09-20p';
   /* ---------- 2. crowds: no sprinting, no statues ---------- */
   const STRIDE = 1.5, MAXFPS = 8;
   function crowd(G, dt){
+    return;   /* retired: one walk controller owns every character now */
     for (const p of (G.walkers || [])) {
       if (!p) continue;
       if (Math.abs(p.v || 0) < .05) p.v = (Math.random() < .5 ? -1 : 1)*(.85 + Math.random()*.5);  /* nobody stands frozen */
@@ -14928,6 +14923,123 @@ window.OGRA_BUILD = '2026-09-20p';
     updateGame = function(G, dt, inp){
       const out = _ug.apply(this, arguments);
       try { crowd(G, Math.min(dt, .05)); } catch(e) {}
+      return out;
+    };
+  }
+})();
+</script>
+<script>
+/* =====================================================================
+   THE LICENCE, BACK WHERE YOU CAN SEE IT
+   The printed card is drawn in the menu again, with the renewal options
+   beside it, so the traffic screen needs no trip to the old layout.
+   ===================================================================== */
+(function(){
+  if (typeof UI === 'undefined') return;
+  const AR = () => typeof LANG !== 'undefined' && LANG.cur === 'ar';
+  const T = (a, e) => AR() ? a : e;
+  const nm = o => { try { return tn(o); } catch(e) { return (o && (AR() ? o.ar : o.en)) || ''; } };
+  const money = n => Math.round(n || 0).toLocaleString('en-US');
+
+  window.OG_licPage = function(){
+    const s = S(), L = (typeof licState === 'function') ? licState(s) : {cls:'none', left:0, pts:0, expired:true};
+    const card = (typeof licCard === 'function') ? licCard() : '';
+    const state = L.cls === 'none' ? T('مفيش رخصة','No licence')
+                : L.expired ? T('الرخصة منتهية','Expired')
+                : T('سارية','Valid');
+    const colour = L.cls === 'none' || L.expired ? '#ff9aa4' : '#8ff5b9';
+    const tiers = (typeof LIC_TYPES !== 'undefined' ? LIC_TYPES : []).map(t => {
+      const own = L.cls === t.id;
+      return `<div class="card"><b>${nm(t.n)}</b>
+        <div class="sub">${nm(t.d)}</div>
+        <div class="row" style="justify-content:space-between;margin-top:8px">
+          <span class="sub">${money(t.price)} ${T('ج','EGP')} · ${t.days} ${T('يوم','days')}</span>
+          <button class="btn ${own ? '' : 'go'}" data-x="act" data-k="dmvBuy" data-p="${t.id}">
+            ${own ? T('جدّد','Renew') : T('استخرج','Issue')}</button></div></div>`;
+    }).join('');
+    return `<div class="hd"><h2>${T('المرور','Licence')}</h2><span class="sub">${T('رخصتك وحالتها','Your licence and its standing')}</span></div>
+      <div class="split">
+        <div class="g">
+          <div class="card" style="display:grid;gap:8px;place-items:center">
+            ${card || `<div class="sub" style="padding:22px 0">${T('لسه مستخرجتش رخصة','No licence issued yet')}</div>`}
+          </div>
+        </div>
+        <div class="g">
+          <div class="g g3">
+            <div class="pod"><small>${T('الحالة','Status')}</small><b style="color:${colour}">${state}</b></div>
+            <div class="pod"><small>${T('النوع','Class')}</small><b>${L.cls === 'pro' ? T('مهنية','Prof.') : L.cls === 'private' ? T('خاصة','Private') : '—'}</b></div>
+            <div class="pod"><small>${T('باقي','Days left')}</small><b>${Math.max(0, L.left || 0)}</b></div>
+            <div class="pod"><small>${T('النقاط','Points')}</small><b>${L.pts || 0}</b></div>
+          </div>
+          ${tiers}
+        </div>
+      </div>`;
+  };
+})();
+</script>
+<script>
+/* =====================================================================
+   ONE WALK CONTROLLER
+   Every character — street crowds, people at stops and the painted
+   walkers — is animated from the ground they actually cover: eight frames
+   to a 1.5 m stride, one frame at a time, in order, start to finish.
+   Nothing else is allowed to touch a walk phase.
+   ===================================================================== */
+(function(){
+  if (typeof GAME === 'undefined' || typeof RD === 'undefined') return;
+  const STRIDE = 1.5;              /* metres per complete eight-frame cycle */
+  const FRAME = 6.2832/8;          /* one frame, in phase */
+  const MAX_PER_DRAW = FRAME;      /* never more than a single frame per drawn frame */
+
+  /* the sheet crowd: phase comes from distance walked on the ground */
+  if (typeof RD.person === 'function') {
+    const _p = RD.person;
+    RD.person = function(Lk, x, fy, sc, ph, walking, wave, face){
+      try {
+        if (Lk) {
+          const world = (RD.camL || 0) + x/Math.max(1, RD.PPM);     /* where this person is on the road */
+          if (Lk.__wx == null) { Lk.__wx = world; Lk.__wp = 0; }
+          let d = world - Lk.__wx; Lk.__wx = world;
+          if (Math.abs(d) > 30) d = 0;                              /* a jump means a new person, not a stride */
+          const dist = Math.abs(d);
+          if (dist > 0.01) {
+            Lk.__face = d > 0 ? 1 : -1;
+            Lk.__wp = (Lk.__wp || 0) + Math.min(MAX_PER_DRAW, (dist/STRIDE)*6.2832);
+            Lk.__mv = performance.now();
+          }
+          const moving = performance.now() - (Lk.__mv || 0) < 260;
+          if (Lk.__face) face = Lk.__face;
+          walking = moving;
+          ph = Lk.__wp || 0;                                        /* our phase, never the caller's */
+        }
+      } catch(e) {}
+      return _p.call(this, Lk, x, fy, sc, ph, walking, wave, face);
+    };
+  }
+
+  /* the painted walkers carry their own frame number */
+  function art(G, dt){
+    for (const q of (G.props || [])) {
+      if (!q || q.t !== 'artW') continue;
+      if (!q.sp) q.sp = .8 + Math.random()*.35;
+      const v = q.sp*0.95;                               /* a normal walking pace */
+      q.x += (q.dir || 1)*v*dt;
+      q.ph = (q.ph || 0) + Math.min(1, (v*dt/STRIDE)*8); /* one frame at most */
+      if (q.ph >= 8) q.ph -= 8;
+      q.flip = (q.dir || 1) < 0;
+    }
+  }
+  /* people who are meant to be walking always have somewhere to go */
+  function nudge(G){
+    for (const p of (G.walkers || [])) {
+      if (p && Math.abs(p.v || 0) < .05) p.v = (Math.random() < .5 ? -1 : 1)*(.9 + Math.random()*.35);
+    }
+  }
+  if (typeof updateGame === 'function') {
+    const _ug = updateGame;
+    updateGame = function(G, dt, inp){
+      const out = _ug.apply(this, arguments);
+      try { const d = Math.min(dt, .05); art(G, d); nudge(G); } catch(e) {}
       return out;
     };
   }
