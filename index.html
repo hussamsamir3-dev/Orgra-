@@ -9488,7 +9488,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-19n';
+window.OGRA_BUILD = '2026-09-19p';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
@@ -13525,7 +13525,7 @@ window.OGRA_BUILD = '2026-09-19n';
   function freeze(){
     try {
       /* 1. no more frames */
-      if (!raf) { raf = window.requestAnimationFrame; window.requestAnimationFrame = function(cb){ return raf.call(window, function(t){ try { if (document.getElementById('pz')) return; } catch(e) {} return cb(t); }); }; }
+      /* frames are left alone: skipping them can strand the game loop */
       /* 2. the canvas stops being composited */
       const cv = document.querySelector('canvas#cv') || document.querySelector('canvas');
       if (cv && canvasWas === null) { canvasWas = cv.style.visibility || ''; cv.style.visibility = 'hidden'; }
@@ -13557,6 +13557,62 @@ window.OGRA_BUILD = '2026-09-19n';
       }
     } catch(e) {}
   }, 150);
+})();
+</script>
+<script>
+/* =====================================================================
+   HEARTBEAT
+   The sound keeps playing while everything else stops, which means the
+   page's main thread is stuck inside one piece of code. This writes the
+   name of whatever is running, a few times a second. When the page is
+   killed and reopened, the last name written is where it got stuck.
+   ===================================================================== */
+(function(){
+  if (typeof GAME === 'undefined') return;
+  const K = 'ogra_hb';
+  let last = '', n = 0;
+  const beat = tag => { try { if (tag !== last || (n++ % 8) === 0) { last = tag; localStorage.setItem(K, tag + ' #' + n); } } catch(e) {} };
+  window.OG_beat = beat;
+
+  /* report the last activity from a previous run that never finished */
+  setTimeout(() => {
+    try {
+      const v = localStorage.getItem(K);
+      if (v && window.OG_report) OG_report({message:'the game last got stuck inside: ' + v}, 'stuck at');
+      localStorage.removeItem(K);
+    } catch(e) {}
+  }, 3200);
+  /* a clean shutdown clears it */
+  addEventListener('pagehide', () => { try { localStorage.removeItem(K); } catch(e) {} });
+  addEventListener('beforeunload', () => { try { localStorage.removeItem(K); } catch(e) {} });
+
+  /* name the big pieces as they run */
+  const wrap = (owner, name, tag) => {
+    try {
+      const f = owner[name]; if (typeof f !== 'function' || f.__hb) return;
+      const w = function(){ beat(tag + ':in'); try { return f.apply(this, arguments); } finally { beat(tag + ':out'); } };
+      w.__hb = 1; owner[name] = w;
+    } catch(e) {}
+  };
+  const wrapGlobal = (name, tag) => {
+    try {
+      const f = window[name]; if (typeof f !== 'function' || f.__hb) return;
+      const w = function(){ beat(tag + ':in'); try { return f.apply(this, arguments); } finally { beat(tag + ':out'); } };
+      w.__hb = 1; window[name] = w;
+    } catch(e) {}
+  };
+  function arm(){
+    wrapGlobal('updateGame', 'update');
+    wrapGlobal('renderScene', 'draw');
+    wrapGlobal('saveGame', 'save');
+    if (typeof UI !== 'undefined') { wrap(UI, 'act', 'menu-act'); wrap(UI, 'hud', 'hud'); wrap(UI, 'feed', 'feed'); }
+    if (typeof AU !== 'undefined') { wrap(AU, 'pauseGame', 'audio-pause'); wrap(AU, 'setVol', 'audio-vol'); }
+    if (typeof MUSIC !== 'undefined') wrap(MUSIC, 'want', 'music');
+    if (window.RADIO) { wrap(RADIO, 'power', 'radio-power'); wrap(RADIO, 'tune', 'radio-tune'); }
+    if (window.OGRA_NET) { wrap(OGRA_NET, 'push', 'net-push'); wrap(OGRA_NET, 'save', 'net-save'); wrap(OGRA_NET, 'buy', 'net-buy'); }
+  }
+  arm(); setInterval(arm, 3000);
+  setInterval(() => beat('idle'), 500);
 })();
 </script>
 <script>
