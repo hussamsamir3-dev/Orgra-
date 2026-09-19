@@ -9495,7 +9495,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-20r';
+window.OGRA_BUILD = '2026-09-20s';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
@@ -14991,30 +14991,26 @@ window.OGRA_BUILD = '2026-09-20r';
   const FRAME = 6.2832/8;          /* one frame, in phase */
   const MAX_PER_DRAW = FRAME;      /* never more than a single frame per drawn frame */
 
-  /* the sheet crowd: phase comes from distance walked on the ground */
-  if (typeof RD.person === 'function') {
-    const _p = RD.person;
-    RD.person = function(Lk, x, fy, sc, ph, walking, wave, face){
-      try {
-        if (Lk) {
-          const world = (RD.camL || 0) + x/Math.max(1, RD.PPM);     /* where this person is on the road */
-          if (Lk.__wx == null) { Lk.__wx = world; Lk.__wp = 0; }
-          let d = world - Lk.__wx; Lk.__wx = world;
-          if (Math.abs(d) > 30) d = 0;                              /* a jump means a new person, not a stride */
-          const dist = Math.abs(d);
-          if (dist > 0.01) {
-            Lk.__face = d > 0 ? 1 : -1;
-            Lk.__wp = (Lk.__wp || 0) + Math.min(MAX_PER_DRAW, (dist/STRIDE)*6.2832);
-            Lk.__mv = performance.now();
-          }
-          const moving = performance.now() - (Lk.__mv || 0) < 260;
-          if (Lk.__face) face = Lk.__face;
-          walking = moving;
-          ph = Lk.__wp || 0;                                        /* our phase, never the caller's */
-        }
-      } catch(e) {}
-      return _p.call(this, Lk, x, fy, sc, ph, walking, wave, face);
-    };
+  /* The look object is shared between people, so it cannot hold anyone's
+     phase. Each person owns their own, advanced from the distance they
+     cover; the drawing code is left to use it as given. */
+  function crowdTick(list, dt){
+    for (const p of (list || [])) {
+      if (!p) continue;
+      const v = Math.abs(p.v || 0);
+      if (v > 0.03) {
+        const dist = v*dt;
+        p.ph = (p.ph || 0) + Math.min(FRAME, (dist/STRIDE)*6.2832);   /* one frame at most */
+        if (p.ph > 62.83) p.ph -= 62.83;
+        p.face = p.v > 0 ? 1 : -1;
+        p.walk = true;
+      } else if (p.walkTo != null && Math.abs(p.walkTo - p.x) > 0.15) {
+        const dir = p.walkTo > p.x ? 1 : -1;
+        p.x += dir*1.05*dt;
+        p.ph = (p.ph || 0) + Math.min(FRAME, (1.05*dt/STRIDE)*6.2832);
+        p.face = dir; p.walk = true;
+      } else { p.walk = false; }
+    }
   }
 
   /* the painted walkers carry their own frame number */
@@ -15039,7 +15035,7 @@ window.OGRA_BUILD = '2026-09-20r';
     const _ug = updateGame;
     updateGame = function(G, dt, inp){
       const out = _ug.apply(this, arguments);
-      try { const d = Math.min(dt, .05); art(G, d); nudge(G); } catch(e) {}
+      try { const d = Math.min(dt, .05); art(G, d); nudge(G); crowdTick(G.walkers, d); crowdTick(G.peds, d); } catch(e) {}
       return out;
     };
   }
