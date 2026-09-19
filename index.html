@@ -9495,7 +9495,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-20j';
+window.OGRA_BUILD = '2026-09-20k';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
@@ -12922,7 +12922,12 @@ window.OGRA_BUILD = '2026-09-20j';
   const AR = () => typeof LANG !== 'undefined' && LANG.cur === 'ar';
 
   /* ---------- 1. air conditioning: everything except the old and the small ---------- */
-  const NO_AC = {car_old:1, hatch_city:1, v_suzuki:1, v_foton:1, v_n300:1, micro_classic:1, sedan_compact:1};
+  /* air conditioning follows the real vehicles.
+     Fitted: every modern microbus, minibus, coach and car, including the
+     Toyota HiAce H200, which has factory air in Egypt.
+     Not fitted: the 1985 Fiat 128 Nasr, the Lada Riva, and the small
+     cab-over vans sold here in their most basic trim. */
+  const NO_AC = {car_old:1, hatch_city:1, v_suzuki:1, v_n300:1, v_shineray:1};
   window.OG_hasAC = car => !!(car && car.spec && !NO_AC[car.spec.id]);
 
   /* ---------- 2. checkpoint kit stays put ---------- */
