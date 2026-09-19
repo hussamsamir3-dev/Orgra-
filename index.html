@@ -9495,7 +9495,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-20h';
+window.OGRA_BUILD = '2026-09-20j';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
@@ -14747,6 +14747,71 @@ window.OGRA_BUILD = '2026-09-20h';
       return _p.call(this, Lk, x, fy, sc, ph, walking, wave, face);
     };
   }
+})();
+</script>
+<script>
+/* =====================================================================
+   MENU BACKDROP — a city at dusk, with traffic
+   A photographic plate behind the menu, slowly panning, with minibuses
+   and a coach crossing at three depths, warm street lamps, rain and a
+   heavy vignette. Everything is CSS, so it costs almost nothing.
+   ===================================================================== */
+(function(){
+  document.head.insertAdjacentHTML('beforeend', `<style>
+  #mxbg{position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none;background:#05070f}
+  #mxbg .plate{position:absolute;inset:-6%;background:url('assets/cairo-rain-road.webp') center/cover no-repeat;
+    filter:blur(1.5px) saturate(1.02) brightness(.8);animation:mxPan 44s ease-in-out infinite alternate}
+  @keyframes mxPan{from{transform:scale(1.06) translate3d(0,0,0)}to{transform:scale(1.14) translate3d(-2.5%,-1.5%,0)}}
+  #mxbg .tint{position:absolute;inset:0;background:
+    linear-gradient(180deg,rgba(4,8,20,.62) 0%,rgba(5,10,24,.22) 42%,rgba(3,6,16,.86) 100%),
+    radial-gradient(60% 45% at 14% 20%,rgba(0,229,255,.12),transparent 60%),
+    radial-gradient(55% 45% at 86% 72%,rgba(255,47,179,.10),transparent 60%)}
+  #mxbg .vig{position:absolute;inset:0;background:radial-gradient(78% 64% at 50% 45%,transparent 38%,rgba(2,4,10,.78) 100%)}
+  #mxbg .rain{position:absolute;inset:-12%;opacity:.16;
+    background:repeating-linear-gradient(102deg,rgba(255,255,255,.3) 0 1px,transparent 1px 13px);
+    animation:mxRain 1.2s linear infinite}
+  @keyframes mxRain{to{transform:translate3d(-42px,150px,0)}}
+  #mxbg .lamp{position:absolute;border-radius:50%;filter:blur(42px);mix-blend-mode:screen;opacity:.45}
+  #mxbg .road{position:absolute;left:0;right:0;bottom:0;height:34%;
+    background:linear-gradient(180deg,rgba(5,9,20,0),rgba(4,7,16,.9) 45%,#03050d 100%)}
+  #mxbg .road::after{content:"";position:absolute;left:0;right:0;top:46%;height:2px;
+    background:repeating-linear-gradient(90deg,rgba(255,255,255,.35) 0 54px,transparent 54px 130px);
+    animation:mxLine 2.6s linear infinite}
+  @keyframes mxLine{to{background-position:-184px 0}}
+  #mxbg .bus{position:absolute;bottom:0;opacity:0;filter:drop-shadow(0 12px 24px rgba(0,0,0,.6))}
+  #mxbg .bus img{display:block;width:100%;height:auto}
+  #mxbg .far{bottom:30%;width:min(16vw,180px);opacity:.45;filter:blur(1px) brightness(.72);
+    animation:mxDriveL 26s linear infinite}
+  #mxbg .mid{bottom:19%;width:min(24vw,290px);opacity:.72;filter:brightness(.85);
+    animation:mxDriveR 19s linear infinite 3s}
+  #mxbg .near{bottom:5%;width:min(36vw,460px);opacity:.95;filter:brightness(1);
+    animation:mxDriveL 13s linear infinite 6s}
+  @keyframes mxDriveL{0%{transform:translateX(-40vw);opacity:0}8%{opacity:var(--o,.6)}
+    92%{opacity:var(--o,.6)}100%{transform:translateX(125vw);opacity:0}}
+  @keyframes mxDriveR{0%{transform:translateX(125vw) scaleX(-1);opacity:0}8%{opacity:var(--o,.5)}
+    92%{opacity:var(--o,.5)}100%{transform:translateX(-40vw) scaleX(-1);opacity:0}}
+  #mx .fx{opacity:.35}                        /* the old grid sits behind the plate now */
+  @media (prefers-reduced-motion:reduce){#mxbg *{animation:none!important}}
+  </style>`);
+
+  const ART = ['assets/veh_hiace.webp','assets/veh_kingwb.webp','assets/veh_coaster.webp','assets/veh_tourismo.webp'];
+  function build(){
+    const m = document.getElementById('mx'); if (!m || m.querySelector('#mxbg')) return;
+    const bg = document.createElement('div'); bg.id = 'mxbg';
+    bg.innerHTML = `<div class="plate"></div><div class="tint"></div><div class="rain"></div>
+      <div class="lamp" style="left:8%;top:26%;width:220px;height:220px;background:#ffcf7a"></div>
+      <div class="lamp" style="right:12%;top:18%;width:260px;height:260px;background:#7fd4ff"></div>
+      <div class="lamp" style="left:52%;bottom:18%;width:300px;height:300px;background:#ff9ad5;opacity:.25"></div>
+      <div class="road"></div>
+      <div class="bus far"><img src="${ART[1]}" alt=""></div>
+      <div class="bus mid"><img src="${ART[0]}" alt=""></div>
+      <div class="bus near"><img src="${ART[2]}" alt=""></div>
+      <div class="vig"></div>`;
+    m.insertBefore(bg, m.firstChild);
+    /* if a picture is missing, the layer simply is not drawn */
+    bg.querySelectorAll('img').forEach(i => i.addEventListener('error', () => { i.parentElement.style.display = 'none'; }));
+  }
+  setInterval(build, 800);
 })();
 </script>
 <script>
