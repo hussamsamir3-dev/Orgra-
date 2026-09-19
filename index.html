@@ -9488,7 +9488,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-18k';
+window.OGRA_BUILD = '2026-09-18l';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
@@ -12405,7 +12405,7 @@ window.OGRA_BUILD = '2026-09-18k';
       const msg = String((u && u.error && u.error.message) || '');
       if (/network|fetch|timeout/i.test(msg)) return;               /* a dropped connection is not a deleted account */
       try { await sb.auth.signOut(); } catch(e) {}
-      try { localStorage.removeItem('ogra_prof'); } catch(e) {}
+      try { localStorage.removeItem('ogra_prof'); sessionStorage.removeItem('ogra_gate_dismissed'); } catch(e) {}
       if (!told) { told = true;
         try { (window.OG_report || function(){})({message:'This account no longer exists on the server, so you have been signed out.'}, 'account'); } catch(e) {}
       }
@@ -12415,6 +12415,55 @@ window.OGRA_BUILD = '2026-09-18k';
   setTimeout(verify, 4000);
   setInterval(verify, 300000);                                      /* and every five minutes after that */
   addEventListener('online', () => setTimeout(verify, 2000));
+})();
+</script>
+<script>
+/* =====================================================================
+   HONEST ACCOUNT STATE: the badge tells the truth, and you can always
+   get the sign-in card back
+   ===================================================================== */
+(function(){
+  const N = () => window.OGRA_NET;
+  const AR = () => typeof LANG !== 'undefined' && LANG.cur === 'ar';
+  const signedIn = () => { const n = N(); return !!(n && n.online && !n.practice); };
+
+  function openGate(){
+    const n = N(); if (!n || !n.gate) return;
+    try { sessionStorage.removeItem('ogra_gate_dismissed'); } catch(e) {}
+    const old = document.getElementById('ogGate'); if (old) old.remove();
+    n.practice = false;
+    n.gate(true, AR() ? 'سجّل دخولك أو اعمل حساب جديد' : 'Sign in, or create a new account');
+  }
+  window.OG_openGate = openGate;
+
+  /* the little corner badge: green only when a real account is signed in */
+  setInterval(() => {
+    try {
+      const el = document.getElementById('ogMode'); if (!el) return;
+      const on = signedIn();
+      el.style.pointerEvents = 'auto';
+      el.style.cursor = on ? 'default' : 'pointer';
+      const txt = on ? (AR() ? '● متصل' : '● online')
+                     : (AR() ? '○ من غير حساب — اضغط للدخول' : '○ not signed in — tap to sign in');
+      if (el.textContent !== txt) el.textContent = txt;
+      el.style.color = on ? '#8ff5b9' : '#ffc28a';
+      if (!el.__wired) { el.__wired = 1;
+        const go = e => { if (signedIn()) return; e.preventDefault(); e.stopPropagation(); openGate(); };
+        el.addEventListener('click', go); el.addEventListener('touchend', go, {passive:false});
+      }
+    } catch(e) {}
+  }, 800);
+
+  /* after a sign-out, or when the server says the account is gone, the card
+     must be able to come back */
+  try {
+    const n = N();
+    if (n && n.signOut && !n.signOut.__wrap) {
+      const so = n.signOut.bind(n);
+      const w = function(){ try { sessionStorage.removeItem('ogra_gate_dismissed'); } catch(e) {} const r = so(); setTimeout(openGate, 400); return r; };
+      w.__wrap = 1; n.signOut = w;
+    }
+  } catch(e) {}
 })();
 </script>
 <script>
