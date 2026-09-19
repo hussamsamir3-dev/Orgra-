@@ -9488,7 +9488,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-18l';
+window.OGRA_BUILD = '2026-09-18m';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
@@ -12227,17 +12227,23 @@ window.OGRA_BUILD = '2026-09-18l';
   function wear(G, dt){
     const car = G.car, own = G.own; if (!car || !own || !own.cond) return;
     const c = own.cond, kmh = Math.abs(car.vx)*3.6;
-    /* a knock: a sudden loss of speed that is not braking */
-    const dv = (G.__wv == null ? car.vx : G.__wv) - car.vx; G.__wv = car.vx;
-    if (dv > 2.2 && car.brk < .4) {
-      const hit = clamp(dv*2.2, 2, 18);
-      c.body = clamp((c.body ?? 100) - hit, 0, 100);
-      c.susp = clamp((c.susp ?? 100) - hit*.35, 0, 100);
-      if (Math.random() < .3) c.tires = clamp((c.tires ?? 100) - hit*.3, 0, 100);
-      G.__wearMsg = true;
+    /* damage comes from real collisions only, never from stopping, being
+       parked, teleporting into a shop, or a paused frame */
+    const busy = GAME.paused || !!document.getElementById('rhScreen') || G.site ||
+                 !(document.getElementById('modal') || {}).classList || !document.getElementById('modal').classList.contains('hidden');
+    if (!busy && dt < .12 && car.on) {
+      const dv = (G.__wv == null ? car.vx : G.__wv) - car.vx;
+      if (dv > 3.5 && dv < 25 && car.brk < .35 && Math.abs(car.vx) > .4) {
+        const hit = clamp(dv*1.6, 2, 14);
+        c.body = clamp((c.body ?? 100) - hit, 0, 100);
+        c.susp = clamp((c.susp ?? 100) - hit*.3, 0, 100);
+        if (Math.random() < .25) c.tires = clamp((c.tires ?? 100) - hit*.25, 0, 100);
+        G.__wearMsg = true;
+      }
     }
+    G.__wv = car.vx;
     /* ordinary use: potholes, braking, revs, heat */
-    if (kmh > 3) {
+    if (kmh > 3 && !GAME.paused && dt < .12) {
       const rough = Math.min(2, G.__rough || 0);
       c.susp = clamp((c.susp ?? 100) - dt*(0.004 + rough*0.01), 0, 100);
       c.tires = clamp((c.tires ?? 100) - dt*(0.003 + kmh/9000), 0, 100);
