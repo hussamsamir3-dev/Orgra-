@@ -9488,7 +9488,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-18h';
+window.OGRA_BUILD = '2026-09-18i';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
@@ -12315,6 +12315,60 @@ window.OGRA_BUILD = '2026-09-18h';
       return r;
     };
   }
+})();
+</script>
+<script>
+/* =====================================================================
+   NOTHING A BUTTON DOES CAN TAKE THE GAME DOWN
+   ===================================================================== */
+(function(){
+  if (typeof GAME === 'undefined') return;
+
+  /* 1. a mis-step inside a menu action is reported, not fatal */
+  const shield = (obj, name, label) => {
+    try {
+      const fn = obj && obj[name]; if (typeof fn !== 'function' || fn.__shield) return;
+      const wrapped = function(){
+        try { return fn.apply(this, arguments); }
+        catch(e) {
+          try { (window.OG_report || function(){})(e, label + ' ' + (arguments[0] || '')); } catch(_) {}
+          try { GAME.paused = false; } catch(_) {}
+          return null;
+        }
+      };
+      wrapped.__shield = 1; obj[name] = wrapped;
+    } catch(e) {}
+  };
+  const arm = () => {
+    if (typeof UI === 'undefined') return;
+    shield(UI, 'act', 'menu button');
+    shield(UI, 'hudAct', 'hud button');
+    shield(UI, 'siteModal', 'site window');
+    shield(UI, 'modalShow', 'window');
+    shield(UI, 'refresh', 'screen');
+    shield(UI, 'show', 'screen');
+  };
+  arm(); setInterval(arm, 1500);
+
+  /* 2. the earlier trick that blocked the old AC strip was replacing two
+        core DOM methods for the whole page. Narrow it to the one case it
+        was meant for, so nothing else can trip over it. */
+  try {
+    const A = Element.prototype.appendChild, I = Element.prototype.insertBefore;
+    if (A && !A.__narrow) {
+      const DEAD = {acPanel:1, acPanel2:1};
+      const na = function(node){
+        try { if (this === document.body && node && node.nodeType === 1 && DEAD[node.id]) return node; } catch(e) {}
+        return A.apply(this, arguments);
+      };
+      const ni = function(node, ref){
+        try { if (this === document.body && node && node.nodeType === 1 && DEAD[node.id]) return node; } catch(e) {}
+        return I.apply(this, arguments);
+      };
+      na.__narrow = ni.__narrow = 1;
+      Element.prototype.appendChild = na; Element.prototype.insertBefore = ni;
+    }
+  } catch(e) {}
 })();
 </script>
 <script>
