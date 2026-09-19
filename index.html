@@ -9488,7 +9488,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-19g';
+window.OGRA_BUILD = '2026-09-19h';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
@@ -10067,7 +10067,7 @@ window.OGRA_BUILD = '2026-09-19g';
   let bare = 0;
   setInterval(() => {
     try {
-      const busy = UI.fueling || document.querySelector('#hud .siteUI, #phone:not(.hidden)');
+      const busy = UI.fueling || document.querySelector('#hud .siteUI, #phone:not(.hidden), #ogPause, #wsWrap, #acWrap, #rhScreen, #restPrompt');   /* our own windows count as a menu */
       if (GAME.state === 'play' && GAME.paused && !modalOpen() && !busy) { if (++bare >= 3) { GAME.paused = false; try { AU.pauseGame(false); } catch(e) {} bare = 0; } }
       else bare = 0;
     } catch(e) {}
