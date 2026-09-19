@@ -557,7 +557,7 @@ ROUTES.push(
   toll:.24, marks:[{id:'pyramids',at:.14},{id:'library',at:.97}]}
 );
 const LONG_REST = {cairo_alex:[.52], coach_cairo_alex:[.52], cairo_sokhna:[.5], asher_capital:[.55], banha:[.5]};
-const routeAllows = (r, v) => (r.cls || ['micro']).includes(v.cls);
+const routeAllows = (r, v) => true;   /* any vehicle may drive any line; distance is what gates a route */
 
 
 /* =================== OGRA AUDIO ENGINE (all synthesized) =================== */
@@ -9488,7 +9488,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-18o';
+window.OGRA_BUILD = '2026-09-18s';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
@@ -12730,6 +12730,127 @@ window.OGRA_BUILD = '2026-09-18o';
       return _act.apply(this, arguments);
     };
   }
+})();
+</script>
+<script>
+/* =====================================================================
+   Routes unlock by distance, in order: short, medium, long, very long.
+   Every vehicle can drive every line.
+   ===================================================================== */
+(function(){
+  if (typeof ROUTES === 'undefined') return;
+  const AR = () => typeof LANG !== 'undefined' && LANG.cur === 'ar';
+  /* the ladder: a route's unlock level comes from its real length */
+  const tierFor = km => km <= 15 ? 1 : km <= 25 ? 2 : km <= 40 ? 4 : km <= 60 ? 6 :
+                        km <= 100 ? 8 : km <= 150 ? 10 : km <= 250 ? 13 : km <= 400 ? 16 : 19;
+  const TIER_NAME = km => km <= 25 ? ['قصير', 'short'] : km <= 60 ? ['متوسط', 'medium'] :
+                          km <= 250 ? ['طويل', 'long'] : ['طويل جداً', 'very long'];
+  function apply(){
+    try {
+      ROUTES.forEach(r => {
+        const km = r.realKm || r.km || 10;
+        r.lvl = tierFor(km);
+        r.cls = null;                                   /* no class restriction at all */
+        r.tier = TIER_NAME(km);
+      });
+    } catch(e) {}
+  }
+  apply();
+  /* the routes screen labels each line with its tier, so the ladder is visible */
+  if (typeof UI !== 'undefined' && UI.show) {
+    const _s = UI.show;
+    UI.show = function(n){
+      const out = _s.apply(this, arguments);
+      try {
+        if (n === 'routes') setTimeout(() => {
+          document.querySelectorAll('#screens .card[data-p]').forEach(card => {
+            const r = ROUTES.find(q => q.id === card.dataset.p); if (!r || card.querySelector('.ogTier')) return;
+            const tag = document.createElement('span');
+            tag.className = 'tag ogTier';
+            tag.textContent = (AR() ? r.tier[0] : r.tier[1]) + ' · ' + (r.realKm || 0) + (AR() ? ' كم' : ' km');
+            const row = card.querySelector('.row'); if (row) row.appendChild(tag);
+          });
+        }, 60);
+      } catch(e) {}
+      return out;
+    };
+  }
+})();
+</script>
+<script>
+/* the fuel window (and any shop window) stops shimmering on iPhone */
+(function(){
+  if (typeof GAME === 'undefined') return;
+  const coarse = matchMedia('(pointer:coarse)').matches || navigator.maxTouchPoints > 0;
+  if (coarse) {
+    document.head.insertAdjacentHTML('beforeend', `<style>
+      /* a blurred pane over a canvas that repaints every frame is what shimmers */
+      #modal, #modal *, #wsWrap, #acWrap{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+      #modal{background:rgba(3,6,12,.74)!important}
+      #modal > .pn{background:rgba(12,18,32,.97)!important;will-change:auto;transform:translateZ(0)}
+    </style>`);
+  }
+  /* while a shop window is open the road behind it does not need 60 redraws a second */
+  if (typeof renderScene === 'function') {
+    const _rs = renderScene; let last = 0;
+    renderScene = function(){
+      try {
+        const m = document.getElementById('modal');
+        const open = (m && !m.classList.contains('hidden') && m.innerHTML.trim()) || document.getElementById('wsWrap');
+        if (open && GAME.state === 'play') {
+          const now = performance.now();
+          if (now - last < 220) return null;
+          last = now;
+        }
+      } catch(e) {}
+      return _rs.apply(this, arguments);
+    };
+  }
+})();
+</script>
+<script>
+/* =====================================================================
+   RAMPS INSTEAD OF STEPS
+   Where one stretch of road meets another at a different height, the game
+   used to jump straight up or down. Every join now climbs or falls over an
+   80 m ramp, the way a real flyover does, on every route. Humps, potholes
+   and rough tarmac are untouched.
+   ===================================================================== */
+(function(){
+  if (typeof GAME === 'undefined') return;
+  const L = 80;                                  /* ramp length in metres */
+  const S = t => { t = Math.max(0, Math.min(1, t)); return t*t*(3 - 2*t); };
+
+  function ramp(W){
+    if (!W || W.__ramped || !W.elev || !W.segs) return;
+    const raw = W.elev.bind(W);
+    const step = [];                             /* {x0, d, cum} for each join */
+    function build(){
+      step.length = 0;
+      let cum = 0;
+      for (let i = 1; i < W.segs.length; i++) {
+        const x0 = W.segs[i].x0;
+        const d = raw(x0 + .05) - raw(x0 - .05);   /* the cliff the generator made */
+        cum += d;
+        step.push({x0, d, cum});
+      }
+      W.__stepCount = step.length;
+    }
+    build();
+    let seen = W.segs.length;
+    W.elev = function(x){
+      if (W.segs.length !== seen) { seen = W.segs.length; build(); }
+      let y = raw(x);
+      for (const s of step) {
+        if (x >= s.x0) y -= s.d;                             /* take the cliff out */
+        y += s.d*S((x - s.x0 + L/2)/L);                      /* put it back as a slope */
+      }
+      return y;
+    };
+    W.__ramped = true;
+  }
+  if (typeof newSession === 'function') { const _ns = newSession; newSession = function(){ const G = _ns.apply(this, arguments); try { ramp(G.world); } catch(e) {} return G; }; }
+  setInterval(() => { try { ramp(GAME.G && GAME.G.world); } catch(e) {} }, 1200);
 })();
 </script>
 <script>
