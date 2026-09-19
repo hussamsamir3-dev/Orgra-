@@ -3004,7 +3004,7 @@ UI.scr.routes = function(p){ const s = S(), u = UI.sel; if (p) u.tab = p; const 
   const sel = u[vk] && vehById(u[vk]), own = sel && s.owned[sel.id];
   let list;
   if (!isGo) list = ROUTES.filter(r => u.cls === 'all' || r.cls.includes(u.cls)).map(r => { const lk = r.lvl > s.lvl; return `<div class="card ${u.route === r.id ? 'sel' : ''} ${lk ? 'lock' : ''}" data-a="${lk ? 'nope' : 'route'}" data-p="${r.id}">
-     <div class="row" style="justify-content:space-between"><span class="tag ${r.len === 'long' ? 'r' : r.len === 'medium' ? 'a' : 'g'}">${t(r.len)}</span><span class="row" style="gap:.3em">${r.cls.map(k => `<span class="tag">${tn(CLS_N[k])}</span>`).join('')}</span></div>
+     <div class="row" style="justify-content:space-between"><span class="tag ${r.len === 'long' ? 'r' : r.len === 'medium' ? 'a' : 'g'}">${t(r.len)}</span><span class="row" style="gap:.3em">${(r.cls || []).map(k => `<span class="tag">${tn(CLS_N[k] || k)}</span>`).join('')}</span></div>
      <div class="t1" style="margin:.35em 0 .1em">${tn(r.n)}</div><div class="lbl">${tn(r.city)} · ${t('via')} ${tn(r.via)}</div>
      <div class="row" style="margin-top:.7em;gap:1.2em;flex-wrap:wrap"><div><div class="lbl">${t('fare')}</div><div class="val led">${money(r.fare)}</div></div><div><div class="lbl">${t('km')}</div><div class="val num">${r.realKm}</div></div><div><div class="lbl">${t('stations')}</div><div class="val num">${r.st.length}</div></div></div>
      <div class="row" style="margin-top:.6em;gap:.4em;flex-wrap:wrap">${[...new Set(r.segs.map(g => g.theme))].map(th => `<span class="tag">${tn(THEMES[th].n)}</span>`).join('')}${r.src ? `<span class="tag g">${t('real_fare')}</span>` : `<span class="tag a">${t('est_fare')}</span>`}</div>
@@ -9488,7 +9488,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-18s';
+window.OGRA_BUILD = '2026-09-18t';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
@@ -12485,7 +12485,23 @@ window.OGRA_BUILD = '2026-09-18s';
 
   /* ---------- 1. money can never become NaN ---------- */
   const MONEY = ['fares','tips','fines','svc','comm','net','rides','pax','km','xp'];
+  const PART_KEYS = ['engine','gearbox','brakes','susp','tires','body'];
+  function fixCond(own, car){
+    if (!own) return;
+    own.cond = own.cond || {};
+    for (const k of PART_KEYS) if (!fin(own.cond[k])) own.cond[k] = 100;
+    for (const k in own.cond) own.cond[k] = Math.max(0, Math.min(100, own.cond[k]));
+    if (car && car.E && fin(car.E.tank)) { if (!fin(car.fuel)) car.fuel = 0; car.fuel = Math.min(car.fuel, car.E.tank); }
+    if (fin(own.fuel) && car && car.E && fin(car.E.tank)) own.fuel = Math.min(own.fuel, car.E.tank);
+  }
+  /* the garage and the menu read these too, so clean every owned vehicle */
+  setInterval(() => {
+    try { const s = S(); for (const id in (s.owned || {})) { const o = s.owned[id];
+      o.cond = o.cond || {}; for (const k of PART_KEYS) if (!fin(o.cond[k])) o.cond[k] = 100;
+      const sp = vehById(id); if (sp && fin(o.fuel) && sp.tank) o.fuel = Math.min(o.fuel, sp.tank); } } catch(e) {}
+  }, 2000);
   function fixTrip(G){
+    try { fixCond(G && G.own, G && G.car); } catch(e) {}
     const t = G && G.trip; if (!t) return;
     for (const k of MONEY) if (k in t && !fin(t[k])) t[k] = 0;
     if (G.own && G.own.cond) for (const k in G.own.cond) if (!fin(G.own.cond[k])) G.own.cond[k] = 100;
@@ -12750,7 +12766,7 @@ window.OGRA_BUILD = '2026-09-18s';
       ROUTES.forEach(r => {
         const km = r.realKm || r.km || 10;
         r.lvl = tierFor(km);
-        r.cls = null;                                   /* no class restriction at all */
+        r.cls = r.cls && r.cls.length ? r.cls : ['micro'];   /* labels only: every vehicle is allowed anyway */
         r.tier = TIER_NAME(km);
       });
     } catch(e) {}
