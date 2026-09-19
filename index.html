@@ -2131,7 +2131,7 @@ function newSession(opt){
   G.modal = (k, d) => UI.gameModal && UI.gameModal(k, d);
   G.setWeather = (w, dur) => { G.weather = w; G.wxT = dur; G.feedAdd('wx_' + w, {}, 'info'); if (w === 'rain') AU.thunder(); };
   G.onImpact = (ax, cv, kind) => { const car = G.car, i = clamp((cv - .8)/2.2, .05, 1); AU.bump(i); if (kind === 'stop') AU.clunk(i);
-    if (Math.random() < .3) AU.creak(); RD.shake = Math.max(RD.shake, i*.6);
+    if (Math.random() < .3) AU.creak(); if (i > .45) RD.shake = Math.max(RD.shake, i*.6);
     const dmg = i*(kind === 'stop' ? 2.2 : .7)*(1 - .12*(own.up?.susp || 0)); own.cond.susp = Math.max(0, own.cond.susp - dmg); if (kind === 'stop') own.cond.tires = Math.max(0, own.cond.tires - i*1.2);
     if (G.onboard.length && i > .25) { G.trip.disc += i*6; G.onboard.forEach(p => { p.mood -= i*9*(1 - .1*car.E.comfort); p.bv += i*2; }); if (Math.random() < .5) G.bubble(pickLine('bump')); }
     if (kind === 'stop' && i > .6 && Math.random() < (1 - own.cond.tires/100)*.5 + .06 && !ax.flat) { ax.flat = true; G.feedAdd('ev_flat', {}, 'warn'); AU.burst('white', .6, 'highpass', 800, 1, .25); }
@@ -2139,7 +2139,7 @@ function newSession(opt){
     if (car.rack && i > .5) for (const b of car.rack) if (!b.lost && Math.random() < i*.4) { b.lost = true; G.debris.push({k:'bag', x:car.x - 1, y:car.y + car.spec.H*.6, vx:car.vx*.8, vy:2 + Math.random()*2, a:0, w:(Math.random() - .5)*4, d:laneLp(car.lane)*DEP.lane1, col:b.c, w2:b.w, h:b.h, life:30}); G.feedAdd('ev_bag', {}, 'warn'); }
     for (let k = 0; k < 6*i; k++) G.parts.push({k:'dust', x:ax.wx + (Math.random() - .5), y:ax.wy - ax.r, vx:(Math.random() - .5)*2 - car.vx*.1, vy:Math.random()*1.5, t:0, life:.8, r:.15, g:.6, d:laneLp(car.lane)*DEP.lane1}); };
   G.onScrape = (x, y) => { AU.scrape(.7); for (let k = 0; k < 14; k++) G.parts.push({k:'spark', x, y, vx:-G.car.vx*.3 + (Math.random() - .5)*4, vy:Math.random()*3, t:0, life:.5, d:G.laneLp(car.lane)*DEP.lane1}); own.cond.body = Math.max(0, own.cond.body - .6); };
-  G.onCrash = (o, E, side, rel) => { const car = G.car, i = clamp(E/(car.m*90), .05, 1); AU.crash(i); RD.shake = Math.max(RD.shake, .4 + i); G.trip.crashes++;
+  G.onCrash = (o, E, side, rel) => { const car = G.car, i = clamp(E/(car.m*90), .05, 1); AU.crash(i); if (i > .3) RD.shake = Math.max(RD.shake, .3 + i); G.trip.crashes++;
     try { if (window.ograCrash) ograCrash(G, o, Math.abs(car.vx)*3.6); } catch(e) {}
     const dmg = clamp(E/(car.m*6), 1, 60)*(1 - .12*car.E.armor); own.cond.body = Math.max(0, own.cond.body - dmg); if (side > 0) { own.cond.engine = Math.max(0, own.cond.engine - dmg*.35); car.dmgF = Math.min(1, (car.dmgF || 0) + dmg/60); } else car.dmgR = Math.min(1, (car.dmgR || 0) + dmg/60);
     car.scr = Math.min(1, (car.scr || 0) + .2);
@@ -3848,7 +3848,7 @@ const pickTx = k => { const a = VOX[k], p = a[Math.floor(Math.random()*a.length)
 { const _fi = FEAT.init; FEAT.init = function(G){ _fi(G); const car = G.car; G.shouts = []; G.bq = []; G.evLast = {};
   const ob = G.bubble; G.bubble = (text, x, tag) => { if (!text) return; if (G._lb && G._lb.text === text && G.clock - G._lb.t < 25) return; if (G.bubbles.some(b => b.t < 2.8)) { if (G.bq.length < 2 && !G.bq.some(q => (q && q.text || q) === text)) G.bq.push({text, tag}); return; } G.bubbles.length = 0; ob(text, x, tag); G._lb = {text, t:G.clock}; };
   G.shout = (o, text) => { if (!text || G.shouts.some(s => s.o === o && s.t < 3)) return; G.shouts.push({o, text, t:0}); if (G.shouts.length > 2) G.shouts.shift(); };
-  G.onLight = (o, side, rel) => { AU.clunk(.3); AU.burst('white', .12, 'bandpass', 2400, 2, .04); RD.shake = Math.max(RD.shake, .12); FEAT.comboBreak(G); AU.haptic(30); G.onboard.forEach(p => p.mood -= 3); o.flash = 1.4;
+  G.onLight = (o, side, rel) => { AU.clunk(.3); AU.burst('white', .12, 'bandpass', 2400, 2, .04); FEAT.comboBreak(G); AU.haptic(30); G.onboard.forEach(p => p.mood -= 3); o.flash = 1.4;
     const pan = clamp((o.x - car.x)/25, -1, 1); AU.distantHorn(pan, .1); setTimeout(() => AU.distantHorn(pan, .09), 380); G.shout(o, AU.voice('angry') || pickTx('angry')); };
   const oc = G.onCrash; G.onCrash = (o, E, side, rel) => { oc(o, E, side, rel); const i = clamp(E/(car.m*90), .05, 1), front = o.lane === 1 ? true : side < 0, dir = o.lane === 1 ? -1 : 1;
     o.parts = o.parts || {}; for (const k of front ? ['bumperF','headL'] : ['bumperR','tailL']) if (o.parts[k] !== 0 && Math.random() < i*1.5) { o.parts[k] = 0;
@@ -4236,19 +4236,19 @@ function renderScene(G, dt){ const c = RD.ctx, W = G.world, car = G.car, set = G
   // zoom: steady in town, eases out on open road; long vehicles and a car behind widen the view
   /* zoom by speed: close in when crawling (bus fills about half the width),      fully pulled back by 40 km/h */
   const zFar = 1.08 - clamp(spd/90, 0, 1)*(RD.coarse ? .24 : .32) - clamp((L - 5)/8, 0, 1)*.1 - (behind ? .04 : 0);
-  const zNear = clamp(.66*RD.Ws/Math.max(1, L*RD.PPM), zFar, 2.8);
-  let zt = lerp(zNear, zFar, clamp((spd - 5)/25, 0, 1));   /* fully pulled back by 30 km/h */
+  const zNear = clamp(.62*RD.Ws/Math.max(1, L*RD.PPM), zFar, 1.45);   /* short cars no longer blow up the view */
+  let zt = lerp(zNear, zFar, clamp((spd - 3)/14.6, 0, 1));   /* fully pulled back by 20 km/h */
   if (!set.dynZoom || G.mode === 'attract') zt = 1 - clamp((L - 5)/8, 0, 1)*.1;
   zt *= (set.zoom || 1)*0.80;   /* pull the camera back for a longer view */
-  RD.zoom = RD.zoom || zt; RD.zoom = lerp(RD.zoom, zt, 1 - Math.exp(-dt*(zt < RD.zoom ? .55 : .4)));
+  RD.zoom = RD.zoom || zt; if (Math.abs(zt - RD.zoom) > .004) RD.zoom = lerp(RD.zoom, zt, 1 - Math.exp(-dt*.8));
   const z = RD.zoom; RD.W = RD.Ws/z; RD.H = RD.Hs/z; RD.ROADY = RD.RYs/z;
   const vw = RD.W/RD.PPM, minF = (L/2 + 1.2)/vw; let frac;
   if (G.mode === 'attract') frac = .34; else if (car.vx < -.5 || car.gear < 0) frac = Math.max(.55, 1 - minF - .05); else if (behind) frac = clamp((car.x - behind.x)/vw, minF*.42, .22); else { /* the back of the bus stays at least 15% in from the left edge */
     const acc = car.vx - (G.__camV ?? car.vx); G.__camV = car.vx;
-    let want = .015 + (L/2 + .1)/vw + (acc > .05 ? -.01 : acc < -.08 ? .02 : 0);
+    let want = .045 + (L/2 + .15)/vw + (acc > .05 ? -.01 : acc < -.08 ? .02 : 0);
     if (G.rest && G.rest.active) want += .06;
     frac = Math.max(minF*.42, Math.min(.5, want));
-    G.camFrac = G.camFrac == null ? frac : (G.camFrac + (frac - G.camFrac)*(1 - Math.exp(-dt*2.4))); frac = G.camFrac; }
+    G.camFrac = G.camFrac == null ? frac : (G.camFrac + (frac - G.camFrac)*(1 - Math.exp(-dt*1.6))); frac = G.camFrac; }
   G.camFrac = G.camFrac ?? frac; G.camFrac = lerp(G.camFrac, frac, 1 - Math.exp(-dt*(frac > G.camFrac ? 1.6 : .7)));
   RD.camL = G.mode === 'attract' ? lerp(RD.camL, car.x - vw*G.camFrac, 1 - Math.exp(-dt*3.2)) : car.x - vw*G.camFrac; if (G.mode !== 'attract' && !(car.vx < -.4 || car.gear < 0)) { if (RD._fwd != null && RD.camL < RD._fwd - .004) RD.camL = RD._fwd; RD._fwd = RD.camL; } else RD._fwd = null; RD.camY = lerp(RD.camY, W.h(car.x), 1 - Math.exp(-dt*2.5));
   const sh = set.shake ? (Math.random() - .5)*RD.shake*7 : 0; RD.shake *= Math.exp(-dt*5);
@@ -5143,7 +5143,7 @@ const ROUTEEV = {
   camelTrain(G){ const x = G.car.x + 130, R = Math.random;
     for (let i = 0; i < 3; i++) G.peds.push({x:x + i*3, lane:-1.1 + R()*.3, look:mkLook(R), t:0, ph:R()*6, face:1, v:.5});
     G.feedAdd('ev_camels', {}, 'warn'); },
-  touristConvoy(G){ const x = G.car.x - 60;
+  touristConvoy(G){ return;   /* retired: it asked the driver to change lane */ const x = G.car.x - 60;
     for (let i = 0; i < 3; i++) { const o = mkAI(G, 'citybus', x - i*16, 0, 22); o.v = 22; o.v0 = 24; G.traffic.push(o); }
     G.feedAdd('ev_convoyt', {}, 'info'); },
   fuelQueue(G){ const x = G.car.x + 140, R = Math.random;
@@ -9488,7 +9488,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-18i';
+window.OGRA_BUILD = '2026-09-18j';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
@@ -12369,6 +12369,21 @@ window.OGRA_BUILD = '2026-09-18i';
       Element.prototype.appendChild = na; Element.prototype.insertBefore = ni;
     }
   } catch(e) {}
+})();
+</script>
+<script>
+/* any leftover "keep right / change lane" message never reaches the driver */
+(function(){
+  if (typeof GAME === 'undefined') return;
+  const BAD = /change lane|keep right|keep left|غيّر الحارة|غير الحارة|خد يمين|خد شمال|الحارة/i;
+  function guard(G){
+    if (!G || G.__laneGuard) return; G.__laneGuard = true;
+    const ob = G.bubble, of = G.feedAdd;
+    G.bubble = function(t, x, tag){ try { if (t && BAD.test(String(t))) return; } catch(e) {} return ob.apply(this, arguments); };
+    G.feedAdd = function(k, d, kind){ try { if (k === 'ev_polconv' || k === 'ev_convoyt') return; } catch(e) {} return of.apply(this, arguments); };
+  }
+  if (typeof newSession === 'function') { const _ns = newSession; newSession = function(){ const G = _ns.apply(this, arguments); guard(G); return G; }; }
+  setInterval(() => { try { guard(GAME.G); } catch(e) {} }, 1200);
 })();
 </script>
 <script>
