@@ -9499,7 +9499,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-20f';
+window.OGRA_BUILD = '2026-09-20g';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
@@ -14353,6 +14353,16 @@ window.OGRA_BUILD = '2026-09-20f';
   const bandName = k => ({short:T('قصير','Short'), medium:T('متوسط','Medium'), long:T('طويل','Long'), xl:T('طويل جداً','Very long')})[k];
 
   /* ---------- screens ---------- */
+  function live(){
+    try {
+      const m = document.getElementById('mx'); if (!m) return;
+      const S0 = s(), need = (typeof xpFor === 'function') ? xpFor(S0.lvl || 1) : 220;
+      const set = (id, v) => { const e = m.querySelector(id); if (e && e.textContent !== v) e.textContent = v; };
+      set('#mxCash', money(S0.cash) + T(' ج',' EGP'));
+      set('#mxXp', 'XP ' + money(S0.xp) + ' / ' + money(need));
+      set('#mxLvl', String(S0.lvl || 1));
+    } catch(e) {}
+  }
   function render(){
     const m = document.getElementById('mx'); if (!m || m.style.display === 'none') return;
     const S0 = s(), need = (typeof xpFor === 'function') ? xpFor(S0.lvl || 1) : 220;
@@ -14543,7 +14553,12 @@ window.OGRA_BUILD = '2026-09-20f';
       const m = document.getElementById('mx');
       const usingOld = UI.cur && UI.cur.name && !['hub'].includes(UI.cur.name) && m.style.display === 'none';
       if (!usingOld && m.style.display === 'none') show();
-      if (m.style.display !== 'none' && (!m.__t || Date.now() - m.__t > 1200)) { m.__t = Date.now(); render(); }
+      if (m.style.display !== 'none') {
+        const S0 = s(), sig = [tab, gtab, filter, UI.sel.route, UI.sel.vid, UI.sel.tod, UI.sel.wvid, S0.lvl, S0.xp, S0.cash,
+          Object.keys(S0.owned || {}).length, AR()].join('|');
+        if (sig !== m.__sig) { m.__sig = sig; render(); }      /* no repainting for the sake of it */
+        else live();                                           /* just refresh the live numbers */
+      }
     } catch(e) {}
   }, 350);
   /* the old deck is retired */
