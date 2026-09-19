@@ -9499,7 +9499,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-20e';
+window.OGRA_BUILD = '2026-09-20f';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
@@ -14548,6 +14548,112 @@ window.OGRA_BUILD = '2026-09-20e';
   }, 350);
   /* the old deck is retired */
   setInterval(() => { const d = document.getElementById('deck'); if (d) d.remove(); }, 500);
+})();
+</script>
+<script>
+/* =====================================================================
+   RADIO OFF WHEN THE SHIFT ENDS · TRAFFIC THAT TARGETS THE LIMIT ·
+   NO CROSS STREETS · REAL WALK CYCLES · NO OVERLAP IN THE MENU
+   ===================================================================== */
+(function(){
+  if (typeof GAME === 'undefined' || typeof RD === 'undefined') return;
+
+  /* 1. leaving a shift silences the radio */
+  let wasPlaying = false;
+  setInterval(() => {
+    try {
+      const playing = !!(window.RADIO && RADIO.on);
+      if (GAME.state !== 'play' && playing) { RADIO.power(); wasPlaying = false; }
+      if (GAME.state === 'play') wasPlaying = playing;
+    } catch(e) {}
+  }, 400);
+
+  /* 2. every AI vehicle aims for the posted limit, and closes the gap */
+  function drive(G, dt){
+    const W = G.world; if (!W || !W.segAt) return;
+    for (const o of G.traffic || []) {
+      if (!o || o.__void || o.parked || o.isTow || o.broke || o.dead) continue;
+      const lim = ((W.segAt(o.x) || {}).lim || 60)/3.6;
+      const target = lim*(o.type === 'truck' ? .9 : .97);
+      o.v0 = Math.max(o.v0 || 0, target);                       /* the target is the limit, always */
+      const ahead = (G.traffic || []).find(q => q && q !== q.parked && q !== o && !q.parked && q.lane === o.lane
+        && q.x > o.x && q.x - o.x < (o.L || 5) + 22);
+      if (!ahead && o.v < target*.92) o.v = Math.min(target, o.v + dt*2.6);   /* catch up briskly */
+    }
+  }
+
+  /* 3. cross streets removed: no side roads, no crossing traffic, no lights on them */
+  function noCross(G){
+    const W = G.world; if (!W) return;
+    if (W.isx && W.isx.length) W.isx.length = 0;
+    if (W.tl && W.tl.length) W.tl.length = 0;
+    if (W.cross && W.cross.length) W.cross.length = 0;
+    for (const o of G.traffic || []) if (o && (o.cross || o.turning)) o.__void = true;
+  }
+  if (typeof addIsx === 'function') { window.addIsx = function(){ return; }; }   /* none are generated either */
+
+  /* 4. pedestrians: a full eight-frame cycle timed to their real pace,
+        and their facing comes from the direction they actually move */
+  if (typeof RD.person === 'function') {
+    const _p = RD.person;
+    RD.person = function(Lk, x, fy, sc, ph, walking, wave, face){
+      try {
+        if (Lk) {
+          const now = performance.now();
+          if (Lk.__lx != null && now - (Lk.__lt || 0) < 400) {
+            const dx = x - Lk.__lx;
+            if (Math.abs(dx) > 0.35) { Lk.__face = dx > 0 ? 1 : -1; Lk.__moving = now; }
+            else if (now - (Lk.__moving || 0) > 220) Lk.__still = true;
+          }
+          Lk.__lx = x; Lk.__lt = now;
+          if (Lk.__face) face = Lk.__face;                       /* never moonwalk */
+          walking = walking || (now - (Lk.__moving || 0) < 220);
+        }
+      } catch(e) {}
+      return _p.call(this, Lk, x, fy, sc, ph, walking, wave, face);
+    };
+  }
+  /* pace: one full stride cycle per 1.35 m walked, so the legs match the ground */
+  function pace(list, dt){
+    for (const p of list || []) {
+      if (!p) continue;
+      const v = Math.abs(p.v || 0);
+      if (v > .03) p.ph = (p.ph || 0) + (v/1.35)*6.2832*dt;
+    }
+  }
+
+  if (typeof updateGame === 'function') {
+    const _ug = updateGame;
+    updateGame = function(G, dt, inp){
+      const out = _ug.apply(this, arguments);
+      try { drive(G, dt); noCross(G); pace(G.walkers, dt); pace(G.peds, dt); } catch(e) {}
+      return out;
+    };
+  }
+
+  /* 5. the menu checks itself for overlaps and tightens up if it finds any */
+  setInterval(() => {
+    try {
+      const m = document.getElementById('mx'); if (!m || m.style.display === 'none') return;
+      const els = [...m.querySelectorAll('.card,.chip,.btn,.pod')].filter(e => e.offsetParent);
+      const R = els.map(e => e.getBoundingClientRect());
+      let hit = 0;
+      for (let i = 0; i < els.length && hit < 3; i++) for (let j = i + 1; j < els.length && hit < 3; j++) {
+        if (els[i].contains(els[j]) || els[j].contains(els[i])) continue;
+        const a = R[i], b = R[j];
+        if (Math.min(a.right, b.right) - Math.max(a.left, b.left) > 4 &&
+            Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 4) hit++;
+      }
+      m.classList.toggle('tight', hit > 0);
+    } catch(e) {}
+  }, 1500);
+  document.head.insertAdjacentHTML('beforeend', `<style>
+    #mx.tight .g2{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))!important}
+    #mx.tight .g3{grid-template-columns:repeat(auto-fill,minmax(110px,1fr))!important}
+    #mx.tight .card{padding:8px!important;font-size:11.5px}
+    #mx .card,#mx .pod{overflow:hidden}
+    #mx .page{contain:layout}
+  </style>`);
 })();
 </script>
 <script>

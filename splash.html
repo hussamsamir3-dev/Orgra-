@@ -43,10 +43,18 @@
   .cta:active{background:rgba(230,180,85,.2)}
   @keyframes breathe{0%,100%{box-shadow:0 0 0 rgba(230,180,85,0)}50%{box-shadow:0 0 34px rgba(230,180,85,.28)}}
   .curtain{position:absolute;inset:0;background:#05070d;z-index:5;opacity:0;pointer-events:none;transition:opacity .45s}
+  #logo{position:fixed;inset:0;z-index:9;display:grid;place-items:center;background:#05070d;
+    opacity:0;animation:logoIn 1s ease forwards, logoOut .9s ease 3s forwards}
+  #logo img{width:min(72vw,620px);max-height:70vh;object-fit:contain;
+    filter:drop-shadow(0 18px 50px rgba(0,0,0,.6));animation:logoZoom 4s ease-out both}
+  @keyframes logoIn{to{opacity:1}}
+  @keyframes logoOut{to{opacity:0;visibility:hidden}}
+  @keyframes logoZoom{from{transform:scale(.94)}to{transform:scale(1)}}
   .curtain.on{opacity:1}
   @media (prefers-reduced-motion:reduce){*{animation:none!important}}
 </style></head>
 <body>
+<div id="logo"><img src="assets/company_logo.svg" alt=""></div>
 <div id="sp">
   <div class="fallback"></div>
   <div class="shot" id="shot"></div>
@@ -88,9 +96,12 @@
     curtain.classList.add('on');
     setTimeout(function(){ try { parent.postMessage('ogra:splash-done', '*'); } catch(e) {} }, 420);
   }
-  document.getElementById('sp').addEventListener('click', go);
-  document.getElementById('sp').addEventListener('touchend', function(e){ e.preventDefault(); go(); }, {passive:false});
-  addEventListener('keydown', go);
+  var logoUp = true;
+  setTimeout(function(){ logoUp = false; var l = document.getElementById('logo'); if (l) l.style.display = 'none'; }, 3900);
+  function guard(fn){ return function(e){ if (logoUp) { if (e && e.preventDefault) e.preventDefault(); return; } fn(); }; }
+  document.getElementById('sp').addEventListener('click', guard(go));
+  document.getElementById('sp').addEventListener('touchend', guard(function(){ go(); }), {passive:false});
+  addEventListener('keydown', guard(go));
   setTimeout(function(){ if (!done) go(); }, 16000);
 </script>
 </body></html>
