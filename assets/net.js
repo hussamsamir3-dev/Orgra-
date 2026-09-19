@@ -17,7 +17,9 @@
     /* ---------- boot ---------- */
     async init() {
       if (!window.supabase) return this.offline('supabase library missing');
-      this.sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      this.sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth:{ detectSessionInUrl:true, flowType:'implicit' } });
+      /* a confirmation link leaves a long token in the address bar: tidy it away */
+      try { if (location.hash && /access_token=/.test(location.hash)) setTimeout(() => history.replaceState(null, '', location.pathname + location.search), 1200); } catch (e) {}
 
       const { data } = await this.sb.auth.getSession();
       if (data && data.session) { this.user = data.session.user; await this.afterAuth(); }
@@ -185,7 +187,9 @@
     },
     async signUp(email, pass, note) {
       const ar = (typeof LANG !== 'undefined' && LANG.cur === 'ar');
-      const { error } = await this.sb.auth.signUp({ email, password: pass });
+      /* send them back to this exact page, not to the top of the domain */
+      const back = location.origin + location.pathname;
+      const { error } = await this.sb.auth.signUp({ email, password: pass, options:{ emailRedirectTo: back } });
       if (error) note(error.message);
       else note(ar ? 'بعتنالك إيميل تأكيد — افتحه وبعدين سجّل دخول.'
                    : 'Check your email to confirm, then sign in.', true);
