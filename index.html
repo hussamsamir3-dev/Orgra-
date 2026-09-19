@@ -9488,7 +9488,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-19e';
+window.OGRA_BUILD = '2026-09-19f';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
@@ -13143,6 +13143,84 @@ window.OGRA_BUILD = '2026-09-19e';
   setInterval(fit, 700);
   addEventListener('resize', () => setTimeout(fit, 80));
   addEventListener('orientationchange', () => setTimeout(fit, 350));
+})();
+</script>
+<script>
+/* =====================================================================
+   A PAUSE MENU OF OUR OWN
+   The built-in pause window keeps ending up unreachable on a phone, so on
+   touch screens the game now shows a simple, short panel that always fits,
+   always sits on top, and calls the same actions.
+   ===================================================================== */
+(function(){
+  if (typeof GAME === 'undefined') return;
+  const AR = () => typeof LANG !== 'undefined' && LANG.cur === 'ar';
+  const T = (ar, en) => AR() ? ar : en;
+
+  document.head.insertAdjacentHTML('beforeend', `<style>
+    #ogPause{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;
+      background:rgba(4,8,16,.82);padding:10px;font-family:Cairo,system-ui}
+    #ogPause .box{width:min(94vw,520px);max-height:94vh;overflow:auto;border-radius:18px;padding:16px;
+      background:linear-gradient(180deg,#16203a,#0c1220);border:1px solid rgba(255,182,39,.4);
+      box-shadow:0 24px 60px rgba(0,0,0,.6);display:grid;gap:10px}
+    #ogPause h3{margin:0;font:900 22px Cairo,system-ui;color:#ffd98a;text-align:center}
+    #ogPause .sub{margin:-4px 0 4px;text-align:center;color:#9fb0cc;font:700 13px Cairo,system-ui}
+    #ogPause button{border:0;border-radius:14px;padding:.85em 1em;font:800 17px Cairo,system-ui;cursor:pointer;
+      background:#1b2844;color:#e8eefc;touch-action:manipulation}
+    #ogPause button.go{background:linear-gradient(180deg,#ffe2a6,#ffb627);color:#1b1204}
+    #ogPause button.bad{background:rgba(255,77,94,.16);color:#ffc5cb;border:1px solid rgba(255,77,94,.45)}
+    #ogPause button:active{filter:brightness(1.2);transform:scale(.98)}
+    #ogPause .row{display:flex;gap:10px}#ogPause .row button{flex:1}
+  </style>`);
+
+  let el = null;
+  function close(){ if (el) { el.remove(); el = null; } }
+  function act(a){
+    close();
+    try { UI.act(a); } catch(e) { try { GAME.paused = false; } catch(_) {} }
+    if (a === 'resume') { try { GAME.paused = false; AU.pauseGame && AU.pauseGame(false); } catch(e) {} }
+  }
+  function show(){
+    if (el) return;
+    el = document.createElement('div'); el.id = 'ogPause';
+    const G = GAME.G;
+    const R = G && G.route ? tn(G.route.n) : '';
+    el.innerHTML = `<div class="box">
+      <h3>${T('متوقف', 'Paused')}</h3>
+      <div class="sub">${R}</div>
+      <button class="go" data-p="resume">${T('كمّل ▶', 'Resume ▶')}</button>
+      <div class="row">
+        <button data-p="mute">${T('الصوت', 'Sound')}</button>
+        <button data-p="settings">${T('الإعدادات', 'Settings')}</button>
+      </div>
+      <button class="bad" data-p="endShift">${T('إنهاء الوردية', 'End shift')}</button>
+      <button class="bad" data-p="quit">${T('رجوع للقائمة', 'Back to menu')}</button>
+    </div>`;
+    document.body.appendChild(el);
+    const hit = e => {
+      const b = e.target.closest('[data-p]');
+      if (!b) { if (e.target === el) act('resume'); return; }
+      e.preventDefault(); e.stopPropagation();
+      const k = b.dataset.p;
+      if (k === 'settings') { close(); try { GAME.paused = false; UI.show('settings'); } catch(err) {} return; }
+      act(k);
+    };
+    el.addEventListener('click', hit);
+    el.addEventListener('touchend', hit, {passive:false});
+  }
+
+  /* take over whenever the game pauses during a shift */
+  setInterval(() => {
+    try {
+      const m = document.getElementById('modal');
+      const isPause = m && !m.classList.contains('hidden') && m.querySelector('[data-a="resume"]');
+      if (GAME.state === 'play' && GAME.paused && isPause) {
+        m.classList.add('hidden');                 /* the built-in one steps aside */
+        show();
+      } else if (el && (!GAME.paused || GAME.state !== 'play')) close();
+    } catch(e) {}
+  }, 250);
+  addEventListener('keydown', e => { if (e.key === 'Escape' && el) act('resume'); });
 })();
 </script>
 <script>
