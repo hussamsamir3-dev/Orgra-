@@ -939,8 +939,8 @@ class World {
     for (let x = a; x < b; x += 9 + R()*16) { const th = this.themeAt(x); const r = R();
       if ((th === 'corniche' || th === 'capital' || th === 'giza' || th === 'rural') && r < .45) this.props.push({x, t:'palm', h:6 + R()*5, th});
       else if (th === 'rural' && r < .7) this.props.push({x, t:'tree', h:5 + R()*4, th});
-      else if (th === 'desert' && r < .07) this.props.push({x, t:'billboard', th, k:Math.floor(R()*4)});
-      else if (th === 'ring' && r < .12) this.props.push({x, t:'billboard', th, k:Math.floor(R()*4)});
+      else if (false) {}   /* black billboards removed */
+      else if (false) {}   /* black billboards removed */
       else if (T0.city && r < .05) this.props.push({x, t:'kiosk', th, k:Math.floor(R()*3)});
       else if (T0.city && r < .09) this.props.push({x, t:'bin', th});
     }
@@ -9488,7 +9488,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-18m';
+window.OGRA_BUILD = '2026-09-18o';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
@@ -10537,11 +10537,11 @@ window.OGRA_BUILD = '2026-09-18m';
     const t = performance.now()/1000, spd = Math.min(1, Math.abs(G.car.vx)/28);
     c.save(); c.setTransform(1, 0, 0, 1, 0, 0);
     /* three depths of rain, leaning with speed */
-    const layers = (window.OG_fx && !OG_fx()) ? 1 : 3;
+    const layers = 2;
     for (let l = 0; l < layers; l++) {
-      const n = Math.round((l === 0 ? 34 : l === 1 ? 26 : 18)*heavy*(W/1200)), len = (14 + l*16)*dpr,
+      const n = Math.round((l === 0 ? 20 : 14)*heavy*(W/1200)), len = (22 + l*20)*dpr,
             slant = (0.22 + spd*.9 + l*.05), sp = (900 + l*700)*dpr;
-      c.strokeStyle = `rgba(200,220,245,${(.10 + l*.07)*heavy})`; c.lineWidth = (l < 2 ? 1 : 1.6)*dpr;
+      c.strokeStyle = `rgba(206,224,248,${(.055 + l*.035)*heavy})`; c.lineWidth = (l < 1 ? .9 : 1.3)*dpr;
       c.beginPath();
       for (let i = 0; i < n; i++) {
         const seed = i*97.3 + l*31.7;
@@ -10557,7 +10557,7 @@ window.OGRA_BUILD = '2026-09-18m';
     g.addColorStop(0, `rgba(190,205,225,0)`); g.addColorStop(.5, `rgba(190,205,225,${.10*heavy*(.3 + spd)})`); g.addColorStop(1, 'rgba(190,205,225,0)');
     c.fillStyle = g; c.fillRect(0, road - 40*dpr, W, 70*dpr);
     /* drops sitting on the glass, wiped now and then */
-    if (drops.length < (window.OG_fx && !OG_fx() ? 12 : 46)*heavy) drops.push({x:Math.random()*W, y:Math.random()*H*.75, r:(1.6 + Math.random()*3.4)*dpr, v:0, born:t});
+    if (drops.length < 14*heavy) drops.push({x:Math.random()*W, y:Math.random()*H*.75, r:(1.6 + Math.random()*3.4)*dpr, v:0, born:t});
     wiperT -= 1/60;
     if (wiperT <= 0) { wiper = 1; wiperT = 5 + Math.random()*5; }
     if (wiper > 0) { wiper -= .022; const wx2 = (1 - wiper)*W*1.25 - W*.12;
@@ -10569,7 +10569,7 @@ window.OGRA_BUILD = '2026-09-18m';
     for (const d of drops) {
       d.v += .012; d.y += d.v*dpr*(.5 + spd);
       if (d.y > H) { d.y = -5; d.x = Math.random()*W; d.v = 0; }
-      c.fillStyle = `rgba(215,230,250,${.18*heavy})`;
+      c.fillStyle = `rgba(215,230,250,${.09*heavy})`;
       c.beginPath(); c.ellipse(d.x, d.y, d.r*.8, d.r, 0, 0, 6.28); c.fill();
       c.strokeStyle = `rgba(255,255,255,${.12*heavy})`; c.lineWidth = dpr*.6;
       c.beginPath(); c.arc(d.x - d.r*.25, d.y - d.r*.3, d.r*.45, 3.4, 5.2); c.stroke();
@@ -12470,6 +12470,266 @@ window.OGRA_BUILD = '2026-09-18m';
       w.__wrap = 1; n.signOut = w;
     }
   } catch(e) {}
+})();
+</script>
+<script>
+/* =====================================================================
+   NaN-proof money · quieter passengers in a good bus · traffic that keeps
+   moving · no black billboards · palms that move with the wind · real
+   Egyptian temperatures · condition that is saved · calmer rain
+   ===================================================================== */
+(function(){
+  if (typeof GAME === 'undefined' || typeof RD === 'undefined') return;
+  const fin = v => typeof v === 'number' && Number.isFinite(v);
+  const AR = () => typeof LANG !== 'undefined' && LANG.cur === 'ar';
+
+  /* ---------- 1. money can never become NaN ---------- */
+  const MONEY = ['fares','tips','fines','svc','comm','net','rides','pax','km','xp'];
+  function fixTrip(G){
+    const t = G && G.trip; if (!t) return;
+    for (const k of MONEY) if (k in t && !fin(t[k])) t[k] = 0;
+    if (G.own && G.own.cond) for (const k in G.own.cond) if (!fin(G.own.cond[k])) G.own.cond[k] = 100;
+    const s = (typeof S === 'function') && S();
+    if (s && !fin(s.cash)) s.cash = 0;
+  }
+
+  /* ---------- 2. real Egyptian temperatures ----------
+     monthly averages for Cairo: low and high, in °C */
+  const EG_T = [[9,19],[10,21],[12,24],[16,29],[19,33],[21,35],[22,35],[22,35],[20,33],[18,30],[14,25],[10,21]];
+  function outsideReal(G){
+    const d = new Date(), m = d.getMonth(), [lo, hi] = EG_T[m];
+    const hour = ((G.clock/3600 + (G.tod0 || 8)) % 24);
+    const t = lo + (hi - lo)*Math.max(0, Math.cos((hour - 15)/24*2*Math.PI))**1.2;
+    const th = (G.world.themeAt(G.car.x) || '');
+    let v = t;
+    if (/desert|openDesert|giza|sinai|windfarm/.test(th)) v += 4;
+    if (/coast|redsea|resort|alex|corniche/.test(th)) v -= 3;
+    if (G.weather === 'rain') v -= 5;
+    return Math.round(v*10)/10;
+  }
+
+  /* ---------- 3. a comfortable bus gets no complaints ---------- */
+  const COMPLAIN = /حر|الجو|تكييف|شباك|مطبات|ظهري|المطبات|hot|air condition|window|bumps|back is killing/i;
+  function comfy(G){
+    const A = G.ac;
+    return !!(A && A.has && A.on && A.cabin >= 20 && A.cabin <= 26.5 && (G.__rough || 0) < 1.2);
+  }
+  function guardTalk(G){
+    if (!G || G.__comfyGuard) return; G.__comfyGuard = true;
+    const ob = G.bubble;
+    G.bubble = function(t, x, tag){
+      try { if (t && comfy(G) && COMPLAIN.test(String(t))) return; } catch(e) {}
+      return ob.apply(this, arguments);
+    };
+  }
+
+  /* ---------- 4. traffic does not dawdle ---------- */
+  function keepMoving(G, dt){
+    const W = G.world;
+    for (const o of G.traffic || []) {
+      if (!o || o.__void || o.parked || o.isTow || o.broke) continue;
+      const lim = ((W.segAt && W.segAt(o.x) || {}).lim || 60)/3.6;
+      const ahead = (G.traffic || []).some(q => q && q !== o && !q.parked && q.lane === o.lane && q.x > o.x && q.x - o.x < (o.L || 5) + 14);
+      if (ahead) { o.__slow = 0; continue; }                 /* held up by the car in front: fair enough */
+      if (o.v < lim*.62) { o.__slow = (o.__slow || 0) + dt;
+        if (o.__slow > 1.5) { o.v0 = Math.max(o.v0 || 0, lim*.92); o.hurryT = Math.max(o.hurryT || 0, 4); }
+      } else o.__slow = 0;
+    }
+  }
+
+  /* ---------- 5. palms and trees move with the wind ---------- */
+  function windNow(G){
+    const base = .25 + (G.weather === 'dust' ? .9 : 0) + (G.weather === 'rain' ? .5 : 0);
+    return base + Math.sin(performance.now()/2600)*.18;
+  }
+  if (RD.prop) {
+    const _pr = RD.prop;
+    RD.prop = function(p, x, gy){
+      if (p && (p.t === 'palm' || p.t === 'tree')) {
+        const G = GAME.G, w = G ? windNow(G) : .3;
+        const sway = Math.sin(performance.now()/900 + (p.x || 0)*.35)*w*0.055;
+        const c = this.ctx;
+        c.save(); c.translate(x, gy); c.rotate(sway); c.translate(-x, -gy);
+        const r = _pr.apply(this, arguments);
+        c.restore(); return r;
+      }
+      return _pr.apply(this, arguments);
+    };
+  }
+
+  /* ---------- 6. pedestrians: smooth legs, correct facing ---------- */
+  function fixWalk(list, dt){
+    for (const p of list || []) {
+      if (!p || !p.look) continue;
+      const v = p.v || 0;
+      if (Math.abs(v) > .02) { p.face = v > 0 ? 1 : -1; p.walk = true; p.ph = (p.ph || 0) + dt*Math.min(9, 3.4 + Math.abs(v)*2.6); }
+      else if (p.walkTo != null) { const d = p.walkTo - p.x; if (Math.abs(d) > .1) { p.face = d > 0 ? 1 : -1; p.walk = true; p.ph = (p.ph || 0) + dt*5; } else p.walk = false; }
+      else p.walk = false;
+    }
+  }
+
+  /* ---------- 7. condition is saved ---------- */
+  let saveT = 0;
+  function persist(G, dt){
+    saveT += dt; if (saveT < 12) return; saveT = 0;
+    try { if (G.own && G.own.cond && typeof saveGame === 'function') saveGame(); } catch(e) {}
+  }
+
+  if (typeof updateGame === 'function') {
+    const _ug = updateGame;
+    updateGame = function(G, dt, inp){
+      const out = _ug.apply(this, arguments);
+      try {
+        fixTrip(G); guardTalk(G); keepMoving(G, dt);
+        fixWalk(G.walkers, dt); fixWalk(G.peds, dt);
+        if (G.ac) G.ac.out = outsideReal(G);
+        persist(G, dt);
+      } catch(e) {}
+      return out;
+    };
+  }
+})();
+</script>
+<script>
+/* =====================================================================
+   WORKSHOP, REBUILT
+   One repair system for both the roadside workshop and the garage:
+   honest prices, parts you can fix one by one or all at once, the wallet
+   in view, and the work actually applied and saved.
+   ===================================================================== */
+(function(){
+  if (typeof GAME === 'undefined') return;
+  const AR = () => typeof LANG !== 'undefined' && LANG.cur === 'ar';
+  const cash = () => { try { return window.OG_cash ? OG_cash() : (S().cash || 0); } catch(e) { return 0; } };
+  const PARTS = [
+    {k:'engine',  w:1.45, n:['الموتور', 'Engine']},
+    {k:'gearbox', w:1.20, n:['الفتيس', 'Gearbox']},
+    {k:'brakes',  w:0.70, n:['الفرامل', 'Brakes']},
+    {k:'susp',    w:0.85, n:['العفشة', 'Suspension']},
+    {k:'tires',   w:0.75, n:['الكاوتش', 'Tyres']},
+    {k:'body',    w:0.55, n:['السمكرة والدهان', 'Body and paint']}
+  ];
+  const cond = G => (G.own && G.own.cond) || {};
+  const price = (G, p) => {
+    const c = cond(G), have = Math.max(0, Math.min(100, c[p.k] ?? 100)), miss = 100 - have;
+    if (miss < 0.5) return 0;
+    const base = ((G.own && G.own.spec && G.own.spec.price) || (G.car.spec && G.car.spec.price) || 150000)/1000;
+    return Math.max(25, Math.round(base*p.w*miss*0.42));
+  };
+  const total = G => PARTS.reduce((s, p) => s + price(G, p), 0);
+
+  function pay(n){
+    try { const s = S(); if ((s.cash || 0) < n) { const b = cash(); if (b >= n) s.cash = b; }
+      if ((s.cash || 0) < n) return false;
+      s.cash -= n; if (typeof saveGame === 'function') saveGame(); return true; } catch(e) { return false; }
+  }
+  function apply(G, keys){
+    const c = cond(G);
+    keys.forEach(k => { c[k] = 100; });
+    if (keys.includes('engine')) { G.broke = false; if (G.car) { G.car.dead = false; G.car.brokeT = 0; G.car.__crashDmg = 0; } }
+    if (keys.includes('tires')) { if (G.car && G.car.flat) G.car.flat = null; }
+    if (keys.includes('brakes') && G.car) G.car.fade = 0;
+    try { if (typeof saveGame === 'function') saveGame(); } catch(e) {}
+    try { AU.ding && AU.ding(); } catch(e) {}
+  }
+
+  document.head.insertAdjacentHTML('beforeend', `<style>
+    #wsWrap{position:fixed;inset:0;z-index:2147482400;display:grid;place-items:center;padding:12px;background:rgba(3,6,12,.66);opacity:0;transition:opacity .18s}
+    #wsWrap.in{opacity:1}
+    #wsBox{width:min(96vw,620px);max-height:min(92vh,720px);overflow:auto;background:linear-gradient(180deg,#141b2b,#0c1220);
+      border:1px solid rgba(255,182,39,.35);border-radius:16px;padding:16px;color:#e8eefc;font:600 14px Cairo,system-ui;
+      box-shadow:0 24px 60px rgba(0,0,0,.6);transform:scale(.96);transition:transform .18s}
+    #wsWrap.in #wsBox{transform:scale(1)}
+    #wsBox h3{margin:0 0 2px;font:800 20px Cairo,system-ui}
+    #wsBox .sub{color:#9fb0cc;font-size:12.5px;margin-bottom:12px}
+    #wsBox .wallet{float:inline-end;background:rgba(255,182,39,.12);border:1px solid rgba(255,182,39,.4);color:#ffd98a;
+      border-radius:10px;padding:5px 10px;font:800 14px Cairo,system-ui}
+    #wsBox .part{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid rgba(140,190,255,.12)}
+    #wsBox .part:first-of-type{border-top:0}
+    #wsBox .nm{min-width:110px}
+    #wsBox .bar{flex:1;height:8px;border-radius:6px;background:#0b1220;overflow:hidden}
+    #wsBox .bar i{display:block;height:100%;border-radius:6px}
+    #wsBox .pc{width:44px;text-align:end;font-variant-numeric:tabular-nums}
+    #wsBox button{border:0;border-radius:10px;padding:.55em 1em;font:800 14px Cairo,system-ui;cursor:pointer;
+      background:#1b2844;color:#e8eefc;min-width:92px}
+    #wsBox button.buy{background:linear-gradient(180deg,#ffd98a,#ffb627);color:#1b1204}
+    #wsBox button[disabled]{opacity:.45;cursor:default}
+    #wsBox .foot{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:14px;flex-wrap:wrap}
+    #wsBox .ok{color:#8ff5b9}
+  </style>`);
+
+  let wrap = null;
+  function close(){ if (!wrap) return; const w = wrap; wrap = null; w.classList.remove('in'); setTimeout(() => w.remove(), 200); try { GAME.paused = false; } catch(e) {} }
+  function open(G){
+    G = G || GAME.G; if (!G) return;
+    if (wrap) close();
+    wrap = document.createElement('div'); wrap.id = 'wsWrap';
+    wrap.innerHTML = '<div id="wsBox"></div>';
+    document.body.appendChild(wrap);
+    requestAnimationFrame(() => wrap && wrap.classList.add('in'));
+    const hit = e => {
+      const b = e.target.closest('[data-ws]'); if (!b) { if (e.target === wrap) close(); return; }
+      e.preventDefault(); e.stopPropagation();
+      const k = b.dataset.ws;
+      if (k === 'close') return close();
+      if (k === 'all') { const n = total(G); if (!n) return; if (!pay(n)) return paint(G, true); apply(G, PARTS.map(p => p.k)); return paint(G); }
+      const p = PARTS.find(q => q.k === k); if (!p) return;
+      const n = price(G, p); if (!n) return;
+      if (!pay(n)) return paint(G, true);
+      apply(G, [p.k]); paint(G);
+    };
+    wrap.addEventListener('click', hit); wrap.addEventListener('touchend', hit, {passive:false});
+    paint(G);
+  }
+  function paint(G, poor){
+    if (!wrap) return;
+    const box = wrap.querySelector('#wsBox'), c = cond(G), t = total(G), money = cash();
+    const rows = PARTS.map(p => {
+      const v = Math.max(0, Math.min(100, c[p.k] ?? 100)), n = price(G, p);
+      const col = v > 80 ? '#39f28b' : v > 55 ? '#ffb627' : '#ff4d5e';
+      return `<div class="part"><span class="nm">${AR() ? p.n[0] : p.n[1]}</span>
+        <span class="bar"><i style="width:${v}%;background:${col}"></i></span>
+        <span class="pc">${Math.round(v)}%</span>
+        ${n ? `<button data-ws="${p.k}" ${money < n ? 'disabled' : ''}>${n.toLocaleString('en-US')} ${AR() ? 'ج' : 'EGP'}</button>`
+             : `<button disabled class="ok">${AR() ? 'تمام' : 'OK'}</button>`}</div>`;
+    }).join('');
+    box.innerHTML = `<div class="wallet">${money.toLocaleString('en-US')} ${AR() ? 'ج' : 'EGP'}</div>
+      <h3>${AR() ? '🔧 الورشة' : '🔧 Workshop'}</h3>
+      <div class="sub">${AR() ? 'اختر اللي عايز تصلحه، أو صلّح كل حاجة مرة واحدة' : 'Fix one part at a time, or everything at once'}</div>
+      ${rows}
+      <div class="foot">
+        <span class="${poor ? '' : 'ok'}" style="${poor ? 'color:#ff9aa4' : ''}">${
+          poor ? (AR() ? 'الفلوس مش مكفية' : 'Not enough money')
+               : t ? (AR() ? `الإجمالي ${t.toLocaleString('en-US')} ج` : `Total ${t.toLocaleString('en-US')} EGP`)
+                   : (AR() ? 'العربية سليمة تماماً' : 'Everything is in good order')}</span>
+        <span style="display:flex;gap:8px">
+          ${t ? `<button class="buy" data-ws="all" ${money < t ? 'disabled' : ''}>${AR() ? 'صلّح الكل' : 'Fix everything'}</button>` : ''}
+          <button data-ws="close">${AR() ? 'امشي' : 'Leave'}</button>
+        </span></div>`;
+  }
+  window.OG_repair = open;
+
+  /* the roadside workshop opens this instead of the old window */
+  if (typeof UI !== 'undefined' && UI.siteModal) {
+    const _sm = UI.siteModal;
+    UI.siteModal = function(G, site){
+      try { if (site && site.t === 'mech') { GAME.paused = true; open(G); return; } } catch(e) {}
+      return _sm.apply(this, arguments);
+    };
+  }
+  /* and so does the garage's repair tab */
+  if (typeof UI !== 'undefined' && UI.act) {
+    const _act = UI.act;
+    UI.act = function(a, p, el){
+      try {
+        if ((a === 'rsvc' || a === 'fixall' || a === 'wtab') && (a !== 'wtab' || p === 'fix')) {
+          const G = GAME.G || {own:S().owned && S().owned[S().veh], car:{spec:null}};
+          if (G && G.own) { open(G); return; }
+        }
+      } catch(e) {}
+      return _act.apply(this, arguments);
+    };
+  }
 })();
 </script>
 <script>
