@@ -9499,7 +9499,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-19r';
+window.OGRA_BUILD = '2026-09-20e';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
@@ -13638,6 +13638,916 @@ window.OGRA_BUILD = '2026-09-19r';
   }
   arm(); setInterval(arm, 3000);
   setInterval(() => beat('idle'), 500);
+})();
+</script>
+<script>
+/* =====================================================================
+   OGRA — NEON MENU SHELL
+   A futuristic front end: a living synthwave backdrop, a glass command
+   bar, a sliding dock, a hero panel for tonight's trip and stat pods.
+   Layout is done with grid on the existing containers, so no element is
+   moved and nothing can lose its handler.
+   ===================================================================== */
+(function(){
+  const AR = () => typeof LANG !== 'undefined' && LANG.cur === 'ar';
+
+  document.head.insertAdjacentHTML('beforeend', `<style>
+  :root{--nq1:#00e5ff;--nq2:#ff2fb3;--nq3:#ffb627;--nglass:rgba(12,20,44,.72)}
+
+  /* ---------- living backdrop ---------- */
+  /* the neon layer sits over the street scene, under the interface */
+  #nbg{position:fixed;inset:0;z-index:1;pointer-events:none;overflow:hidden;opacity:.92;
+       background:linear-gradient(180deg,rgba(6,10,28,.82),rgba(3,5,14,.92))}
+  body:not(.menuUI) #nbg{display:none}
+  #nbg::after{content:"";position:absolute;inset:0;
+       background:radial-gradient(75% 60% at 50% 40%,transparent 35%,rgba(2,4,12,.75) 100%)}
+  #nbg .sun{mix-blend-mode:screen;position:absolute;left:50%;top:22%;width:min(52vw,520px);aspect-ratio:1;transform:translate(-50%,-50%);
+    border-radius:50%;background:linear-gradient(180deg,#ffd36e,#ff2fb3 58%,#7a1bff);opacity:.3;
+    -webkit-mask:repeating-linear-gradient(180deg,#000 0 14px,transparent 14px 20px);
+    mask:repeating-linear-gradient(180deg,#000 0 14px,transparent 14px 20px);filter:blur(.4px)}
+  #nbg .grid{mix-blend-mode:screen;position:absolute;left:-10%;right:-10%;top:52%;bottom:-10%;
+    background:repeating-linear-gradient(90deg,rgba(0,229,255,.22) 0 2px,transparent 2px 92px),
+               repeating-linear-gradient(0deg,rgba(0,229,255,.18) 0 2px,transparent 2px 52px);
+    transform:perspective(520px) rotateX(76deg);transform-origin:top center;
+    -webkit-mask:linear-gradient(180deg,#000,transparent 72%);mask:linear-gradient(180deg,#000,transparent 72%);
+    animation:nflow 2.8s linear infinite}
+  @keyframes nflow{to{background-position:0 52px,0 52px}}
+  #nbg .haze{position:absolute;inset:0;mix-blend-mode:screen;background:
+    radial-gradient(60% 40% at 12% 18%,rgba(0,229,255,.12),transparent 60%),
+    radial-gradient(50% 40% at 88% 72%,rgba(255,47,179,.12),transparent 60%)}
+  #nbg .scan{position:absolute;inset:0;background:repeating-linear-gradient(0deg,rgba(255,255,255,.035) 0 1px,transparent 1px 3px);
+    opacity:.5;animation:nscan 8s linear infinite}
+  @keyframes nscan{to{transform:translateY(3px)}}
+  body.menuUI #screens, body.menuUI #topBar, body.menuUI #navRail{position:relative;z-index:2}
+
+  /* ---------- command bar ---------- */
+  body.menuUI #topBar{background:linear-gradient(180deg,rgba(9,16,38,.92),rgba(4,8,20,.78))!important;
+    -webkit-backdrop-filter:blur(14px) saturate(1.3);backdrop-filter:blur(14px) saturate(1.3);
+    border-bottom:1px solid rgba(0,229,255,.28)!important;
+    box-shadow:0 10px 34px rgba(0,0,0,.55), 0 1px 0 rgba(0,229,255,.18) inset}
+  body.menuUI #topBar .tbProf{background:linear-gradient(180deg,rgba(0,229,255,.12),rgba(0,229,255,.03))!important;
+    border:1px solid rgba(0,229,255,.38)!important;border-radius:16px!important;
+    box-shadow:0 0 22px rgba(0,229,255,.16)}
+  body.menuUI #topBar .tbChip{background:linear-gradient(180deg,rgba(255,182,39,.18),rgba(255,182,39,.05))!important;
+    border:1px solid rgba(255,182,39,.5)!important;border-radius:14px!important;
+    box-shadow:0 0 20px rgba(255,182,39,.16)}
+
+  /* ---------- dock ---------- */
+  body.menuUI #navRail{background:linear-gradient(180deg,rgba(9,16,38,.9),rgba(4,8,20,.9))!important;
+    -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+    border-inline-start:1px solid rgba(0,229,255,.2)!important}
+  body.menuUI #navRail button{border-radius:14px!important;position:relative;
+    transition:transform .14s cubic-bezier(.2,1.2,.3,1),background .2s,box-shadow .2s,color .2s}
+  body.menuUI #navRail button:active{transform:scale(.92)}
+  body.menuUI #navRail button.on{color:#eafcff!important;
+    background:linear-gradient(180deg,rgba(0,229,255,.22),rgba(0,229,255,.05))!important;
+    box-shadow:inset 0 0 0 1px rgba(0,229,255,.55), 0 8px 26px rgba(0,229,255,.25)!important}
+  body.menuUI #navRail button.on::before{content:"";position:absolute;inset-inline-start:-1px;top:14%;bottom:14%;width:3px;
+    border-radius:99px;background:linear-gradient(180deg,var(--nq1),var(--nq2));box-shadow:0 0 14px var(--nq1)}
+
+  /* ---------- screens ---------- */
+  @keyframes nIn{from{opacity:0;transform:translateY(16px) scale(.995);filter:blur(5px)}to{opacity:1;transform:none;filter:none}}
+  body.menuUI #screens .scr{animation:nIn .34s cubic-bezier(.2,.9,.3,1) both}
+  body.menuUI .scrHead h1{font-weight:900;letter-spacing:.02em;
+    background:linear-gradient(90deg,#fff,var(--nq1),#fff,var(--nq3));background-size:320% 100%;
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    filter:drop-shadow(0 0 18px rgba(0,229,255,.35));animation:nshine 7s linear infinite}
+  @keyframes nshine{to{background-position:320% 0}}
+
+  /* ---------- panels and cards ---------- */
+  body.menuUI .pn, body.menuUI .scr .card{background:var(--nglass)!important;
+    border:1px solid rgba(0,229,255,.2)!important;border-radius:18px!important;
+    -webkit-backdrop-filter:blur(9px);backdrop-filter:blur(9px);
+    box-shadow:0 12px 34px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.05)}
+  body.menuUI .scr .card{position:relative;overflow:hidden;
+    transition:transform .16s cubic-bezier(.2,1.1,.3,1),border-color .2s,box-shadow .2s}
+  body.menuUI .scr .card::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;
+    background:linear-gradient(135deg,rgba(0,229,255,.55),transparent 40%,rgba(255,47,179,.45));
+    -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+    -webkit-mask-composite:xor;mask-composite:exclude;opacity:0;transition:opacity .2s}
+  body.menuUI .scr .card:hover{transform:translateY(-4px);box-shadow:0 18px 40px rgba(0,0,0,.55)}
+  body.menuUI .scr .card:hover::before, body.menuUI .scr .card.sel::before{opacity:1}
+  body.menuUI .scr .card.sel{border-color:rgba(0,229,255,.6)!important;
+    box-shadow:0 0 0 1px rgba(0,229,255,.5), 0 16px 40px rgba(0,229,255,.18)!important}
+
+  /* ---------- chips and buttons ---------- */
+  body.menuUI .chip{border-radius:999px!important;border:1px solid rgba(0,229,255,.25)!important;
+    background:rgba(10,18,40,.7)!important;transition:transform .12s,box-shadow .2s,background .2s}
+  body.menuUI .chip:active{transform:scale(.95)}
+  body.menuUI .chip.on{background:linear-gradient(180deg,var(--nq1),#0af)!important;color:#03121b!important;
+    border-color:transparent!important;box-shadow:0 0 22px rgba(0,229,255,.45)!important}
+  body.menuUI [data-a="start"], body.menuUI [data-a="hubGo"], body.menuUI .btn.pri{
+    position:relative;overflow:hidden;border:0!important;border-radius:16px!important;
+    background:linear-gradient(120deg,var(--nq1),#3ba9ff 45%,var(--nq2))!important;color:#02121c!important;
+    font-weight:900!important;box-shadow:0 14px 38px rgba(0,229,255,.3), 0 0 0 1px rgba(255,255,255,.18) inset!important;
+    animation:nPulse 3s ease-in-out infinite}
+  @keyframes nPulse{0%,100%{box-shadow:0 14px 38px rgba(0,229,255,.28)}50%{box-shadow:0 18px 52px rgba(255,47,179,.4)}}
+  body.menuUI [data-a="start"]::after, body.menuUI [data-a="hubGo"]::after{content:"";position:absolute;inset:0;
+    background:linear-gradient(120deg,transparent 35%,rgba(255,255,255,.65) 50%,transparent 65%);
+    transform:translateX(-130%);animation:nSweep 3.2s linear infinite}
+  @keyframes nSweep{to{transform:translateX(130%)}}
+
+  /* ---------- the hub laid out as a command deck ---------- */
+  body.menuUI .scr .hbLeft{display:grid;gap:calc(var(--u)*1.1)}
+  body.menuUI .scr .hbRight{display:grid;gap:calc(var(--u)*1.1);align-content:start}
+  body.menuUI .scr .hbLeft > *:first-child{position:relative;overflow:hidden;
+    background:linear-gradient(135deg,rgba(0,229,255,.12),rgba(255,47,179,.08))!important;
+    border:1px solid rgba(0,229,255,.35)!important}
+  body.menuUI .scr .hbLeft > *:first-child::after{content:"";position:absolute;inset:auto -20% -60% auto;width:70%;height:160%;
+    background:radial-gradient(closest-side,rgba(0,229,255,.22),transparent);pointer-events:none}
+  body.menuUI .bar i, body.menuUI .bar > i{background:linear-gradient(90deg,var(--nq1),#7ef0ff)!important;
+    box-shadow:0 0 14px rgba(0,229,255,.5)}
+  @media (prefers-reduced-motion:reduce){body.menuUI *,#nbg *{animation:none!important}}
+  </style>`);
+
+  function backdrop(){
+    if (document.getElementById('nbg')) return;
+    const d = document.createElement('div'); d.id = 'nbg';
+    d.innerHTML = '<div class="sun"></div><div class="haze"></div><div class="grid"></div><div class="scan"></div>';
+    document.body.prepend(d);
+  }
+  backdrop(); setInterval(backdrop, 2000);
+})();
+</script>
+<script>
+/* =====================================================================
+   OGRA DECK — the main menu, rebuilt from nothing
+   Its own markup, its own responsive grid, its own rendering. It reads
+   the game's data and calls the game's actions, but owns every pixel it
+   draws, so nothing can overlap anything else at any screen size.
+   ===================================================================== */
+(function(){
+  const AR = () => typeof LANG !== 'undefined' && LANG.cur === 'ar';
+  const T = (a, e) => AR() ? a : e;
+  const nm = o => { try { return tn(o); } catch(e) { return (o && (AR() ? o.ar : o.en)) || ''; } };
+  const money = n => (n || 0).toLocaleString('en-US');
+
+  document.head.insertAdjacentHTML('beforeend', `<style>
+  #deck{position:fixed;inset:0;z-index:40;display:grid;grid-template-rows:auto 1fr;
+    font-family:Cairo,system-ui;color:#eaf2ff;background:linear-gradient(180deg,rgba(4,8,20,.72),rgba(3,5,14,.88));
+    -webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);overflow:hidden}
+  #deck *{box-sizing:border-box}
+  #deck .bar{display:flex;align-items:center;gap:10px;padding:8px clamp(10px,1.6vw,20px);
+    background:linear-gradient(180deg,rgba(9,16,38,.95),rgba(5,9,22,.8));
+    border-bottom:1px solid rgba(0,229,255,.25);box-shadow:0 8px 26px rgba(0,0,0,.45)}
+  #deck .who{display:flex;align-items:center;gap:8px;padding:5px 10px;border-radius:14px;
+    background:linear-gradient(180deg,rgba(0,229,255,.12),rgba(0,229,255,.03));border:1px solid rgba(0,229,255,.38)}
+  #deck .who b{font:900 13px Cairo,system-ui}#deck .who small{display:block;color:#9fd7ff;font:700 10.5px Rajdhani}
+  #deck .lv{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;
+    background:conic-gradient(var(--nq1,#00e5ff) var(--p,40%),rgba(255,255,255,.12) 0);}
+  #deck .lv i{display:grid;place-items:center;width:27px;height:27px;border-radius:50%;background:#071026;
+    font:900 12px Rajdhani;color:#eaf2ff;font-style:normal}
+  #deck .cash{margin-inline-start:auto;padding:6px 12px;border-radius:14px;font:900 14px Rajdhani;
+    background:linear-gradient(180deg,rgba(255,182,39,.18),rgba(255,182,39,.05));
+    border:1px solid rgba(255,182,39,.5);color:#ffd98a}
+  #deck .ico{width:36px;height:36px;border-radius:12px;border:1px solid rgba(0,229,255,.25);
+    background:rgba(10,18,40,.7);color:#dbe9ff;font-size:16px;display:grid;place-items:center;cursor:pointer}
+
+  #deck .body{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);gap:clamp(8px,1.2vw,16px);
+    padding:clamp(8px,1.4vw,18px);overflow:hidden;min-height:0}
+  #deck .pane{min-height:0;display:flex;flex-direction:column;gap:8px;overflow:hidden}
+  #deck .scroll{overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;min-height:0;padding-inline-end:4px}
+  #deck h2{margin:0;font:900 clamp(15px,2vw,22px) Cairo,system-ui;color:#fff;letter-spacing:.01em}
+  #deck .subt{margin:0;color:#9fd7ff;font:700 clamp(10px,1.3vw,13px) Cairo,system-ui}
+  #deck .chips{display:flex;flex-wrap:wrap;gap:6px}
+  #deck .chip{padding:.4em .85em;border-radius:999px;font:800 clamp(10px,1.2vw,13px) Cairo,system-ui;cursor:pointer;
+    background:rgba(10,18,40,.75);border:1px solid rgba(0,229,255,.25);color:#cfe6ff;white-space:nowrap}
+  #deck .chip.on{background:linear-gradient(180deg,#00e5ff,#0af);color:#03121b;border-color:transparent;
+    box-shadow:0 0 18px rgba(0,229,255,.45)}
+  #deck .list{display:grid;grid-template-columns:repeat(auto-fill,minmax(clamp(150px,15vw,220px),1fr));gap:8px;align-content:start}
+  #deck .rt{position:relative;text-align:start;padding:9px 10px;border-radius:14px;cursor:pointer;
+    background:rgba(11,19,42,.8);border:1px solid rgba(0,229,255,.18);display:grid;gap:3px;min-width:0}
+  #deck .rt.on{border-color:#00e5ff;box-shadow:0 0 0 1px #00e5ff,0 10px 26px rgba(0,229,255,.2)}
+  #deck .rt.lock{opacity:.45;cursor:not-allowed}
+  #deck .rt b{font:800 clamp(11px,1.35vw,14px) Cairo;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #deck .rt small{color:#9fd7ff;font:700 clamp(9.5px,1.1vw,12px) Rajdhani,Cairo}
+  #deck .hero{padding:clamp(10px,1.3vw,16px);border-radius:16px;display:grid;gap:6px;
+    background:linear-gradient(135deg,rgba(0,229,255,.14),rgba(255,47,179,.08));border:1px solid rgba(0,229,255,.35)}
+  #deck .hero .big{font:900 clamp(16px,2.4vw,28px)/1.15 Cairo;margin:0}
+  #deck .facts{display:flex;flex-wrap:wrap;gap:8px;color:#dce9ff;font:700 clamp(10px,1.3vw,13px) Cairo}
+  #deck .pods{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:8px}
+  #deck .pod{padding:8px 10px;border-radius:14px;background:rgba(11,19,42,.8);border:1px solid rgba(0,229,255,.18)}
+  #deck .pod small{display:block;color:#9fd7ff;font:700 10.5px Cairo}
+  #deck .pod b{display:block;font:900 clamp(13px,1.7vw,18px) Rajdhani;margin-top:1px}
+  #deck .pod .bar{height:5px;border-radius:5px;background:rgba(255,255,255,.12);margin-top:5px;overflow:hidden}
+  #deck .pod .bar i{display:block;height:100%;border-radius:5px;background:linear-gradient(90deg,#00e5ff,#7ef0ff)}
+  #deck .vrail{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
+  #deck .v{flex:0 0 auto;width:clamp(96px,11vw,132px);padding:7px;border-radius:13px;cursor:pointer;text-align:center;
+    background:rgba(11,19,42,.8);border:1px solid rgba(0,229,255,.18)}
+  #deck .v.on{border-color:#ffb627;box-shadow:0 0 0 1px #ffb627}
+  #deck .v img{width:100%;height:clamp(34px,4.6vw,54px);object-fit:contain}
+  #deck .v small{display:block;font:700 10.5px Cairo;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #deck .go{border:0;border-radius:15px;padding:.85em 1em;cursor:pointer;font:900 clamp(14px,1.8vw,18px) Cairo;
+    background:linear-gradient(120deg,#00e5ff,#3ba9ff 45%,#ff2fb3);color:#02121c;
+    box-shadow:0 12px 34px rgba(0,229,255,.3)}
+  #deck .foot{display:grid;gap:8px;padding-top:2px}
+  #deck .dock{display:flex;gap:6px;flex-wrap:wrap}
+  #deck .dock button{flex:1 1 84px;padding:.55em .5em;border-radius:12px;cursor:pointer;font:800 clamp(10px,1.2vw,12.5px) Cairo;
+    background:rgba(10,18,40,.75);border:1px solid rgba(0,229,255,.22);color:#cfe6ff}
+  /* one column on anything narrow or short, with each pane scrolling on its own */
+  /* tall and narrow (a phone upright): a single column that scrolls as one page */
+  @media (orientation:portrait) and (max-width:620px){
+    #deck .body{display:block!important;overflow-y:auto!important;padding:10px}
+    #deck .pane{overflow:visible!important;max-height:none!important;display:block}
+    #deck .pane.left{margin-bottom:12px}
+    #deck .scroll{overflow:visible!important}
+    #deck .list{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))!important}
+    #deck .pods{grid-template-columns:repeat(2,1fr)}
+  }
+  @media (max-width:900px), (max-height:560px){
+    #deck .body{grid-template-columns:1fr!important;grid-template-rows:minmax(0,.9fr) minmax(0,1.1fr);overflow:hidden}
+    #deck .pane{min-height:0;overflow:hidden}
+    #deck .pane.left{min-height:0}
+    #deck .pane.right{overflow-y:auto}
+    #deck .list{grid-template-columns:repeat(auto-fill,minmax(132px,1fr))!important}
+    #deck .v{width:96px}
+    #deck .dock button{flex:1 1 70px;font-size:10.5px}
+  }
+  /* a phone held sideways: shorter everything, and the panes sit side by side again */
+  @media (max-height:470px) and (orientation:landscape){
+    #deck .body{grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;grid-template-rows:minmax(0,1fr);gap:8px;padding:8px}
+    #deck .bar{padding:5px 8px;gap:6px}
+    #deck .who b{font-size:11.5px}#deck .who small{font-size:9px}
+    #deck .cash{padding:4px 9px;font-size:12px}
+    #deck .ico{width:30px;height:30px;font-size:14px}
+    #deck h2{font-size:14px}#deck .subt{font-size:10px}
+    #deck .chip{padding:.3em .7em;font-size:10px}
+    #deck .rt{padding:6px 8px}
+    #deck .pods{grid-template-columns:repeat(4,1fr)}
+    #deck .pod{padding:5px 7px}#deck .pod b{font-size:12px}
+    #deck .v{width:84px}#deck .v img{height:30px}
+    #deck .go{padding:.6em .8em;font-size:14px}
+    #deck .dock button{padding:.4em .3em;font-size:9.5px;flex:1 1 58px}
+    #deck .pane.right{overflow-y:auto}
+  }
+  </style>`);
+
+  const TIER = km => km <= 25 ? T('قصير','short') : km <= 60 ? T('متوسط','medium') : km <= 250 ? T('طويل','long') : T('طويل جداً','very long');
+  let filter = 'all';
+
+  function build(){
+    if (document.getElementById('deck')) return;
+    const d = document.createElement('div'); d.id = 'deck';
+    d.innerHTML = `<div class="bar">
+        <div class="lv" id="dkLv"><i></i></div>
+        <div class="who"><div><b id="dkName"></b><small id="dkXp"></small></div></div>
+        <div class="cash" id="dkCash"></div>
+        <button class="ico" data-d="lang">🌐</button>
+        <button class="ico" data-d="settings">⚙</button>
+      </div>
+      <div class="body">
+        <div class="pane left">
+          <h2>${T('المسارات','Routes')}</h2>
+          <div class="chips" id="dkFilter"></div>
+          <div class="scroll"><div class="list" id="dkRoutes"></div></div>
+        </div>
+        <div class="pane right scroll">
+          <div class="hero">
+            <p class="subt">${T('رحلة الليلة','Tonight')}</p>
+            <h3 class="big" id="dkTitle"></h3>
+            <div class="facts" id="dkFacts"></div>
+          </div>
+          <div class="pods" id="dkPods"></div>
+          <p class="subt">${T('العربية','Vehicle')}</p>
+          <div class="vrail" id="dkVeh"></div>
+          <p class="subt">${T('ميعاد الطلوع','Departure')}</p>
+          <div class="chips" id="dkTod"></div>
+          <div class="foot">
+            <button class="go" data-d="start">${T('يلا بينا ›','Start the trip ›')}</button>
+            <div class="dock">
+              <button data-d="workshop">🔧 ${T('المرآب','Garage')}</button>
+              <button data-d="showroom">🚐 ${T('المعرض','Showroom')}</button>
+              <button data-d="missions">🏆 ${T('المهام','Missions')}</button>
+              <button data-d="rewards">🎁 ${T('الجوائز','Rewards')}</button>
+              <button data-d="dmv">🪪 ${T('المرور','Licence')}</button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    document.body.appendChild(d);
+    d.addEventListener('click', hit);
+    paint();
+  }
+  function hide(){ const d = document.getElementById('deck'); if (d) d.style.display = 'none'; }
+  function showDeck(){ const d = document.getElementById('deck'); if (d) { d.style.display = 'grid'; paint(); } }
+
+  function hit(e){
+    const b = e.target.closest('[data-d]'); if (!b) {
+      const rt = e.target.closest('[data-r]'); if (rt && !rt.classList.contains('lock')) { UI.sel.route = rt.dataset.r; paint(); return; }
+      const v = e.target.closest('[data-v]'); if (v) { UI.sel.vid = v.dataset.v; try { S().veh = v.dataset.v; } catch(_) {} paint(); return; }
+      const f = e.target.closest('[data-f]'); if (f) { filter = f.dataset.f; paint(); return; }
+      const td = e.target.closest('[data-t]'); if (td) { UI.sel.tod = td.dataset.t; paint(); return; }
+      return;
+    }
+    const k = b.dataset.d;
+    if (k === 'start') { try { UI.sel.tab = 'line'; hide(); startGame(); } catch(err) { showDeck(); } return; }
+    if (k === 'lang') { try { UI.act('lang'); } catch(err) {} setTimeout(paint, 120); return; }
+    if (window.OG_page) { window.OG_page(k); return; }       /* opens inside the deck's own frame */
+    hide();
+    try { UI.show(k); } catch(err) { showDeck(); }
+  }
+
+  function paint(){
+    const d = document.getElementById('deck'); if (!d || d.style.display === 'none') return;
+    const s = S(), sel = UI.sel;
+    const need = (typeof xpFor === 'function') ? xpFor(s.lvl || 1) : 220;
+    d.querySelector('#dkName').textContent = s.name || T('الأسطى','Driver');
+    d.querySelector('#dkXp').textContent = 'XP ' + money(s.xp) + ' / ' + money(need);
+    d.querySelector('#dkCash').textContent = money(s.cash) + T(' ج',' EGP');
+    const lv = d.querySelector('#dkLv'); lv.style.setProperty('--p', Math.min(100, Math.round((s.xp % need)/need*100)) + '%');
+    lv.querySelector('i').textContent = s.lvl || 1;
+
+    /* filters */
+    const tiers = [['all', T('الكل','All')], ['short', T('قصير','Short')], ['medium', T('متوسط','Medium')], ['long', T('طويل','Long')], ['xl', T('طويل جداً','Very long')]];
+    d.querySelector('#dkFilter').innerHTML = tiers.map(([k, n]) => `<button class="chip ${filter === k ? 'on' : ''}" data-f="${k}">${n}</button>`).join('');
+
+    /* routes */
+    const band = r => { const km = r.realKm || 10; return km <= 25 ? 'short' : km <= 60 ? 'medium' : km <= 250 ? 'long' : 'xl'; };
+    const list = ROUTES.filter(r => !r.go).filter(r => filter === 'all' || band(r) === filter)
+      .sort((a, b) => (a.realKm || 0) - (b.realKm || 0));
+    d.querySelector('#dkRoutes').innerHTML = list.map(r => {
+      const lock = (r.lvl || 1) > (s.lvl || 1);
+      return `<button class="rt ${sel.route === r.id ? 'on' : ''} ${lock ? 'lock' : ''}" data-r="${r.id}">
+        <b>${nm(r.n)}</b>
+        <small>${r.realKm || 0} ${T('كم','km')} · ${TIER(r.realKm || 0)}${lock ? ' · 🔒 ' + T('مستوى','lvl') + ' ' + r.lvl : ''}</small>
+      </button>`;
+    }).join('') || `<p class="subt">${T('مفيش خطوط في الفئة دي','Nothing in this group')}</p>`;
+
+    /* hero */
+    const R = (typeof routeById === 'function') && routeById(sel.route);
+    d.querySelector('#dkTitle').textContent = R ? nm(R.n) : '';
+    d.querySelector('#dkFacts').innerHTML = R ? [
+      `🛣️ ${R.realKm || 0} ${T('كم','km')}`,
+      `🚏 ${(R.st && R.st.length) || 0} ${T('محطة','stops')}`,
+      `🪙 ${R.fare} ${T('ج للراكب','EGP a seat')}`,
+      `⏱️ ${TIER(R.realKm || 0)}`
+    ].map(x => `<span>${x}</span>`).join('') : '';
+
+    /* pods */
+    const own = (s.owned || {})[sel.vid || s.veh] || {};
+    const spec = (typeof vehById === 'function') && vehById(sel.vid || s.veh);
+    const cond = own.cond || {};
+    const health = Math.round(['engine','gearbox','brakes','susp','tires','body'].reduce((a, k) => a + (cond[k] ?? 100), 0)/6);
+    const fuel = Math.round(((own.fuel ?? 0)/((spec && spec.tank) || 45))*100);
+    d.querySelector('#dkPods').innerHTML = `
+      <div class="pod"><small>${T('حالة المركبة','Condition')}</small><b>${health}%</b><div class="bar"><i style="width:${health}%"></i></div></div>
+      <div class="pod"><small>${T('الوقود','Fuel')}</small><b>${fuel}%</b><div class="bar"><i style="width:${fuel}%"></i></div></div>
+      <div class="pod"><small>${T('السمعة','Rating')}</small><b>${(s.rep ?? 5).toFixed ? (s.rep ?? 5).toFixed(1) : s.rep}★</b></div>
+      <div class="pod"><small>${T('المستوى','Level')}</small><b>${s.lvl || 1}</b></div>`;
+
+    /* vehicles */
+    const ids = Object.keys(s.owned || {});
+    d.querySelector('#dkVeh').innerHTML = ids.map(id => {
+      const v = vehById(id); if (!v) return '';
+      const art = (typeof vehArt === 'function' && vehArt(id)) || '';
+      return `<button class="v ${(sel.vid || s.veh) === id ? 'on' : ''}" data-v="${id}">
+        ${art ? `<img src="${art}" alt="">` : '<div style="height:38px"></div>'}
+        <small>${nm(v.n)}</small><small style="color:#7fd8ff">${v.seats} ${T('راكب','seats')}</small></button>`;
+    }).join('');
+
+    /* departure */
+    const tods = [['dawn', T('الفجر','Dawn')], ['rush', T('زحمة الصبح','Morning rush')], ['noon', T('الضهر','Noon')],
+                  ['evening', T('زحمة المغرب','Evening rush')], ['night', T('بالليل','Night')]];
+    d.querySelector('#dkTod').innerHTML = tods.map(([k, n]) => `<button class="chip ${sel.tod === k ? 'on' : ''}" data-t="${k}">${n}</button>`).join('');
+  }
+
+  /* the deck owns the menu; the game's own screens are used for the other tabs */
+  function tick(){
+    try {
+      if (GAME.state === 'hub') {
+        if (!document.getElementById('deck')) build();
+        const d = document.getElementById('deck');
+        const page = d.querySelector('.page');
+        const other = !page && UI.cur && UI.cur.name && UI.cur.name !== 'hub';
+        if (other) { d.style.display = 'none'; }
+        else { d.style.display = 'grid'; }
+        if (d.style.display !== 'none' && (!d.__t || Date.now() - d.__t > 900)) { d.__t = Date.now(); paint(); }
+      } else { const d = document.getElementById('deck'); if (d) d.style.display = 'none'; }
+    } catch(e) {}
+  }
+  setInterval(tick, 300);
+  window.OG_deck = {build, paint, showDeck, hide};
+})();
+</script>
+<script>
+/* =====================================================================
+   EVERY OTHER MENU SCREEN, RESTRUCTURED
+   Garage, showroom, missions, rewards, licence and settings are laid out
+   by the same rules as the deck: one scrolling column, a header, wrapped
+   filter rows, a responsive card grid and a docked action bar. Nothing
+   floats, nothing is clipped.
+   ===================================================================== */
+(function(){
+  document.head.insertAdjacentHTML('beforeend', `<style>
+  body.menuUI #screens{position:relative!important;z-index:2}
+  body.menuUI #screens .scr{
+    position:absolute!important;inset:0!important;display:flex!important;flex-direction:column!important;
+    gap:clamp(6px,1vh,14px);padding:clamp(8px,1.4vw,20px) clamp(10px,1.8vw,24px) clamp(8px,1.2vw,16px)!important;
+    overflow-y:auto!important;overflow-x:hidden!important;-webkit-overflow-scrolling:touch;
+    align-items:stretch!important}
+  body.menuUI #screens .scr > *{flex:0 0 auto;width:100%;max-width:1200px;margin-inline:auto!important;
+    position:static!important;inset:auto!important;transform:none!important}
+
+  body.menuUI .scr .scrHead{text-align:center}
+  body.menuUI .scr .scrHead h1{margin:0;font-size:clamp(18px,3vw,34px);line-height:1.15}
+  body.menuUI .scr .scrHead p,body.menuUI .scr .scrHead .sub{margin:.15em 0 0;font-size:clamp(10px,1.4vw,14px)}
+  body.menuUI .scr .tabs,body.menuUI .scr .row.tabs{display:flex!important;flex-wrap:wrap!important;
+    justify-content:center;gap:6px}
+  body.menuUI .scr .hdr{display:flex!important;flex-wrap:wrap!important;gap:6px;justify-content:center}
+
+  /* any grid of cards flows and wraps */
+  body.menuUI .scr .grid{display:grid!important;
+    grid-template-columns:repeat(auto-fill,minmax(clamp(170px,19vw,260px),1fr))!important;
+    gap:clamp(6px,.9vw,12px)!important;max-height:none!important;overflow:visible!important;align-content:start}
+  body.menuUI .scr .grid > *{margin:0!important;min-width:0}
+  body.menuUI .scr .card,body.menuUI .scr .pn{padding:clamp(8px,1vw,14px)!important;min-height:0!important;
+    font-size:clamp(11px,1.25vw,14px)}
+  body.menuUI .scr .card .row,body.menuUI .scr .pn .row{flex-wrap:wrap!important;gap:6px}
+  body.menuUI .scr .scroll{max-height:none!important;overflow:visible!important}
+
+  /* rows of items become side-scrolling strips rather than spilling out */
+  body.menuUI .scr .vrow,body.menuUI .scr .rail,body.menuUI .scr .strip{
+    display:flex!important;gap:8px;overflow-x:auto;overflow-y:hidden;padding-bottom:4px}
+  body.menuUI .scr .vrow > *,body.menuUI .scr .rail > *,body.menuUI .scr .strip > *{flex:0 0 auto}
+
+  /* the mechanic, the licence clerk and any other portrait panel */
+  body.menuUI .scr .npc,body.menuUI .scr .talk{max-width:min(100%,520px);margin-inline:auto!important}
+
+  /* the last panel on a screen docks to the bottom */
+  body.menuUI .scr > .pn:last-child{position:sticky;bottom:0;margin-top:auto!important;z-index:4;
+    border-radius:16px 16px 0 0!important;
+    background:linear-gradient(180deg,rgba(8,14,32,.9),rgba(5,9,22,.97))!important;
+    box-shadow:0 -12px 30px rgba(0,0,0,.5)}
+
+  @media (max-height:560px){
+    body.menuUI .scr .scrHead p,body.menuUI .scr .scrHead .sub{display:none}
+    body.menuUI .scr .scrHead h1{font-size:clamp(15px,2.4vw,22px)}
+    body.menuUI .scr .grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))!important}
+    body.menuUI .scr .card,body.menuUI .scr .pn{font-size:11px;padding:7px!important}
+  }
+  </style>`);
+})();
+</script>
+<style>
+  /* the earlier phone menu rules are superseded by the rebuilt layout */
+  html.ogShort body.menuUI #screens .scr,
+  html.ogShort body.menuUI #screens .scr *{position:static!important}
+  html.ogShort body.menuUI #screens .scr{position:absolute!important;inset:0!important}
+  html.ogShort body.menuUI .scr .grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))!important;
+    display:grid!important;overflow:visible!important;max-height:none!important}
+  html.ogShort body.menuUI .scr .card{width:auto!important;min-width:0!important;flex:0 0 auto!important}
+  html.ogShort body.menuUI .scr .vrow,html.ogShort body.menuUI .scr .rail{position:static!important}
+  html.ogShort body.menuUI .scr > .pn:last-child{position:sticky!important;bottom:0}
+  /* leftovers from the retired sliding rails */
+  body.menuUI .scr .ogArr,body.menuUI .scr .ogRail::before,body.menuUI .scr .ogRail::after{display:none!important}
+  body.menuUI .scr .ogRail{display:flex!important;gap:8px;overflow-x:auto;padding:0!important}
+</style>
+<script>
+/* =====================================================================
+   OGRA DECK — every menu screen, rebuilt
+   Garage, showroom, missions, rewards, licence and settings now live in
+   the deck's own frame: one header, one scrolling body, one dock. The
+   screens the game still renders are hosted inside that frame, so the
+   whole menu reads as one designed product instead of six layouts.
+   ===================================================================== */
+(function(){
+  if (typeof UI === 'undefined') return;
+  const AR = () => typeof LANG !== 'undefined' && LANG.cur === 'ar';
+  const T = (a, e) => AR() ? a : e;
+
+  document.head.insertAdjacentHTML('beforeend', `<style>
+  #deck .page{position:absolute;inset:0;display:grid;grid-template-rows:auto minmax(0,1fr);z-index:6;
+    background:linear-gradient(180deg,rgba(5,9,22,.96),rgba(3,6,16,.99))}
+  #deck .pgBar{display:flex;align-items:center;gap:10px;padding:9px clamp(10px,1.6vw,20px);
+    border-bottom:1px solid rgba(0,229,255,.25);background:linear-gradient(180deg,rgba(9,16,38,.96),rgba(5,9,22,.9))}
+  #deck .pgBar h2{margin:0;font:900 clamp(15px,2.2vw,24px) Cairo;flex:1;
+    background:linear-gradient(90deg,#fff,#00e5ff,#fff);background-size:300% 100%;
+    -webkit-background-clip:text;background-clip:text;color:transparent;animation:nshine 7s linear infinite}
+  #deck .back{padding:.5em 1em;border-radius:12px;cursor:pointer;font:800 13px Cairo;color:#cfe6ff;
+    background:rgba(10,18,40,.8);border:1px solid rgba(0,229,255,.3)}
+  #deck .host{overflow:auto;-webkit-overflow-scrolling:touch;padding:clamp(8px,1.4vw,18px);min-height:0}
+  #deck .host .scr{position:static!important;inset:auto!important;display:flex!important;flex-direction:column!important;
+    gap:10px;padding:0!important;overflow:visible!important;max-width:1180px;margin-inline:auto!important}
+  #deck .host .scr > *{position:static!important;width:100%;margin:0 auto!important}
+  #deck .host .grid{display:grid!important;grid-template-columns:repeat(auto-fill,minmax(clamp(160px,18vw,250px),1fr))!important;
+    gap:10px!important;max-height:none!important;overflow:visible!important}
+  #deck .host .scroll{max-height:none!important;overflow:visible!important}
+  #deck .host .card,#deck .host .pn{padding:clamp(8px,1vw,14px)!important;min-height:0!important;border-radius:16px!important}
+  #deck .host .row{flex-wrap:wrap!important;gap:6px}
+  #deck .host .ogArr{display:none!important}
+  #deck .host .vrow,#deck .host .rail,#deck .host .ogRail{display:flex!important;gap:8px;overflow-x:auto;padding:0!important}
+  #deck .host .hbLeft,#deck .host .hbRight{display:grid!important;gap:10px}
+  </style>`);
+
+  const TITLES = {workshop:['المرآب','Garage'], showroom:['المعرض','Showroom'], missions:['المهام','Missions'],
+                  rewards:['الجوائز','Rewards'], dmv:['المرور','Licence'], settings:['الإعدادات','Settings']};
+
+  function page(name){
+    const d = document.getElementById('deck'); if (!d) return;
+    close();
+    const p = document.createElement('div'); p.className = 'page'; p.dataset.page = name;
+    const ttl = TITLES[name] || [name, name];
+    p.innerHTML = `<div class="pgBar"><button class="back">${T('‹ رجوع','‹ Back')}</button><h2>${T(ttl[0], ttl[1])}</h2></div>
+                   <div class="host" id="deckHost"></div>`;
+    d.appendChild(p);
+    p.querySelector('.back').addEventListener('click', () => { close(); try { UI.show('hub'); } catch(e) {} });
+    /* the game renders the screen where it always did; we host the node itself,
+       and clicks are forwarded to the same handler the game uses */
+    try { UI.show(name); } catch(e) {}
+    setTimeout(() => {
+      try {
+        const scr = document.querySelector('#screens .scr');
+        if (scr) { p.querySelector('#deckHost').appendChild(scr); }
+      } catch(e) {}
+    }, 30);
+  }
+  function close(){
+    const d = document.getElementById('deck'); if (!d) return;
+    const old = d.querySelector('.page');
+    if (old) {
+      const scr = old.querySelector('.scr');
+      try { if (scr) document.getElementById('screens').appendChild(scr); } catch(e) {}
+      old.remove();
+    }
+  }
+  /* clicks inside the hosted screen reach the game's own handler */
+  document.addEventListener('click', e => {
+    const host = e.target.closest && e.target.closest('#deckHost');
+    if (!host) return;
+    const el = e.target.closest('[data-a]'); if (!el || el.dataset.a === 'noop') return;
+    e.stopPropagation();
+    try { UI.act(el.dataset.a, el.dataset.p, el); } catch(err) { if (window.OG_report) OG_report(err, 'menu ' + el.dataset.a); }
+    /* the game re-renders into #screens: bring the fresh node back into the frame */
+    setTimeout(() => {
+      try {
+        const fresh = document.querySelector('#screens .scr');
+        const h = document.getElementById('deckHost');
+        if (fresh && h && !h.contains(fresh)) h.appendChild(fresh);
+      } catch(_) {}
+    }, 40);
+  }, true);
+
+  window.OG_page = page; window.OG_pageClose = close;
+})();
+</script>
+<script>
+/* =====================================================================
+   OGRA — MENU, BUILT FROM NOTHING
+   Eight screens rendered here: Home, Routes, Garage, Showroom, Missions,
+   Rewards, Licence, Settings. Own markup, own navigation, own visual
+   language, one responsive grid from phone to desktop.
+   ===================================================================== */
+(function(){
+  if (typeof UI === 'undefined' || typeof GAME === 'undefined') return;
+  const AR = () => typeof LANG !== 'undefined' && LANG.cur === 'ar';
+  const T = (a, e) => AR() ? a : e;
+  const nm = o => { try { return tn(o); } catch(e) { return (o && (AR() ? o.ar : o.en)) || ''; } };
+  const money = n => Math.round(n || 0).toLocaleString('en-US');
+  const s = () => S();
+  const act = (a, p, el) => { try { UI.act(a, p, el || document.createElement('button')); } catch(e) { if (window.OG_report) OG_report(e, 'menu ' + a); } };
+
+  let tab = 'home', gtab = 'fix', filter = 'all';
+
+  document.head.insertAdjacentHTML('beforeend', `<style>
+  #mx{position:fixed;inset:0;z-index:44;display:grid;grid-template-rows:auto minmax(0,1fr) auto;
+    font-family:Cairo,system-ui;color:#e9f3ff;overflow:hidden;
+    background:radial-gradient(130% 90% at 50% -20%,#17224a 0%,#0a1027 42%,#04060f 100%)}
+  #mx *,#mx *::before,#mx *::after{box-sizing:border-box}
+  #mx .fx{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:0}
+  #mx .fx .gr{position:absolute;left:-10%;right:-10%;top:55%;bottom:-20%;
+    background:repeating-linear-gradient(90deg,rgba(0,229,255,.16) 0 2px,transparent 2px 96px),
+               repeating-linear-gradient(0deg,rgba(0,229,255,.13) 0 2px,transparent 2px 54px);
+    transform:perspective(560px) rotateX(77deg);transform-origin:top center;
+    -webkit-mask:linear-gradient(180deg,#000,transparent 70%);mask:linear-gradient(180deg,#000,transparent 70%);
+    animation:mxflow 3s linear infinite}
+  @keyframes mxflow{to{background-position:0 54px,0 54px}}
+  #mx .fx .glow{position:absolute;border-radius:50%;filter:blur(60px);opacity:.5}
+  #mx > *{position:relative;z-index:1}
+
+  /* top bar */
+  #mx .top{display:flex;align-items:center;gap:8px;padding:8px clamp(10px,1.5vw,22px);
+    background:linear-gradient(180deg,rgba(8,14,34,.95),rgba(5,9,22,.7));
+    border-bottom:1px solid rgba(0,229,255,.22);backdrop-filter:blur(10px)}
+  #mx .idc{display:flex;align-items:center;gap:8px;padding:5px 10px;border-radius:14px;
+    background:linear-gradient(180deg,rgba(0,229,255,.12),rgba(0,229,255,.02));border:1px solid rgba(0,229,255,.32)}
+  #mx .ring{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;
+    background:conic-gradient(#00e5ff var(--p,30%),rgba(255,255,255,.1) 0)}
+  #mx .ring b{width:29px;height:29px;border-radius:50%;background:#07102a;display:grid;place-items:center;
+    font:900 12px Rajdhani}
+  #mx .idc .nmz{font:800 13px Cairo;line-height:1.1}
+  #mx .idc .xp{color:#8fd4ff;font:700 10px Rajdhani}
+  #mx .wallet{margin-inline-start:auto;padding:6px 12px;border-radius:14px;font:900 14px Rajdhani;color:#ffd98a;
+    background:linear-gradient(180deg,rgba(255,182,39,.16),rgba(255,182,39,.04));border:1px solid rgba(255,182,39,.45)}
+  #mx .mini{width:34px;height:34px;border-radius:12px;display:grid;place-items:center;cursor:pointer;font-size:15px;
+    background:rgba(9,16,38,.8);border:1px solid rgba(0,229,255,.25);color:#d7e9ff}
+
+  /* body + dock */
+  #mx .body{overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:clamp(10px,1.5vw,22px);min-height:0}
+  #mx .page{max-width:1240px;margin-inline:auto;display:grid;gap:clamp(8px,1.2vw,16px);
+    animation:mxIn .3s cubic-bezier(.2,.9,.3,1) both}
+  @keyframes mxIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+  #mx .dock{display:flex;gap:4px;padding:6px clamp(6px,1vw,14px) max(6px,env(safe-area-inset-bottom));
+    background:linear-gradient(180deg,rgba(5,9,22,.6),rgba(5,9,22,.96));border-top:1px solid rgba(0,229,255,.22);
+    overflow-x:auto}
+  #mx .dock button{flex:1 1 0;min-width:64px;display:grid;justify-items:center;gap:2px;padding:7px 4px;border:0;cursor:pointer;
+    border-radius:13px;background:transparent;color:#9fb6d6;font:800 clamp(9px,1.1vw,11.5px) Cairo}
+  #mx .dock button i{font-style:normal;font-size:clamp(15px,2vw,19px);line-height:1}
+  #mx .dock button.on{color:#eafcff;background:linear-gradient(180deg,rgba(0,229,255,.2),rgba(0,229,255,.04));
+    box-shadow:inset 0 0 0 1px rgba(0,229,255,.5),0 6px 20px rgba(0,229,255,.2)}
+
+  /* building blocks */
+  #mx .hd{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  #mx h2{margin:0;font:900 clamp(16px,2.3vw,26px) Cairo;
+    background:linear-gradient(90deg,#fff,#00e5ff,#fff);background-size:300% 100%;
+    -webkit-background-clip:text;background-clip:text;color:transparent;animation:mxsh 7s linear infinite}
+  @keyframes mxsh{to{background-position:300% 0}}
+  #mx .sub{color:#8fb3d8;font:700 clamp(10px,1.3vw,13px) Cairo}
+  #mx .card{background:linear-gradient(180deg,rgba(15,24,48,.86),rgba(9,15,32,.86));
+    border:1px solid rgba(0,229,255,.18);border-radius:16px;padding:clamp(9px,1.1vw,15px);
+    backdrop-filter:blur(8px);box-shadow:0 10px 28px rgba(0,0,0,.4)}
+  #mx .g{display:grid;gap:clamp(7px,.9vw,12px)}
+  #mx .g2{grid-template-columns:repeat(auto-fill,minmax(clamp(150px,16vw,230px),1fr))}
+  #mx .g3{grid-template-columns:repeat(auto-fill,minmax(clamp(120px,13vw,190px),1fr))}
+  #mx .row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  #mx .chip{padding:.42em .9em;border-radius:999px;cursor:pointer;white-space:nowrap;
+    font:800 clamp(10px,1.2vw,13px) Cairo;color:#cfe6ff;background:rgba(10,18,40,.8);
+    border:1px solid rgba(0,229,255,.25)}
+  #mx .chip.on{background:linear-gradient(180deg,#00e5ff,#0af);color:#04121c;border-color:transparent;
+    box-shadow:0 0 18px rgba(0,229,255,.4)}
+  #mx .btn{padding:.6em 1.1em;border-radius:13px;border:1px solid rgba(0,229,255,.3);cursor:pointer;
+    background:rgba(11,19,42,.9);color:#e6f2ff;font:800 clamp(11px,1.3vw,14px) Cairo}
+  #mx .btn.go{border:0;background:linear-gradient(120deg,#00e5ff,#3ba9ff 45%,#ff2fb3);color:#04121c;
+    font:900 clamp(13px,1.7vw,17px) Cairo;box-shadow:0 12px 32px rgba(0,229,255,.28);position:relative;overflow:hidden}
+  #mx .btn.go::after{content:"";position:absolute;inset:0;background:linear-gradient(120deg,transparent 35%,rgba(255,255,255,.6) 50%,transparent 65%);
+    transform:translateX(-130%);animation:mxsw 3s linear infinite}
+  @keyframes mxsw{to{transform:translateX(130%)}}
+  #mx .btn[disabled]{opacity:.4;cursor:default}
+  #mx .bar{height:6px;border-radius:6px;background:rgba(255,255,255,.1);overflow:hidden}
+  #mx .bar i{display:block;height:100%;background:linear-gradient(90deg,#00e5ff,#9af3ff)}
+  #mx .pod{padding:9px 11px;border-radius:14px;background:rgba(11,19,42,.85);border:1px solid rgba(0,229,255,.16)}
+  #mx .pod small{display:block;color:#8fb3d8;font:700 10.5px Cairo}
+  #mx .pod b{display:block;font:900 clamp(14px,1.8vw,19px) Rajdhani;margin:1px 0 4px}
+  #mx .hero{position:relative;overflow:hidden;border-radius:20px;padding:clamp(12px,1.6vw,22px);
+    background:linear-gradient(135deg,rgba(0,229,255,.16),rgba(255,47,179,.08));border:1px solid rgba(0,229,255,.35)}
+  #mx .hero h3{margin:.1em 0 .25em;font:900 clamp(18px,3vw,34px)/1.1 Cairo}
+  #mx .tile{cursor:pointer;transition:transform .15s,border-color .2s,box-shadow .2s}
+  #mx .tile:hover{transform:translateY(-3px);border-color:rgba(0,229,255,.5);box-shadow:0 14px 30px rgba(0,0,0,.45)}
+  #mx .tile.on{border-color:#00e5ff;box-shadow:0 0 0 1px #00e5ff,0 12px 30px rgba(0,229,255,.2)}
+  #mx .tile.lock{opacity:.45;cursor:not-allowed}
+  #mx .veh img{width:100%;height:clamp(40px,5.5vw,70px);object-fit:contain}
+  #mx .sw{width:30px;height:30px;border-radius:9px;cursor:pointer;border:2px solid transparent}
+  #mx .sw.on{border-color:#fff;box-shadow:0 0 0 2px #00e5ff}
+  @media (min-width:900px){ #mx .split{display:grid;grid-template-columns:1.1fr .9fr;gap:clamp(8px,1.2vw,16px);align-items:start} }
+  @media (prefers-reduced-motion:reduce){#mx *{animation:none!important}}
+  </style>`);
+
+  /* ---------- shell ---------- */
+  function shell(){
+    if (document.getElementById('mx')) return;
+    const el = document.createElement('div'); el.id = 'mx';
+    el.innerHTML = `<div class="fx"><div class="gr"></div>
+        <div class="glow" style="left:6%;top:10%;width:260px;height:260px;background:rgba(0,229,255,.2)"></div>
+        <div class="glow" style="right:8%;bottom:16%;width:300px;height:300px;background:rgba(255,47,179,.16)"></div></div>
+      <div class="top">
+        <div class="ring" id="mxRing"><b id="mxLvl">1</b></div>
+        <div class="idc"><div><div class="nmz" id="mxName"></div><div class="xp" id="mxXp"></div></div></div>
+        <div class="wallet" id="mxCash"></div>
+        <button class="mini" data-x="lang">🌐</button>
+      </div>
+      <div class="body" id="mxBody"></div>
+      <div class="dock" id="mxDock"></div>`;
+    document.body.appendChild(el);
+    el.addEventListener('click', click);
+    dock(); render();
+  }
+  const TABS = [['home','🏠',['الرئيسية','Home']],['routes','🗺️',['المسارات','Routes']],['garage','🔧',['المرآب','Garage']],
+                ['shop','🚐',['المعرض','Showroom']],['miss','🏆',['المهام','Missions']],['rew','🎁',['الجوائز','Rewards']],
+                ['lic','🪪',['المرور','Licence']],['set','⚙',['الإعدادات','Settings']]];
+  function dock(){
+    const d = document.getElementById('mxDock'); if (!d) return;
+    d.innerHTML = TABS.map(([k, i, n]) => `<button data-x="tab" data-k="${k}" class="${tab === k ? 'on' : ''}"><i>${i}</i>${T(n[0], n[1])}</button>`).join('');
+  }
+  function click(e){
+    const b = e.target.closest('[data-x]'); if (!b) return;
+    e.preventDefault(); e.stopPropagation();
+    const x = b.dataset.x, k = b.dataset.k;
+    if (x === 'tab') { tab = k; dock(); render(); return; }
+    if (x === 'lang') { act('lang'); setTimeout(() => { dock(); render(); }, 150); return; }
+    if (x === 'route') { UI.sel.route = k; render(); return; }
+    if (x === 'filter') { filter = k; render(); return; }
+    if (x === 'veh') { UI.sel.vid = k; try { s().veh = k; } catch(_) {} render(); return; }
+    if (x === 'tod') { UI.sel.tod = k; render(); return; }
+    if (x === 'start') { UI.sel.tab = 'line'; hide(); try { startGame(); } catch(err) { show(); } return; }
+    if (x === 'gtab') { gtab = k; render(); return; }
+    if (x === 'wveh') { UI.sel.wvid = k; act('wveh', k); render(); return; }
+    if (x === 'act') { act(k, b.dataset.p, b); setTimeout(render, 120); return; }
+    if (x === 'repair') { if (window.OG_repair) OG_repair(GAME.G || {own:s().owned[s().veh], car:{spec:vehById(s().veh)}}); return; }
+  }
+  function hide(){ const m = document.getElementById('mx'); if (m) m.style.display = 'none'; }
+  function show(){ const m = document.getElementById('mx'); if (m) { m.style.display = 'grid'; render(); } }
+
+  /* ---------- data helpers ---------- */
+  const ownOf = id => (s().owned || {})[id] || {};
+  const health = id => { const c = ownOf(id).cond || {}; return Math.round(['engine','gearbox','brakes','susp','tires','body'].reduce((a, k) => a + (c[k] ?? 100), 0)/6); };
+  const band = km => km <= 25 ? 'short' : km <= 60 ? 'medium' : km <= 250 ? 'long' : 'xl';
+  const bandName = k => ({short:T('قصير','Short'), medium:T('متوسط','Medium'), long:T('طويل','Long'), xl:T('طويل جداً','Very long')})[k];
+
+  /* ---------- screens ---------- */
+  function render(){
+    const m = document.getElementById('mx'); if (!m || m.style.display === 'none') return;
+    const S0 = s(), need = (typeof xpFor === 'function') ? xpFor(S0.lvl || 1) : 220;
+    m.querySelector('#mxName').textContent = S0.name || T('الأسطى','Driver');
+    m.querySelector('#mxXp').textContent = 'XP ' + money(S0.xp) + ' / ' + money(need);
+    m.querySelector('#mxCash').textContent = money(S0.cash) + T(' ج',' EGP');
+    m.querySelector('#mxLvl').textContent = S0.lvl || 1;
+    m.querySelector('#mxRing').style.setProperty('--p', Math.min(100, Math.round(((S0.xp || 0) % need)/need*100)) + '%');
+    const body = m.querySelector('#mxBody');
+    body.innerHTML = `<div class="page">${({home:home, routes:routes, garage:garage, shop:shop, miss:miss, rew:rew, lic:lic, set:settings}[tab] || home)()}</div>`;
+    body.scrollTop = 0;
+  }
+
+  function home(){
+    const S0 = s(), R = (typeof routeById === 'function') && routeById(UI.sel.route);
+    const vid = UI.sel.vid || S0.veh, spec = vehById(vid), own = ownOf(vid);
+    const fuel = Math.round(((own.fuel ?? 0)/((spec && spec.tank) || 45))*100);
+    return `<div class="split">
+      <div class="g">
+        <div class="hero">
+          <div class="sub">${T('رحلة الليلة','Tonight')}</div>
+          <h3>${R ? nm(R.n) : ''}</h3>
+          <div class="row sub">${R ? [`🛣️ ${R.realKm || 0} ${T('كم','km')}`, `🚏 ${(R.st && R.st.length) || 0} ${T('محطة','stops')}`,
+            `🪙 ${R.fare} ${T('ج','EGP')}`, `🚐 ${spec ? nm(spec.n) : ''}`].map(x => `<span>${x}</span>`).join('') : ''}</div>
+          <div class="row" style="margin-top:12px"><button class="btn go" data-x="start" style="flex:1">${T('يلا بينا ›','Start ›')}</button>
+            <button class="btn" data-x="tab" data-k="routes">${T('غيّر الخط','Change route')}</button></div>
+        </div>
+        <div class="g g3">
+          ${pod(T('حالة المركبة','Condition'), health(vid) + '%', health(vid))}
+          ${pod(T('الوقود','Fuel'), fuel + '%', fuel)}
+          ${pod(T('السمعة','Rating'), (S0.rep ?? 5) + '★')}
+          ${pod(T('المستوى','Level'), S0.lvl || 1)}
+        </div>
+      </div>
+      <div class="g">
+        <div class="card"><div class="hd"><h2>${T('مهام النهارده','Today')}</h2></div>
+          <div class="g" style="margin-top:8px">${(S0.missions && S0.missions.list || []).slice(0, 3).map(mi => {
+            const d = (typeof MISSION_POOL !== 'undefined') && MISSION_POOL.find(q => q.id === mi.id);
+            const pct = Math.min(100, Math.round(mi.p/mi.goal*100));
+            return `<div><div class="row" style="justify-content:space-between"><span>${d ? nm(d.n) : ''}</span><span class="sub">${mi.p}/${mi.goal}</span></div>
+              <div class="bar"><i style="width:${pct}%"></i></div></div>`; }).join('') || `<span class="sub">—</span>`}</div>
+        </div>
+        <div class="g g3">
+          ${tile('🔧', T('المرآب','Garage'), 'tab', 'garage')}
+          ${tile('🚐', T('المعرض','Showroom'), 'tab', 'shop')}
+          ${tile('🎁', T('الجوائز','Rewards'), 'tab', 'rew')}
+          ${tile('🪪', T('المرور','Licence'), 'tab', 'lic')}
+        </div>
+      </div></div>`;
+  }
+  const pod = (l, v, pct) => `<div class="pod"><small>${l}</small><b>${v}</b>${pct != null ? `<div class="bar"><i style="width:${pct}%"></i></div>` : ''}</div>`;
+  const tile = (ic, label, x, k) => `<div class="card tile" data-x="${x}" data-k="${k}" style="text-align:center"><div style="font-size:22px">${ic}</div><div style="margin-top:4px">${label}</div></div>`;
+
+  function routes(){
+    const S0 = s(), sel = UI.sel;
+    const f = ['all','short','medium','long','xl'];
+    const list = ROUTES.filter(r => !r.go).filter(r => filter === 'all' || band(r.realKm || 10) === filter)
+      .sort((a, b) => (a.realKm || 0) - (b.realKm || 0));
+    const vids = Object.keys(S0.owned || {});
+    const tods = [['dawn',T('الفجر','Dawn')],['rush',T('زحمة الصبح','Rush')],['noon',T('الضهر','Noon')],['evening',T('المغرب','Evening')],['night',T('بالليل','Night')]];
+    return `<div class="hd"><h2>${T('المسارات','Routes')}</h2><span class="sub">${T('اختار وجهتك','Pick your line')}</span></div>
+      <div class="row">${f.map(k => `<button class="chip ${filter === k ? 'on' : ''}" data-x="filter" data-k="${k}">${k === 'all' ? T('الكل','All') : bandName(k)}</button>`).join('')}</div>
+      <div class="g g2">${list.map(r => {
+        const lock = (r.lvl || 1) > (S0.lvl || 1);
+        return `<div class="card tile ${sel.route === r.id ? 'on' : ''} ${lock ? 'lock' : ''}" ${lock ? '' : `data-x="route" data-k="${r.id}"`}>
+          <b>${nm(r.n)}</b><div class="sub">${r.realKm || 0} ${T('كم','km')} · ${bandName(band(r.realKm || 10))}${lock ? ' · 🔒 ' + (r.lvl) : ''}</div>
+          <div class="sub">🪙 ${r.fare} · 🚏 ${(r.st && r.st.length) || 0}</div></div>`; }).join('')}</div>
+      <div class="card"><div class="sub">${T('العربية','Vehicle')}</div>
+        <div class="g g3" style="margin-top:6px">${vids.map(id => { const v = vehById(id); if (!v) return '';
+          const art = (typeof vehArt === 'function' && vehArt(id)) || '';
+          return `<div class="card tile veh ${(sel.vid || S0.veh) === id ? 'on' : ''}" data-x="veh" data-k="${id}" style="text-align:center">
+            ${art ? `<img src="${art}">` : ''}<div style="font-size:11px">${nm(v.n)}</div><div class="sub">${v.seats} ${T('راكب','seats')}</div></div>`; }).join('')}</div>
+        <div class="sub" style="margin-top:10px">${T('ميعاد الطلوع','Departure')}</div>
+        <div class="row" style="margin-top:4px">${tods.map(([k, n]) => `<button class="chip ${sel.tod === k ? 'on' : ''}" data-x="tod" data-k="${k}">${n}</button>`).join('')}</div>
+        <button class="btn go" data-x="start" style="width:100%;margin-top:10px">${T('يلا بينا ›','Start ›')}</button></div>`;
+  }
+
+  function garage(){
+    const S0 = s(), vid = UI.sel.wvid || UI.sel.vid || S0.veh, v = vehById(vid), own = ownOf(vid);
+    const tabs = [['fix',T('تصليح','Repair')],['up',T('تطوير','Upgrades')],['paint',T('الألوان','Paint')],['stk',T('استيكرات','Stickers')]];
+    let inner = '';
+    if (gtab === 'fix') {
+      const parts = [['engine',T('الموتور','Engine')],['gearbox',T('الفتيس','Gearbox')],['brakes',T('الفرامل','Brakes')],
+                     ['susp',T('العفشة','Suspension')],['tires',T('الكاوتش','Tyres')],['body',T('السمكرة','Body')]];
+      inner = `<div class="g g2">${parts.map(([k, n]) => { const val = Math.round((own.cond || {})[k] ?? 100);
+        return `<div class="card"><div class="row" style="justify-content:space-between"><span>${n}</span><b>${val}%</b></div>
+          <div class="bar" style="margin-top:6px"><i style="width:${val}%;background:${val > 70 ? 'linear-gradient(90deg,#39f28b,#b6ffd8)' : 'linear-gradient(90deg,#ff7a4d,#ffb627)'}"></i></div></div>`; }).join('')}</div>
+        <button class="btn go" data-x="repair" style="width:100%;margin-top:10px">${T('افتح الورشة','Open the workshop')}</button>`;
+    } else if (gtab === 'up') {
+      inner = `<div class="g g2">${(typeof PARTS !== 'undefined' ? PARTS : []).filter(p => !p.only || p.only === v.cat).map(p => {
+        const lv = (own.up || {})[p.id] || 0, cost = (typeof partCost === 'function') ? partCost(p, lv, v.cat) : 0, max = lv >= p.max;
+        return `<div class="card"><div class="row" style="justify-content:space-between"><span>${nm(p.n)}</span><span class="sub">${lv}/${p.max}</span></div>
+          <div class="bar" style="margin:6px 0"><i style="width:${Math.round(lv/p.max*100)}%"></i></div>
+          <button class="btn" data-x="act" data-k="upg" data-p="${p.id}" ${max || S0.cash < cost ? 'disabled' : ''}>${max ? T('الأقصى','Max') : money(cost) + T(' ج',' EGP')}</button></div>`; }).join('')}</div>`;
+    } else if (gtab === 'paint') {
+      inner = `<div class="card"><div class="sub">${T('لون العربية','Body colour')}</div>
+        <div class="row" style="margin-top:8px">${(typeof PAINTS !== 'undefined' ? PAINTS : []).map(c =>
+          `<button class="sw ${own.paint === c ? 'on' : ''}" style="background:${c}" data-x="act" data-k="cPaint" data-p="${c}"></button>`).join('')}</div></div>`;
+    } else {
+      inner = `<div class="card"><div class="sub">${T('استيكرات','Stickers')}</div>
+        <div class="row" style="margin-top:8px">${(typeof STICKERS !== 'undefined' ? STICKERS : []).slice(0, 14).map((st, i) =>
+          `<button class="chip ${own.sticker === st.id ? 'on' : ''}" data-x="act" data-k="sticker" data-p="${st.id || i}">${st.t || st.id || i}</button>`).join('')}</div></div>`;
+    }
+    return `<div class="hd"><h2>${T('المرآب','Garage')}</h2><span class="sub">${T('طوّر مركبتك','Keep her sharp')}</span></div>
+      <div class="row">${Object.keys(S0.owned || {}).map(id => { const vv = vehById(id); return vv ?
+        `<button class="chip ${vid === id ? 'on' : ''}" data-x="wveh" data-k="${id}">${nm(vv.n)}</button>` : ''; }).join('')}</div>
+      <div class="row">${tabs.map(([k, n]) => `<button class="chip ${gtab === k ? 'on' : ''}" data-x="gtab" data-k="${k}">${n}</button>`).join('')}</div>
+      ${inner}`;
+  }
+
+  function shop(){
+    const S0 = s();
+    return `<div class="hd"><h2>${T('المعرض','Showroom')}</h2><span class="sub">${T('عربيتك الجاية','Your next vehicle')}</span></div>
+      <div class="g g2">${VEH.filter(v => (v.lvl || 1) <= (S0.lvl || 1) + 6).map(v => {
+        const owned = !!(S0.owned || {})[v.id], lock = (v.lvl || 1) > (S0.lvl || 1), art = (typeof vehArt === 'function' && vehArt(v.id)) || '';
+        return `<div class="card veh ${owned ? 'on' : ''} ${lock ? 'lock' : ''}" style="text-align:center">
+          ${art ? `<img src="${art}">` : ''}<b style="display:block;font-size:12.5px">${nm(v.n)}</b>
+          <div class="sub">${v.seats} ${T('راكب','seats')} · ${v.yr}</div>
+          <div class="sub">${money(v.price)} ${T('ج','EGP')}</div>
+          <button class="btn" style="margin-top:6px;width:100%" ${owned || lock || S0.cash < v.price ? 'disabled' : ''}
+            data-x="act" data-k="buy" data-p="${v.id}">${owned ? T('عندك','Owned') : lock ? '🔒 ' + T('مستوى','Lv') + ' ' + v.lvl : T('اشتري','Buy')}</button></div>`; }).join('')}</div>`;
+  }
+
+  function miss(){
+    const S0 = s(), list = (S0.missions && S0.missions.list) || [];
+    return `<div class="hd"><h2>${T('المهام','Missions')}</h2><span class="sub">${T('كل يوم مهام جديدة','New every day')}</span></div>
+      <div class="g g2">${list.map((mi, i) => { const d = (typeof MISSION_POOL !== 'undefined') && MISSION_POOL.find(q => q.id === mi.id);
+        const pct = Math.min(100, Math.round(mi.p/mi.goal*100)), done = mi.p >= mi.goal;
+        return `<div class="card"><b>${d ? nm(d.n) : ''}</b>
+          <div class="bar" style="margin:8px 0"><i style="width:${pct}%"></i></div>
+          <div class="row" style="justify-content:space-between"><span class="sub">${mi.p}/${mi.goal}</span>
+          <button class="btn ${done && !mi.c ? 'go' : ''}" ${!done || mi.c ? 'disabled' : ''} data-x="act" data-k="claimM" data-p="${i}">
+            ${mi.c ? T('اتسلمت','Claimed') : done ? T('استلم','Claim') : T('شغال','In progress')}${d ? ' · ' + money(d.rw) : ''}</button></div></div>`; }).join('')}</div>`;
+  }
+
+  function rew(){
+    const S0 = s(), today = (typeof todayStr === 'function') ? todayStr() : '';
+    const canDaily = S0.daily && S0.daily.last !== today, canSpin = S0.daily && S0.daily.spin !== today;
+    return `<div class="hd"><h2>${T('الجوائز','Rewards')}</h2><span class="sub">${T('كل يوم جائزة','Something every day')}</span></div>
+      <div class="g g2">
+        <div class="card"><b>${T('الحضور اليومي','Daily attendance')}</b><p class="sub">${T('سجّل حضورك كل يوم','Check in each day')}</p>
+          <button class="btn ${canDaily ? 'go' : ''}" ${canDaily ? '' : 'disabled'} data-x="act" data-k="claimDaily">${canDaily ? T('استلم','Claim') : T('اتسلمت','Claimed')}</button></div>
+        <div class="card"><b>${T('عجلة الحظ','Wheel of luck')}</b><p class="sub">${T('لفة ببلاش كل يوم','One free spin daily')}</p>
+          <div class="row"><button class="btn ${canSpin ? 'go' : ''}" ${canSpin ? '' : 'disabled'} data-x="act" data-k="spin">${T('لف','Spin')}</button>
+          <button class="btn" data-x="act" data-k="spin" data-p="paid">${T('لفة بـ 500 ج','Spin · 500')}</button></div></div>
+      </div>`;
+  }
+
+  function lic(){
+    const S0 = s(), L = (typeof licState === 'function') ? licState(S0) : {cls:'none', left:0, expired:true};
+    const state = L.cls === 'none' ? T('مفيش رخصة','No licence') : L.expired ? T('منتهية','Expired') : T('سارية','Valid');
+    return `<div class="hd"><h2>${T('المرور','Licence')}</h2><span class="sub">${T('من أجل طريق آمن','For a safe road')}</span></div>
+      <div class="g g2">
+        <div class="card"><b>${T('حالة الرخصة','Status')}</b><p style="font:900 clamp(15px,2vw,20px) Cairo;margin:.3em 0">${state}</p>
+          <div class="sub">${T('النوع','Class')}: ${L.cls || '—'} · ${T('باقي','Left')}: ${Math.max(0, L.left || 0)} ${T('يوم','days')}</div>
+          <div class="sub">${T('النقاط','Points')}: ${(S0.lic && S0.lic.pts) || 0}</div></div>
+        <div class="card"><b>${T('المكتب','The office')}</b><p class="sub">${T('جدّد رخصتك أو خُد امتحان','Renew or sit the test')}</p>
+          <button class="btn go" data-x="oldscr" data-k="dmv">${T('ادخل المرور','Open the office')}</button></div></div>`;
+  }
+
+  function settings(){
+    const S0 = s(), st = S0.set || {};
+    const toggles = [['sfx',T('المؤثرات','Sound effects')],['music',T('الموسيقى','Music')],['haptics',T('الاهتزاز','Vibration')],
+                     ['particles',T('التأثيرات','Effects')],['clouds',T('السحاب','Clouds')],['fps',T('عدّاد الإطارات','FPS counter')]];
+    const vol = Math.round(((st.vol && st.vol.master) ?? 1)*100);
+    return `<div class="hd"><h2>${T('الإعدادات','Settings')}</h2></div>
+      <div class="card"><div class="row" style="justify-content:space-between"><b>${T('مستوى الصوت','Volume')}</b><b>${vol}%</b></div>
+        <div class="row" style="margin-top:8px"><button class="btn" data-x="act" data-k="volpop" data-p="-">−</button>
+          <div class="bar" style="flex:1"><i style="width:${vol}%"></i></div>
+          <button class="btn" data-x="act" data-k="volpop" data-p="+">+</button></div></div>
+      <div class="g g2">${toggles.map(([k, n]) => `<div class="card"><div class="row" style="justify-content:space-between">
+        <span>${n}</span><button class="chip ${st[k] !== false ? 'on' : ''}" data-x="act" data-k="set" data-p="${k}">${st[k] !== false ? T('شغال','On') : T('مقفول','Off')}</button></div></div>`).join('')}</div>
+      <div class="card"><b>${T('الحساب','Account')}</b><div class="row" style="margin-top:8px">
+        <button class="btn" data-x="oldscr" data-k="settings">${T('إعدادات متقدمة','Advanced')}</button></div></div>`;
+  }
+
+  /* a couple of flows still live in the game's own screens */
+  document.addEventListener('click', e => {
+    const b = e.target.closest && e.target.closest('[data-x="oldscr"]'); if (!b) return;
+    hide(); try { UI.show(b.dataset.k); } catch(err) { show(); }
+  }, true);
+
+  /* the menu owns the hub state; the game's screens are only used where asked */
+  setInterval(() => {
+    try {
+      if (GAME.state !== 'hub') { const m = document.getElementById('mx'); if (m) m.style.display = 'none'; return; }
+      shell();
+      const m = document.getElementById('mx');
+      const usingOld = UI.cur && UI.cur.name && !['hub'].includes(UI.cur.name) && m.style.display === 'none';
+      if (!usingOld && m.style.display === 'none') show();
+      if (m.style.display !== 'none' && (!m.__t || Date.now() - m.__t > 1200)) { m.__t = Date.now(); render(); }
+    } catch(e) {}
+  }, 350);
+  /* the old deck is retired */
+  setInterval(() => { const d = document.getElementById('deck'); if (d) d.remove(); }, 500);
 })();
 </script>
 <script>
