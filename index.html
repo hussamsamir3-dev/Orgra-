@@ -9488,7 +9488,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-19a';
+window.OGRA_BUILD = '2026-09-19e';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
@@ -9530,11 +9530,9 @@ window.OGRA_BUILD = '2026-09-19a';
     #modal>.pn{max-height:calc(100vh - 16px)!important;max-height:calc(100dvh - 16px)!important;overflow-y:auto!important;
       touch-action:pan-y!important;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
     #modal>.pn input[type=range]{touch-action:pan-y}
-    #modal .ogActs{position:sticky;bottom:calc(-1*max(16px,calc(var(--u,8px)*2.4)));z-index:3;margin-bottom:calc(-1*max(16px,calc(var(--u,8px)*2.4)))!important;
+    #modal .ogActs{position:relative;z-index:3;
       padding:10px 0 max(14px,calc(var(--u,8px)*2.2));background:linear-gradient(180deg,rgba(12,18,32,0),rgba(12,18,32,.96) 30%);flex-wrap:wrap;gap:8px}
     @media (max-height:560px){
-      #modal .pn:has(> .set){display:grid;grid-template-columns:1fr 1fr;column-gap:18px}
-      #modal .pn:has(> .set) > :not(.set){grid-column:1/-1}
       #modal .set{padding:4px 0!important}
       #modal .mtitle{font-size:18px}
     }
@@ -11667,7 +11665,7 @@ window.OGRA_BUILD = '2026-09-19a';
     #modal > .pn{position:relative}
     #modal .ogX{position:absolute;top:8px;inset-inline-end:8px;width:34px;height:34px;border-radius:10px;
       background:rgba(10,16,28,.9);border:1px solid rgba(140,190,255,.3);color:#e8eefc;font:800 16px system-ui;z-index:5}
-    #modal .ogActs{position:sticky;bottom:0;background:linear-gradient(180deg,rgba(12,18,32,0),rgba(12,18,32,.96) 35%);padding-top:8px}
+    #modal .ogActs{position:relative;padding-top:8px}
   </style>`);
   let acT = 0;
   function acIdle(){
@@ -12300,7 +12298,7 @@ window.OGRA_BUILD = '2026-09-19a';
 
   /* ---------- 2. the fuel window stops jiggling ---------- */
   document.head.insertAdjacentHTML('beforeend', `<style>
-    #modal > .pn{min-width:min(92vw, 520px)}
+    #modal > .pn{min-width:0}
     #modal .num, #modal .svcrow span, #modal .lbl{font-variant-numeric:tabular-nums}
     #modal .svcrow{min-height:2.6em}
   </style>`);
@@ -12805,7 +12803,7 @@ window.OGRA_BUILD = '2026-09-19a';
       /* a blurred pane over a canvas that repaints every frame is what shimmers */
       #modal, #modal *, #wsWrap, #acWrap{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
       #modal{background:rgba(3,6,12,.74)!important}
-      #modal > .pn{background:rgba(12,18,32,.97)!important;will-change:auto;transform:translateZ(0)}
+      #modal > .pn{background:rgba(12,18,32,.97)!important}
     </style>`);
   }
   /* while a shop window is open the road behind it does not need 60 redraws a second */
@@ -13105,6 +13103,46 @@ window.OGRA_BUILD = '2026-09-19a';
     held = setTimeout(forceResume, 2000);
   }, {passive:true});
   ['touchend','touchmove','touchcancel'].forEach(ev => document.addEventListener(ev, () => { clearTimeout(held); }, {passive:true}));
+})();
+</script>
+<script>
+/* the pause and shop windows must always sit above the game canvas:
+   taps were landing on the canvas behind them */
+(function(){
+  document.head.insertAdjacentHTML('beforeend', `<style>
+    #modal:not(.hidden){z-index:2147482000!important;isolation:isolate}
+    #modal > .pn{position:relative;z-index:2147482001}
+    canvas#cv{z-index:1!important}
+  </style>`);
+})();
+</script>
+<script>
+/* =====================================================================
+   A WINDOW THAT ALWAYS FITS
+   On a short screen the pause panel was taller than the display, so its
+   buttons sat below the edge: taps landed on nothing. Any window that is
+   too tall is now scaled down until every button is on screen.
+   ===================================================================== */
+(function(){
+  function fit(){
+    try {
+      const m = document.getElementById('modal');
+      if (!m || m.classList.contains('hidden')) return;
+      const pn = m.querySelector('.pn'); if (!pn) return;
+      pn.style.transformOrigin = 'center center';
+      pn.style.transform = 'none';
+      pn.style.maxHeight = 'none';
+      pn.style.overflow = 'visible';           /* show the whole window, then shrink it to fit */
+      const vh = innerHeight - 12, h = Math.max(pn.scrollHeight, pn.getBoundingClientRect().height);
+      if (h > vh) pn.style.transform = 'scale(' + Math.max(0.5, vh/h).toFixed(3) + ')';
+    } catch(e) {}
+  }
+  window.OG_fitModal = fit;
+  const _ms = (typeof UI !== 'undefined') && UI.modalShow;
+  if (_ms) { UI.modalShow = function(){ const r = _ms.apply(this, arguments); setTimeout(fit, 20); setTimeout(fit, 220); return r; }; }
+  setInterval(fit, 700);
+  addEventListener('resize', () => setTimeout(fit, 80));
+  addEventListener('orientationchange', () => setTimeout(fit, 350));
 })();
 </script>
 <script>
