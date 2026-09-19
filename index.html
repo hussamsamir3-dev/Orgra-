@@ -4308,7 +4308,18 @@ function finishSession(G, completed){ if (!G || G.finished) return G && G.result
   let stars = G.mode === 'go' && tr.rides ? Math.round(s.ratings.slice(-tr.rides).reduce((a, b) => a + b, 0)/tr.rides) : clamp(Math.round(comfort/20 + .4 - (tr.fineN ? 1 : 0) - (tr.crashes ? 1 : 0)), 1, 5);
   stars = clamp(stars || 3, 1, 5);
   const xp = Math.round((G.combo ? 1 + (G.combo.best - 1)*.5 : 1)*(tr.pax*8 + tr.rides*45 + tr.dist*3 + (completed && G.mode === 'line' ? 120 : 0) + tr.overtakes*2 + stars*10));
-  s.xp += xp; let lvlUp = false; while (s.xp >= xpFor(s.lvl)) { s.xp -= xpFor(s.lvl); s.lvl++; lvlUp = true; }
+  s.xp += xp; let lvlUp = false;
+  /* bounded level-up: online play can hold the level and XP under the server's
+     control, and the old loop would then spin for ever trying to change them */
+  { if (!Number.isFinite(s.xp)) s.xp = 0; if (!Number.isFinite(s.lvl) || s.lvl < 1) s.lvl = 1;
+    for (let guard = 0; guard < 200; guard++) {
+      const need = xpFor(s.lvl);
+      if (!Number.isFinite(need) || need <= 0 || s.xp < need) break;
+      const beforeXp = s.xp, beforeLvl = s.lvl;
+      s.xp -= need; s.lvl++;
+      if (s.xp === beforeXp || s.lvl === beforeLvl) { s.xp = Math.max(0, beforeXp - need); break; }   /* the values are locked: stop */
+      lvlUp = true;
+    } }
   stat('km', Math.round(tr.dist)); s.stats.earned = (s.stats.earned || 0) + Math.max(0, net); s.stats.fineN = (s.stats.fineN || 0) + tr.fineN;
   if (completed && G.mode === 'line') { stat('trips'); if (G.route.len === 'long') stat('long'); if (G.route.id === 'alex_corniche' || G.route.id === 'cairo_alex') unlockAch('alex'); if (G.route.id === 'asher_capital') unlockAch('capital'); }
   if ((completed || tr.rides) && !tr.fineN) stat('noFine'); if ((completed || tr.rides) && comfort >= 85) stat('smooth'); if ((completed || tr.rides) && !tr.fineN && !tr.crashes) stat('clean'); if ((completed || tr.rides) && (G.tod >= 20 || G.tod < 5)) stat('night');
@@ -9488,7 +9499,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-19q';
+window.OGRA_BUILD = '2026-09-19r';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
