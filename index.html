@@ -5251,7 +5251,7 @@ document.head.insertAdjacentHTML('beforeend', `<style>
   startGame = function(){
     try {
       const u = UI.sel, s = S(), r = routeById(u.route);
-      if (r && r.coachOnly && u.tab !== 'go') {
+      if (false && r && r.coachOnly && u.tab !== 'go') {   /* every vehicle may drive every line now */
         const v = vehById(u.vid || s.cur.line);
         if (!v || v.cat !== 'bus') { UI.toast(t('coach_only')); AU.ui('no'); return; }
       }
@@ -9488,7 +9488,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-18y';
+window.OGRA_BUILD = '2026-09-19a';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
@@ -10012,6 +10012,7 @@ window.OGRA_BUILD = '2026-09-18y';
       const t = e.changedTouches[0]; start = {x:t.clientX, y:t.clientY, el:e.target, at:Date.now()};
     }, {passive:true, capture:true});
     document.addEventListener('touchend', e => {
+      if (window.__ogNoTouchAct) { start = null; return; }        /* the browser handles taps now */
       if (!start) return; const s = start; start = null;
       const t = e.changedTouches[0];
       if (Math.abs(t.clientX - s.x) > 12 || Math.abs(t.clientY - s.y) > 12 || Date.now() - s.at > 800) return;
@@ -12767,6 +12768,7 @@ window.OGRA_BUILD = '2026-09-18y';
         const km = r.realKm || r.km || 10;
         r.lvl = tierFor(km);
         r.cls = r.cls && r.cls.length ? r.cls : ['micro'];   /* labels only: every vehicle is allowed anyway */
+        r.coachOnly = false;                            /* the coach requirement is retired */
         r.tier = TIER_NAME(km);
       });
     } catch(e) {}
@@ -13045,6 +13047,64 @@ window.OGRA_BUILD = '2026-09-18y';
       return out;
     };
   }
+})();
+</script>
+<script>
+/* =====================================================================
+   PAUSE MENU: let the browser handle taps, and tell us when one is lost
+   ===================================================================== */
+(function(){
+  if (typeof GAME === 'undefined') return;
+  const AR = () => typeof LANG !== 'undefined' && LANG.cur === 'ar';
+
+  /* 1. my own touch interception is removed: it was doing the browser's job
+        and could swallow a tap. Native clicks, with no tap delay. */
+  window.__ogNoTouchAct = true;
+  document.head.insertAdjacentHTML('beforeend', `<style>
+    #modal, #modal *{touch-action:manipulation}
+    #modal button, #modal [data-a]{cursor:pointer;-webkit-tap-highlight-color:rgba(255,182,39,.25)}
+    #modal button:active, #modal [data-a]:active{filter:brightness(1.25)}
+  </style>`);
+
+  /* 2. a tap that does nothing is reported, with the button's name */
+  let watch = null;
+  document.addEventListener('click', e => {
+    const b = e.target.closest && e.target.closest('#modal [data-a]');
+    if (!b) return;
+    const a = b.dataset.a, before = JSON.stringify({p:GAME.paused, s:GAME.state,
+      m:!document.getElementById('modal').classList.contains('hidden'),
+      set:JSON.stringify((GAME.save && GAME.save.set) || {}).length});
+    clearTimeout(watch);
+    watch = setTimeout(() => {
+      try {
+        const after = JSON.stringify({p:GAME.paused, s:GAME.state,
+          m:!document.getElementById('modal').classList.contains('hidden'),
+          set:JSON.stringify((GAME.save && GAME.save.set) || {}).length});
+        if (after === before && window.OG_report) OG_report({message:'the "' + a + '" button did nothing'}, 'dead button');
+      } catch(err) {}
+    }, 1500);
+  }, true);
+
+  /* 3. a way out that cannot fail: press Escape, or hold two seconds on the
+        dimmed area, and the game resumes no matter what state it is in */
+  function forceResume(){
+    try {
+      GAME.paused = false;
+      const m = document.getElementById('modal');
+      if (m) { m.classList.add('hidden'); m.innerHTML = ''; }
+      if (typeof AU !== 'undefined' && AU.pauseGame) AU.pauseGame(false);
+      if (window.OG_report) OG_report({message:AR() ? 'رجّعناك للّعب' : 'Returned you to the game'}, 'recovered');
+    } catch(e) {}
+  }
+  window.OG_forceResume = forceResume;
+  addEventListener('keydown', e => { if (e.key === 'Escape' && GAME.paused) forceResume(); });
+  let held = null;
+  document.addEventListener('touchstart', e => {
+    const m = document.getElementById('modal');
+    if (!m || m.classList.contains('hidden') || e.target !== m) return;
+    held = setTimeout(forceResume, 2000);
+  }, {passive:true});
+  ['touchend','touchmove','touchcancel'].forEach(ev => document.addEventListener(ev, () => { clearTimeout(held); }, {passive:true}));
 })();
 </script>
 <script>
