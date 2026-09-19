@@ -9488,7 +9488,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-19h';
+window.OGRA_BUILD = '2026-09-19i';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
@@ -13177,7 +13177,12 @@ window.OGRA_BUILD = '2026-09-19h';
   function close(){ if (el) { el.remove(); el = null; } }
   function act(a){
     close();
-    try { UI.act(a); } catch(e) { try { GAME.paused = false; } catch(_) {} }
+    /* some actions expect the button they came from: give them a stand-in */
+    const stand = document.createElement('button'); stand.dataset.a = a; stand.className = 'btn';
+    document.body.appendChild(stand);
+    try { UI.act(a, null, stand); }
+    catch(e) { try { (window.OG_report || function(){})(e, 'pause ' + a); } catch(_) {} try { GAME.paused = false; } catch(_) {} }
+    setTimeout(() => stand.remove(), 0);
     if (a === 'resume') { try { GAME.paused = false; AU.pauseGame && AU.pauseGame(false); } catch(e) {} }
   }
   function show(){
@@ -13190,8 +13195,9 @@ window.OGRA_BUILD = '2026-09-19h';
       <div class="sub">${R}</div>
       <button class="go" data-p="resume">${T('كمّل ▶', 'Resume ▶')}</button>
       <div class="row">
-        <button data-p="mute">${T('الصوت', 'Sound')}</button>
-        <button data-p="settings">${T('الإعدادات', 'Settings')}</button>
+        <button data-p="vol-">${T('الصوت −', 'Volume −')}</button>
+        <button data-p="mute">${T('كتم/تشغيل', 'Mute / on')}</button>
+        <button data-p="vol+">${T('الصوت +', 'Volume +')}</button>
       </div>
       <button class="bad" data-p="endShift">${T('إنهاء الوردية', 'End shift')}</button>
       <button class="bad" data-p="quit">${T('رجوع للقائمة', 'Back to menu')}</button>
@@ -13202,7 +13208,20 @@ window.OGRA_BUILD = '2026-09-19h';
       if (!b) { if (e.target === el) act('resume'); return; }
       e.preventDefault(); e.stopPropagation();
       const k = b.dataset.p;
-      if (k === 'settings') { close(); try { GAME.paused = false; UI.show('settings'); } catch(err) {} return; }
+      if (k === 'vol+' || k === 'vol-') {
+        try { const st = S().set; st.vol = st.vol || {}; const cur = st.vol.master ?? 1;
+          st.vol.master = Math.max(0, Math.min(1, cur + (k === 'vol+' ? .1 : -.1)));
+          AU.muted = false; AU.setVol && AU.setVol(); saveGame && saveGame();
+          b.textContent = Math.round(st.vol.master*100) + '%';
+          setTimeout(() => { b.textContent = k === 'vol+' ? T('الصوت +', 'Volume +') : T('الصوت −', 'Volume −'); }, 900);
+        } catch(err) {}
+        return;
+      }
+      if (k === 'mute') {
+        try { AU.muted = !AU.muted; const st = S().set; AU.vol.master = AU.muted ? 0 : ((st.vol && st.vol.master) ?? 1);
+          AU.setVol && AU.setVol(); b.style.opacity = AU.muted ? .55 : 1; } catch(err) {}
+        return;
+      }
       act(k);
     };
     el.addEventListener('click', hit);
