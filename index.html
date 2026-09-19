@@ -9488,7 +9488,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-18t';
+window.OGRA_BUILD = '2026-09-18w';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
@@ -10969,7 +10969,7 @@ window.OGRA_BUILD = '2026-09-18t';
      modern cars. A 1980s Fiat or an old HiAce does not. */
   const AC_FLEET = {v_tourismo:1, coach:1, coach2:1, v_zk6128:1, citybus2:1, v_yutong77:1, v_higer:1,
                     v_joya6:1, coaster:1, minibus_ac:1, v_isuzu:1, sedan_mid:1, hatch:1, sedan16:1, sedan_compact:1, crossover:1, exec:1, suv_big:1};
-  const hasAC = car => !!(car && car.spec && AC_FLEET[car.spec.id]);
+  const hasAC = car => window.OG_hasAC ? OG_hasAC(car) : !!(car && car.spec && AC_FLEET[car.spec.id]);
   /* outside air: hot desert afternoons, cool nights on the coast */
   function outsideTemp(G){
     const hour = ((G.clock/3600 + (G.tod0 || 8)) % 24), th = (G.world.themeAt(G.car.x) || '');
@@ -12867,6 +12867,342 @@ window.OGRA_BUILD = '2026-09-18t';
   }
   if (typeof newSession === 'function') { const _ns = newSession; newSession = function(){ const G = _ns.apply(this, arguments); try { ramp(G.world); } catch(e) {} return G; }; }
   setInterval(() => { try { ramp(GAME.G && GAME.G.world); } catch(e) {} }, 1200);
+})();
+</script>
+<script>
+/* the pump finishes what you paid for */
+(function(){
+  if (typeof UI === 'undefined') return;
+  function finish(){
+    try {
+      const f = UI.fueling, G = GAME.G;
+      if (!f || !G || !G.car) return;
+      G.car.fuel = Math.min(G.car.E.tank, (G.car.fuel || 0) + f.left);   /* you paid for it, you get it */
+      f.left = 0; UI.fueling = null;
+      try { AU.ding && AU.ding(); } catch(e) {}
+    } catch(e) {}
+  }
+  const _act = UI.act;
+  UI.act = function(a, p, el){
+    try { if (a === 'siteLeave' && UI.fueling) finish(); } catch(e) {}
+    return _act.apply(this, arguments);
+  };
+  /* the ✕ in the corner counts as leaving too */
+  document.addEventListener('click', e => { if (e.target.closest && e.target.closest('#modal .ogX') && UI.fueling) finish(); }, true);
+  /* while the pump runs, the button says so */
+  setInterval(() => {
+    try {
+      const b = document.querySelector('#modal [data-a="siteLeave"]'); if (!b) return;
+      const ar = typeof LANG !== 'undefined' && LANG.cur === 'ar';
+      if (UI.fueling) {
+        const G = GAME.G, pct = Math.round((G.car.fuel/G.car.E.tank)*100);
+        b.dataset.og = b.dataset.og || b.textContent;
+        b.textContent = (ar ? 'بتعبّي… ' : 'Filling… ') + pct + '%';
+      } else if (b.dataset.og) { b.textContent = b.dataset.og; delete b.dataset.og; }
+    } catch(e) {}
+  }, 300);
+})();
+</script>
+<script>
+/* =====================================================================
+   CHECKPOINT PROPS · NO OVERLAPPING TRAFFIC · RADIO OFF AT THE REST HOUSE
+   AC ON EVERYTHING BUT THE OLD AND SMALL · A REAL FATIGUE SYSTEM
+   FULLER BUSES ON LONG ROUTES · A BRIGHTER MENU
+   ===================================================================== */
+(function(){
+  if (typeof GAME === 'undefined' || typeof RD === 'undefined') return;
+  const AR = () => typeof LANG !== 'undefined' && LANG.cur === 'ar';
+
+  /* ---------- 1. air conditioning: everything except the old and the small ---------- */
+  const NO_AC = {car_old:1, hatch_city:1, v_suzuki:1, v_foton:1, v_n300:1, micro_classic:1, sedan_compact:1};
+  window.OG_hasAC = car => !!(car && car.spec && !NO_AC[car.spec.id]);
+
+  /* ---------- 2. checkpoint kit stays put ---------- */
+  function cpProps(G){
+    const cp = G.cp; if (!cp) return;
+    if (Math.abs(cp.x - G.car.x) > 340) return;
+    G.props = G.props || [];
+    const need = cp.__kit || (cp.__kit = [
+      {x:cp.x - 14, t:'cone'}, {x:cp.x - 10, t:'cone'}, {x:cp.x - 6, t:'cone'},
+      {x:cp.x - 2.5, t:'cone'}, {x:cp.x - 1.5, t:'stopsign'}, {x:cp.x + 10, t:'cone'}
+    ]);
+    for (const p of need) if (G.props.indexOf(p) < 0) G.props.push(p);   /* put back anything culled */
+  }
+
+  /* ---------- 3. vehicles never sit on top of each other ---------- */
+  function separate(G, dt){
+    const lanes = {};
+    for (const o of G.traffic || []) {
+      if (!o || o.__void || o.isTow) continue;
+      const k = Math.round(o.lane == null ? 0 : o.lane);
+      (lanes[k] = lanes[k] || []).push(o);
+    }
+    for (const k in lanes) {
+      const arr = lanes[k].sort((a, b) => a.x - b.x);
+      for (let i = 1; i < arr.length; i++) {
+        const b = arr[i - 1], f = arr[i];
+        const need = ((b.L || 4.5) + (f.L || 4.5))/2 + 1.2;
+        const gap = f.x - b.x;
+        if (gap < need) {
+          const push = (need - gap);
+          f.x += push*0.6; b.x -= push*0.4;                 /* ease apart instead of clipping */
+          if (f.v < b.v) f.v = b.v;                          /* and stop the shunting */
+          else b.v = Math.min(b.v, f.v);
+        }
+      }
+    }
+  }
+
+  /* ---------- 4. traffic sticks to the limit ---------- */
+  function flow(G, dt){
+    const W = G.world;
+    for (const o of G.traffic || []) {
+      if (!o || o.__void || o.parked || o.isTow || o.broke) continue;
+      const lim = ((W.segAt && W.segAt(o.x) || {}).lim || 60)/3.6;
+      if (!o.jamV && o.v0 < lim*.88) o.v0 = lim*(.9 + Math.random()*.08);
+      if (o.v < lim*.45) { o.__crawl = (o.__crawl || 0) + dt;
+        if (o.__crawl > 2) { o.v = Math.min(o.v0, o.v + dt*3.5); }
+      } else o.__crawl = 0;
+    }
+  }
+
+  /* ---------- 5. radio off when you step into the rest house ---------- */
+  let radioWas = false;
+  function restRadio(G){
+    const inside = !!document.getElementById('rhScreen') || !!(G.rest && G.rest.active);
+    if (inside && !G.__radioOff) {
+      G.__radioOff = true;
+      try { if (window.RADIO && RADIO.on) { radioWas = true; RADIO.power(); } } catch(e) {}
+    } else if (!inside && G.__radioOff) {
+      G.__radioOff = false;
+      try { if (radioWas && window.RADIO && !RADIO.on) RADIO.power(); } catch(e) {}
+      radioWas = false;
+    }
+  }
+
+  /* ---------- 6. fatigue, and the moment it takes over ---------- */
+  function fatigue(G, dt){
+    if (G.fatigue == null) return;
+    const car = G.car, parked = car && !car.on && car.hand && Math.abs(car.vx) < .3;
+    if (parked) G.fatigue = Math.max(0, G.fatigue - dt*0.9);       /* a doze in the cab, slowly */
+    const energy = 100 - G.fatigue;
+    if (energy <= 5 && GAME.state === 'play' && !GAME.paused) {
+      G.__nodT = (G.__nodT || 0) - dt;
+      if (G.__nodT <= 0) { G.__nodT = 10; nod(); }                  /* eyes closing, every ten seconds */
+    }
+  }
+  function nod(){
+    let el = document.getElementById('ogNod');
+    if (!el) { el = document.createElement('div'); el.id = 'ogNod';
+      el.style.cssText = 'position:fixed;inset:0;z-index:45;background:#000;opacity:0;pointer-events:none;transition:opacity 1.1s ease';
+      document.body.appendChild(el); }
+    requestAnimationFrame(() => { el.style.opacity = '.92';
+      setTimeout(() => { el.style.opacity = '0'; }, 1200); });
+    try { const G = GAME.G; G.bubble(AR() ? 'يا أسطى صحصح!' : 'Boss, stay awake!'); AU.haptic && AU.haptic(60); } catch(e) {}
+  }
+
+  /* ---------- 7. long routes stay busy ---------- */
+  function keepFull(G){
+    try {
+      if (!G.route || G.route.len !== 'long' || GAME.state !== 'play') return;
+      const cap = (G.car.spec && G.car.spec.seats) || 14, floor = Math.ceil(cap*0.7);
+      if ((G.onboard || []).length >= floor) return;
+      if (G.__fillT > G.clock) return;
+      G.__fillT = G.clock + 6;
+      while (G.onboard.length < floor) {
+        const p = (typeof mkPax === 'function') ? mkPax(G) : {look:(typeof mkLook === 'function' ? mkLook(Math.random) : {type:'m'}), mood:90, fare:G.route.fare, dest:(G.stopI || 0) + 2 + Math.floor(Math.random()*3)};
+        p.mood = p.mood ?? 90; G.onboard.push(p);
+      }
+    } catch(e) {}
+  }
+
+  /* ---------- 8. a brighter, calmer menu ---------- */
+  document.head.insertAdjacentHTML('beforeend', `<style>
+    @keyframes ogDrift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+    @keyframes ogRise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+    body.menuUI #screens .scr{animation:ogRise .28s ease both}
+    body.menuUI #topBar{background:linear-gradient(90deg,#0a1020,#101a30,#0a1020)!important;background-size:220% 100%;
+      animation:ogDrift 18s ease-in-out infinite;border-bottom:1px solid rgba(255,182,39,.25)!important}
+    body.menuUI #navRail{background:linear-gradient(180deg,rgba(12,18,32,.96),rgba(8,12,22,.96))!important}
+    body.menuUI #navRail button.on{background:linear-gradient(180deg,rgba(255,182,39,.22),rgba(255,182,39,.08))!important;
+      box-shadow:inset 0 0 0 1px rgba(255,182,39,.45), 0 4px 18px rgba(255,182,39,.18)!important;border-radius:12px}
+    body.menuUI #navRail button{transition:transform .12s ease,background .15s ease}
+    body.menuUI #navRail button:active{transform:scale(.94)}
+    body.menuUI .scr .card{transition:transform .14s ease, box-shadow .2s ease, border-color .2s ease}
+    body.menuUI .scr .card:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(0,0,0,.45)}
+    body.menuUI .scr .card.sel{border-color:#ffb627!important;box-shadow:0 0 0 1px #ffb627, 0 10px 30px rgba(255,182,39,.18)!important}
+    body.menuUI .scrHead h1{background:linear-gradient(90deg,#ffd98a,#ffb627,#ffe9bd,#ffb627);background-size:300% 100%;
+      -webkit-background-clip:text;background-clip:text;color:transparent;animation:ogDrift 9s linear infinite}
+    body.menuUI .btn.pri, body.menuUI [data-a="start"]{box-shadow:0 8px 26px rgba(255,182,39,.25)}
+    @media (prefers-reduced-motion:reduce){body.menuUI *{animation:none!important}}
+  </style>`);
+
+  if (typeof updateGame === 'function') {
+    const _ug = updateGame;
+    updateGame = function(G, dt, inp){
+      const out = _ug.apply(this, arguments);
+      try { cpProps(G); separate(G, dt); flow(G, dt); restRadio(G); fatigue(G, dt); keepFull(G); } catch(e) {}
+      return out;
+    };
+  }
+})();
+</script>
+<script>
+/* =====================================================================
+   MENU AND LOADING SCREEN — a full visual overhaul
+   Glass panels, a living background, a gold XP ring, animated cards and
+   a loading screen with a moving city and a real progress bar.
+   ===================================================================== */
+(function(){
+  const AR = () => typeof LANG !== 'undefined' && LANG.cur === 'ar';
+
+  document.head.insertAdjacentHTML('beforeend', `<style>
+  /* ---------- shared motion ---------- */
+  @keyframes ogSweep{0%{transform:translateX(-120%)}100%{transform:translateX(120%)}}
+  @keyframes ogFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+  @keyframes ogGlow{0%,100%{opacity:.55}50%{opacity:1}}
+  @keyframes ogLines{from{background-position:0 0}to{background-position:-1200px 0}}
+  @keyframes ogPop{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:none}}
+  @keyframes ogSpinSlow{to{transform:rotate(360deg)}}
+
+  /* ---------- loading screen ---------- */
+  #boot{background:radial-gradient(120% 90% at 50% 20%,#1b2a49 0%,#0a1020 45%,#03050b 100%)!important}
+  #boot .ogSky{position:absolute;inset:0;overflow:hidden;z-index:0}
+  #boot .ogSky i{position:absolute;border-radius:50%;background:#fff;opacity:.5;animation:ogGlow 3.2s ease-in-out infinite}
+  #boot .ogRoad{position:absolute;left:0;right:0;bottom:0;height:26%;
+    background:linear-gradient(180deg,#0c1322,#070b14);border-top:2px solid rgba(255,182,39,.35);z-index:1}
+  #boot .ogRoad::after{content:"";position:absolute;left:0;right:0;top:46%;height:4px;
+    background:repeating-linear-gradient(90deg,rgba(255,255,255,.75) 0 60px,transparent 60px 140px);
+    animation:ogLines 1.6s linear infinite}
+  #boot .ogBus{position:absolute;bottom:26%;left:-18%;width:min(38vw,320px);z-index:2;
+    animation:ogBusDrive 7s cubic-bezier(.4,0,.5,1) infinite;filter:drop-shadow(0 10px 22px rgba(0,0,0,.6))}
+  @keyframes ogBusDrive{0%{left:-22%}60%{left:64%}100%{left:120%}}
+  #boot .logo{z-index:3}
+  #boot .ogBar{position:absolute;left:50%;transform:translateX(-50%);bottom:12%;width:min(64vw,420px);height:8px;z-index:3;
+    border-radius:99px;background:rgba(255,255,255,.1);overflow:hidden;box-shadow:inset 0 0 0 1px rgba(255,182,39,.25)}
+  #boot .ogBar i{display:block;height:100%;width:0;border-radius:99px;
+    background:linear-gradient(90deg,#ffb627,#ffe9bd,#ffb627);background-size:200% 100%;
+    transition:width .35s ease;animation:ogSweep 1.6s linear infinite}
+  #boot .ogHint{position:absolute;bottom:7%;left:0;right:0;text-align:center;color:#9fb0cc;z-index:3;
+    font:700 clamp(12px,1.6vw,15px)/1.4 Cairo,system-ui}
+
+  /* ---------- a living backdrop behind the menu ---------- */
+  #ogBackdrop{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;
+    background:radial-gradient(90% 70% at 80% 0%,rgba(255,182,39,.10),transparent 60%),
+               radial-gradient(70% 60% at 0% 100%,rgba(46,230,255,.08),transparent 60%)}
+  #ogBackdrop .sweep{position:absolute;top:0;bottom:0;width:38%;
+    background:linear-gradient(90deg,transparent,rgba(255,255,255,.045),transparent);animation:ogSweep 9s linear infinite}
+  #ogBackdrop .orb{position:absolute;border-radius:50%;filter:blur(30px);opacity:.5;animation:ogFloat 9s ease-in-out infinite}
+
+  /* ---------- top bar ---------- */
+  body.menuUI #topBar{background:linear-gradient(180deg,rgba(14,22,40,.96),rgba(8,12,22,.9))!important;
+    -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-bottom:1px solid rgba(255,182,39,.28)!important;
+    box-shadow:0 8px 28px rgba(0,0,0,.45)}
+  body.menuUI #topBar .tbProf{position:relative;background:rgba(255,255,255,.05)!important;border:1px solid rgba(140,190,255,.18)!important;
+    border-radius:16px!important}
+  body.menuUI #topBar .tbChip{background:linear-gradient(180deg,rgba(255,182,39,.16),rgba(255,182,39,.06))!important;
+    border:1px solid rgba(255,182,39,.45)!important;border-radius:14px!important}
+  #ogXP{position:absolute;inset:-4px auto -4px -4px;width:calc(100% + 8px);pointer-events:none}
+
+  /* ---------- side rail ---------- */
+  body.menuUI #navRail{background:linear-gradient(180deg,rgba(13,20,36,.95),rgba(7,11,20,.95))!important;
+    -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+  body.menuUI #navRail button{border-radius:14px!important;transition:transform .12s,background .18s,box-shadow .18s}
+  body.menuUI #navRail button:active{transform:scale(.93)}
+  body.menuUI #navRail button.on{background:linear-gradient(180deg,rgba(255,182,39,.24),rgba(255,182,39,.06))!important;
+    box-shadow:inset 0 0 0 1px rgba(255,182,39,.5),0 6px 20px rgba(255,182,39,.2)!important;color:#ffe2a6!important}
+  body.menuUI #navRail button.on .ni{animation:ogFloat 3.4s ease-in-out infinite}
+
+  /* ---------- screens and cards ---------- */
+  body.menuUI #screens .scr{animation:ogPop .32s cubic-bezier(.2,.9,.3,1) both}
+  body.menuUI .scrHead h1{background:linear-gradient(90deg,#ffe9bd,#ffb627,#fff,#ffb627);background-size:280% 100%;
+    -webkit-background-clip:text;background-clip:text;color:transparent;animation:ogSweep 0s, ogShine 7s linear infinite}
+  @keyframes ogShine{to{background-position:280% 0}}
+  body.menuUI .pn, body.menuUI .scr .card{background:linear-gradient(180deg,rgba(20,29,48,.92),rgba(12,18,31,.92))!important;
+    border:1px solid rgba(140,190,255,.16)!important;border-radius:16px!important;
+    -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+  body.menuUI .scr .card{position:relative;overflow:hidden;transition:transform .16s ease,box-shadow .2s ease,border-color .2s}
+  body.menuUI .scr .card::after{content:"";position:absolute;inset:0;pointer-events:none;
+    background:linear-gradient(120deg,transparent 40%,rgba(255,255,255,.06) 50%,transparent 60%);
+    transform:translateX(-120%);transition:transform .6s ease}
+  body.menuUI .scr .card:hover::after{transform:translateX(120%)}
+  body.menuUI .scr .card:hover{transform:translateY(-3px);box-shadow:0 14px 34px rgba(0,0,0,.5);border-color:rgba(255,182,39,.35)!important}
+  body.menuUI .scr .card.sel{border-color:#ffb627!important;box-shadow:0 0 0 1px #ffb627,0 14px 34px rgba(255,182,39,.2)!important}
+  body.menuUI .chip{border-radius:999px!important;transition:transform .12s,background .15s}
+  body.menuUI .chip:active{transform:scale(.95)}
+  body.menuUI .chip.on{background:linear-gradient(180deg,#ffd98a,#ffb627)!important;color:#1b1204!important;border-color:transparent!important}
+  body.menuUI [data-a="start"], body.menuUI .btn.pri{position:relative;overflow:hidden;
+    background:linear-gradient(180deg,#ffe2a6,#ffb627)!important;color:#1b1204!important;
+    box-shadow:0 10px 30px rgba(255,182,39,.28)!important;border:0!important}
+  body.menuUI [data-a="start"]::after, body.menuUI .btn.pri::after{content:"";position:absolute;inset:0;
+    background:linear-gradient(120deg,transparent 35%,rgba(255,255,255,.55) 50%,transparent 65%);
+    transform:translateX(-120%);animation:ogSweep 3.4s linear infinite}
+  @media (prefers-reduced-motion:reduce){body.menuUI *,#boot *{animation:none!important;transition:none!important}}
+  </style>`);
+
+  /* ---------- build the loading screen ---------- */
+  function dressBoot(){
+    const b = document.getElementById('boot');
+    if (!b || b.__dressed) return; b.__dressed = 1;
+    const sky = document.createElement('div'); sky.className = 'ogSky';
+    let stars = '';
+    for (let i = 0; i < 40; i++) {
+      const s = (Math.random()*2 + 1).toFixed(1);
+      stars += `<i style="left:${(Math.random()*100).toFixed(1)}%;top:${(Math.random()*55).toFixed(1)}%;width:${s}px;height:${s}px;animation-delay:${(Math.random()*3).toFixed(1)}s"></i>`;
+    }
+    sky.innerHTML = stars;
+    const road = document.createElement('div'); road.className = 'ogRoad';
+    const bar = document.createElement('div'); bar.className = 'ogBar'; bar.innerHTML = '<i></i>';
+    const hint = document.createElement('div'); hint.className = 'ogHint';
+    hint.textContent = AR() ? 'بنجهّز الشوارع والركاب…' : 'Warming up the streets and the passengers…';
+    b.prepend(sky); b.appendChild(road); b.appendChild(bar); b.appendChild(hint);
+    try {
+      if (window.O2PACK && O2PACK.key) {
+        const bus = document.createElement('img'); bus.className = 'ogBus'; bus.src = O2PACK.key;
+        bus.style.cssText += ';border-radius:14px;opacity:.85';
+        b.appendChild(bus);
+      }
+    } catch(e) {}
+    /* a progress bar that tracks what has actually loaded */
+    const fill = bar.querySelector('i');
+    let p = 0;
+    const tick = setInterval(() => {
+      let real = 0;
+      try { const imgs = [...document.images]; real = imgs.length ? imgs.filter(i => i.complete).length/imgs.length : 0; } catch(e) {}
+      p = Math.max(p + 0.035, real*0.9);
+      if (typeof GAME !== 'undefined' && GAME.state) p = 1;
+      fill.style.width = Math.min(100, p*100) + '%';
+      if (p >= 1 || !document.getElementById('boot')) clearInterval(tick);
+    }, 180);
+  }
+  dressBoot(); setTimeout(dressBoot, 400); setTimeout(dressBoot, 1200);
+
+  /* ---------- backdrop + XP ring ---------- */
+  function dressMenu(){
+    if (!document.getElementById('ogBackdrop')) {
+      const d = document.createElement('div'); d.id = 'ogBackdrop';
+      d.innerHTML = `<div class="sweep"></div>
+        <div class="orb" style="left:8%;top:14%;width:220px;height:220px;background:rgba(255,182,39,.20)"></div>
+        <div class="orb" style="right:12%;bottom:12%;width:260px;height:260px;background:rgba(46,230,255,.16);animation-delay:2.5s"></div>`;
+      document.body.prepend(d);
+    }
+    const prof = document.querySelector('#topBar .tbProf');
+    if (prof && !document.getElementById('ogXP')) {
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.id = 'ogXP'; svg.setAttribute('viewBox', '0 0 100 40'); svg.setAttribute('preserveAspectRatio', 'none');
+      svg.innerHTML = `<rect x="1" y="1" width="98" height="38" rx="12" fill="none" stroke="rgba(255,182,39,.25)" stroke-width="2"/>
+        <rect id="ogXPfill" x="1" y="1" width="0" height="38" rx="12" fill="none" stroke="#ffb627" stroke-width="2"
+              stroke-dasharray="270" stroke-dashoffset="270"/>`;
+      prof.appendChild(svg);
+    }
+    try {
+      const f = document.getElementById('ogXPfill'); if (!f) return;
+      const s = S(), xp = s.xp || 0, need = (typeof xpNeed === 'function') ? xpNeed(s.lvl || 1) : 220;
+      const k = Math.max(0, Math.min(1, (xp % need)/need));
+      f.setAttribute('width', '98'); f.setAttribute('stroke-dashoffset', String(270*(1 - k)));
+    } catch(e) {}
+  }
+  setInterval(dressMenu, 900);
 })();
 </script>
 <script>
