@@ -9495,7 +9495,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-21a';
+window.OGRA_BUILD = '2026-09-21e';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
@@ -14995,6 +14995,7 @@ window.OGRA_BUILD = '2026-09-21a';
      phase. Each person owns their own, advanced from the distance they
      cover; the drawing code is left to use it as given. */
   function crowdTick(list, dt){
+    return;   /* superseded: the walk accumulator below owns every phase */
     for (const p of (list || [])) {
       if (!p) continue;
       const v = Math.abs(p.v || 0);
@@ -15039,6 +15040,269 @@ window.OGRA_BUILD = '2026-09-21a';
       return out;
     };
   }
+})();
+</script>
+<script>
+/* =====================================================================
+   STREET FURNITURE, STATIC CHARACTERS AND A PROPER DOWNPOUR
+   Textures from assets/new are placed where they belong: drains and
+   manholes on the tarmac, kerbs and planters along the pavement, dirt on
+   desert shoulders, guardrail on the open road. The standing figures in
+   ped_07 are sited by role. Rain falls harder, runs down the glass, and
+   is heard from inside the cab.
+   ===================================================================== */
+(function(){
+  if (typeof RD === 'undefined' || typeof GAME === 'undefined') return;
+
+  /* ---------- artwork ---------- */
+  const SRC = {
+    kerb:'assets/new/road_00.webp', barrier:'assets/new/road_05.webp', planter:'assets/new/road_08.webp',
+    drain:'assets/new/road_09.webp', manhole:'assets/new/road_10.webp', dirt:'assets/new/road_11.webp',
+    rail:'assets/new/road_14.webp', people:'assets/new/ped_07.webp'
+  };
+  const IMG = {};
+  const img = k => { let i = IMG[k]; if (!i) { i = IMG[k] = new Image(); i.src = SRC[k]; } return (i.complete && i.naturalWidth) ? i : null; };
+  /* the eight figures inside ped_07, measured from the artwork */
+  const FIG = {
+    sit1:[0,14,55,60], sit2:[52,15,41,57], walkBag:[99,0,51,76], hailWoman:[149,0,50,76], hailMan:[206,1,42,75],
+    officer:[2,73,60,77], mechanic:[73,92,74,57], vendor:[165,78,78,71]
+  };
+  const hash = x => { const n = Math.sin(Math.floor(x)*12.9898)*43758.5453; return n - Math.floor(n); };
+
+  function drawImgAt(im, sx, sy, sw, sh, worldX, metres, depth){
+    const P = RD.PPM, x = RD.sx(worldX), y = RD.sy(GAME.G.world.h(worldX), depth);
+    const w = metres*P, h = w*(sh/sw);
+    if (x < -260 || x > RD.W*RD.zoom + 260) return;
+    RD.ctx.drawImage(im, sx, sy, sw, sh, x - w/2, y - h, w, h);
+  }
+
+  /* ---------- decals along the road ---------- */
+  function street(G){
+    const W = G.world, P = RD.PPM, c = RD.ctx;
+    const from = Math.floor((RD.camL - 20)/10)*10, to = RD.camL + RD.W/P + 30;
+    c.save();
+    for (let x = from; x < to; x += 10) {
+      const r = hash(x), th = (W.themeAt(x) || ''), lim = ((W.segAt && W.segAt(x) || {}).lim || 60);
+      /* tarmac: a manhole or a gully every so often */
+      if (r < .13) { const im = img('manhole'); if (im) drawImgAt(im, 0, 0, im.naturalWidth, im.naturalHeight, x + r*6, 1.1, 0.25); }
+      else if (r < .2) { const im = img('drain'); if (im) drawImgAt(im, 0, 0, im.naturalWidth, im.naturalHeight, x + r*6, 1.5, -.42); }
+      /* pavement edge: kerb, and planters in town */
+      if (r > .55) { const im = img('kerb'); if (im) drawImgAt(im, 0, 0, im.naturalWidth, im.naturalHeight, x + 5, 11, -.62); }
+      if (/downtown|popular|corniche|modern|islamic/.test(th) && r > .82) {
+        const im = img('planter'); if (im) drawImgAt(im, 0, 0, im.naturalWidth, im.naturalHeight, x + 4, 7, -.66);
+      }
+      /* desert and ring road: sand on the shoulder, guardrail where it is fast */
+      if (/desert|openDesert|giza|sinai|windfarm|ring/.test(th) && r > .35) {
+        const im = img('dirt'); if (im) drawImgAt(im, 0, 0, im.naturalWidth, im.naturalHeight, x + 3, 12, -.5);
+      }
+      if (lim >= 90 && r > .6) { const im = img('rail'); if (im) drawImgAt(im, 0, 0, im.naturalWidth, im.naturalHeight, x + 5, 10, -.78); }
+      if (lim >= 90 && r < .08) { const im = img('barrier'); if (im) drawImgAt(im, 0, 0, im.naturalWidth, im.naturalHeight, x, 6, -.48); }
+    }
+    c.restore();
+  }
+
+  /* ---------- the standing characters, by role ---------- */
+  function people(G){
+    const im = img('people'); if (!im) return;
+    const W = G.world, put = (key, worldX, m, depth) => { const f = FIG[key]; drawImgAt(im, f[0], f[1], f[2], f[3], worldX, m, depth); };
+    /* an officer on duty at the checkpoint */
+    if (G.cp && Math.abs(G.cp.x - G.car.x) < 300) put('officer', G.cp.x - 4.5, 1.8, -.5);
+    /* a mechanic at the workshop, a vendor and people waiting near the stops */
+    for (const s of (W.shops || [])) {
+      if (Math.abs(s.x - RD.camL) > 260) continue;
+      if (s.t === 'mech') put('mechanic', s.x + 3, 1.5, -.6);
+      if (s.t === 'rest' || s.t === 'cafe') { put('sit1', s.x - 3, 1.35, -.66); put('sit2', s.x - 1.2, 1.3, -.66); }
+      if (s.t === 'shop' || s.t === 'gas') put('vendor', s.x + 2.5, 1.7, -.64);
+    }
+    for (const st of (W.stations || [])) {
+      if (Math.abs(st.x - RD.camL) > 260) continue;
+      const r = hash(st.x);
+      if (r > .5) put('hailWoman', st.x - 1.6, 1.68, -.6);
+      if (r > .25) put('hailMan', st.x + 1.4, 1.74, -.6);
+      if (r < .4) put('walkBag', st.x + 3.2, 1.72, -.62);
+    }
+  }
+
+  if (typeof RD.drawNearBack === 'function') {
+    const _d = RD.drawNearBack;
+    RD.drawNearBack = function(world){
+      const r = _d.apply(this, arguments);
+      try { const G = GAME.G; if (G && GAME.state === 'play') { street(G); people(G); } } catch(e) {}
+      return r;
+    };
+  }
+
+  /* ---------- rain ---------- */
+  const drops = [];
+  function rainFX(G){
+    const heavy = (G.weather === 'rain') ? (RD.wx != null ? RD.wx : 1) : 0;
+    if (heavy < .05) { drops.length = 0; return; }
+    const c = RD.ctx, cv = c.canvas, W = cv.width, H = cv.height, dpr = W/Math.max(1, RD.Ws || W);
+    const t = performance.now()/1000, spd = Math.min(1.4, Math.abs(G.car.vx)/26);
+    c.save(); c.setTransform(1, 0, 0, 1, 0, 0);
+    /* the fall: four depths, leaning with speed */
+    for (let l = 0; l < 4; l++) {
+      const n = Math.round((30 - l*5)*heavy*(W/1100)), len = (26 + l*22)*dpr,
+            slant = .18 + spd*1.15 + l*.05, sp = (1100 + l*820)*dpr;
+      c.strokeStyle = `rgba(200,220,248,${(.08 + l*.045)*heavy})`;
+      c.lineWidth = (l < 2 ? 1 : 1.5)*dpr; c.beginPath();
+      for (let i = 0; i < n; i++) {
+        const seed = i*83.7 + l*29.3;
+        const x = ((seed*61 + t*sp*slant) % (W + 320)) - 160;
+        const y = ((seed*37 + t*sp) % (H + 240)) - 120;
+        c.moveTo(x, y); c.lineTo(x - len*slant, y + len);
+      }
+      c.stroke();
+    }
+    /* water on the glass: it gathers, then streaks back as you speed up */
+    const want = Math.round(34*heavy);
+    while (drops.length < want) drops.push({x:Math.random()*W, y:Math.random()*H*.72, r:(2 + Math.random()*4.5)*dpr, v:0, w:0});
+    while (drops.length > want) drops.pop();
+    for (const d of drops) {
+      d.v += .02 + spd*.09;                       /* faster you go, faster they run */
+      d.y += d.v*dpr*.55; d.x -= spd*2.6*dpr;
+      d.w = Math.min(1, d.w + .02);
+      if (d.y > H || d.x < -20) { d.y = -8; d.x = Math.random()*W; d.v = 0; d.w = 0; }
+      const tail = 6 + spd*34;
+      const g = c.createLinearGradient(d.x, d.y - tail*dpr, d.x, d.y);
+      g.addColorStop(0, `rgba(210,228,250,0)`); g.addColorStop(1, `rgba(210,228,250,${.16*heavy})`);
+      c.strokeStyle = g; c.lineWidth = d.r*.7; c.beginPath();
+      c.moveTo(d.x + spd*10*dpr, d.y - tail*dpr); c.lineTo(d.x, d.y); c.stroke();
+      c.fillStyle = `rgba(214,231,252,${.2*heavy})`;
+      c.beginPath(); c.ellipse(d.x, d.y, d.r*.85, d.r, 0, 0, 6.28); c.fill();
+      c.strokeStyle = `rgba(255,255,255,${.16*heavy})`; c.lineWidth = dpr*.7;
+      c.beginPath(); c.arc(d.x - d.r*.3, d.y - d.r*.35, d.r*.45, 3.3, 5.3); c.stroke();
+    }
+    /* spray off the tarmac */
+    const road = (RD.ROADY || H*.6)*dpr/(RD.zoom || 1);
+    const gr = c.createLinearGradient(0, road - 46*dpr, 0, road + 26*dpr);
+    gr.addColorStop(0, 'rgba(196,212,235,0)');
+    gr.addColorStop(.5, `rgba(196,212,235,${.12*heavy*(.35 + spd)})`);
+    gr.addColorStop(1, 'rgba(196,212,235,0)');
+    c.fillStyle = gr; c.fillRect(0, road - 46*dpr, W, 72*dpr);
+    c.restore();
+  }
+  if (typeof renderScene === 'function') {
+    const _r = renderScene;
+    renderScene = function(G){ const o = _r.apply(this, arguments); try { const g = G || GAME.G; if (g && GAME.state === 'play') rainFX(g); } catch(e) {} return o; };
+  }
+  /* heard from inside the cab: quieter, and the top end rolled off */
+  if (typeof AU !== 'undefined' && AU.roadTick) {
+    const _rt = AU.roadTick;
+    AU.roadTick = function(v, surf, slip, wet, rain, inside){
+      const r = _rt.call(this, v, surf, slip, wet, (rain || 0)*.28, inside);
+      try {
+        const rd = this.road, t = this.ctx && this.ctx.currentTime;
+        if (rd && t != null) {
+          if (rd.rlp) rd.rlp.frequency.setTargetAtTime(inside ? 620 : 1100, t, .9);
+          if (rd.rhp) rd.rhp.frequency.setTargetAtTime(inside ? 120 : 200, t, .9);
+        }
+      } catch(e) {}
+      return r;
+    };
+  }
+})();
+</script>
+<script>
+/* =====================================================================
+   WALK PHASE OWNED OUTRIGHT · PREMIUM LIGHTING · STEADY FUEL WINDOW
+   ===================================================================== */
+(function(){
+  if (typeof GAME === 'undefined' || typeof RD === 'undefined') return;
+  const STRIDE = 1.55, FRAME = 6.2832/8;
+
+  /* ---------- 1. one accumulator per person; anything the game adds is discarded ---------- */
+  function walk(list, dt){
+    for (const p of (list || [])) {
+      if (!p) continue;
+      if (p.__ph == null) {
+        p.__ph = Math.random()*6.2832;
+        /* the phase becomes read-only to everyone else: several older
+           systems were still adding to it, which is what made the legs
+           stutter back and forth */
+        try { Object.defineProperty(p, 'ph', {get(){ return p.__ph; }, set(){}, configurable:true}); } catch(e) {}
+      }
+      const v = Math.abs(p.v || 0);
+      let moving = v > .03;
+      if (!moving && p.walkTo != null && Math.abs(p.walkTo - p.x) > .15) {
+        const dir = p.walkTo > p.x ? 1 : -1; p.x += dir*1.05*dt; p.face = dir; moving = true;
+        p.__ph += Math.min(FRAME, (1.05*dt/STRIDE)*6.2832);
+      } else if (moving) {
+        p.__ph += Math.min(FRAME, (v*dt/STRIDE)*6.2832);
+        p.face = p.v > 0 ? 1 : -1;
+      }
+      if (p.__ph > 62.83) p.__ph -= 62.83;
+      p.walk = moving;
+    }
+  }
+  if (typeof updateGame === 'function') {
+    const _ug = updateGame;
+    updateGame = function(G, dt, inp){
+      const out = _ug.apply(this, arguments);
+      try { const d = Math.min(dt, .05); walk(G.walkers, d); walk(G.peds, d); } catch(e) {}
+      return out;
+    };
+  }
+
+  /* ---------- 2. lighting ---------- */
+  function lighting(G){
+    const c = RD.ctx, W = RD.W*(RD.zoom || 1), P = RD.PPM, night = RD.night || 0;
+    const cv = c.canvas, dpr = cv.width/Math.max(1, RD.Ws || cv.width);
+    c.save(); c.setTransform(1, 0, 0, 1, 0, 0);
+    const w = cv.width, h = cv.height;
+    /* the sun or the moon, with a soft halo */
+    const hour = ((G.clock/3600 + (G.tod0 || 8)) % 24);
+    const up = hour > 5.5 && hour < 18.5;
+    const t = up ? (hour - 5.5)/13 : ((hour + 24 - 18.5) % 24)/11;
+    const sx = w*(0.12 + 0.76*t), sy = h*(0.34 - Math.sin(Math.PI*t)*0.2);
+    c.globalCompositeOperation = 'lighter';
+    const disc = c.createRadialGradient(sx, sy, 0, sx, sy, (up ? 170 : 120)*dpr);
+    if (up) { disc.addColorStop(0, 'rgba(255,240,205,.55)'); disc.addColorStop(.25, 'rgba(255,214,150,.22)'); }
+    else    { disc.addColorStop(0, 'rgba(206,226,255,.4)');  disc.addColorStop(.3,  'rgba(150,180,235,.14)'); }
+    disc.addColorStop(1, 'rgba(0,0,0,0)');
+    c.fillStyle = disc; c.beginPath(); c.arc(sx, sy, (up ? 170 : 120)*dpr, 0, 6.28); c.fill();
+    /* warm pools under the street lamps once the sun is down */
+    if (night > .25) {
+      const road = (RD.ROADY || h*.6)*dpr/(RD.zoom || 1);
+      const step = 26;                                  /* lamp spacing in metres */
+      const first = Math.ceil((RD.camL - 20)/step)*step;
+      for (let x = first; x < RD.camL + W/P + 20; x += step) {
+        const px = RD.sx(x)*dpr;
+        if (px < -200 || px > w + 200) continue;
+        const top = road - 150*dpr;
+        const cone = c.createLinearGradient(px, top, px, road + 12*dpr);
+        cone.addColorStop(0, `rgba(255,206,130,${.22*night})`);
+        cone.addColorStop(1, 'rgba(255,196,110,0)');
+        c.fillStyle = cone;
+        c.beginPath(); c.moveTo(px - 12*dpr, top); c.lineTo(px + 12*dpr, top);
+        c.lineTo(px + 120*dpr, road + 10*dpr); c.lineTo(px - 120*dpr, road + 10*dpr); c.closePath(); c.fill();
+        const pool = c.createRadialGradient(px, road, 0, px, road, 130*dpr);
+        pool.addColorStop(0, `rgba(255,203,124,${.20*night})`); pool.addColorStop(1, 'rgba(255,203,124,0)');
+        c.fillStyle = pool; c.beginPath(); c.ellipse(px, road, 130*dpr, 26*dpr, 0, 0, 6.28); c.fill();
+      }
+      /* the bus throws its own beam and a glow on the wet road */
+      const carX = RD.sx(G.car.x)*dpr, road2 = (RD.ROADY || h*.6)*dpr/(RD.zoom || 1);
+      const beam = c.createLinearGradient(carX, road2 - 20*dpr, carX + 460*dpr, road2 + 20*dpr);
+      beam.addColorStop(0, `rgba(255,246,214,${.30*night})`); beam.addColorStop(1, 'rgba(255,246,214,0)');
+      c.fillStyle = beam;
+      c.beginPath(); c.moveTo(carX, road2 - 26*dpr); c.lineTo(carX + 470*dpr, road2 - 70*dpr);
+      c.lineTo(carX + 470*dpr, road2 + 46*dpr); c.lineTo(carX, road2 + 4*dpr); c.closePath(); c.fill();
+    }
+    c.restore();
+  }
+  if (typeof renderScene === 'function') {
+    const _r = renderScene;
+    renderScene = function(G){ const o = _r.apply(this, arguments); try { const g = G || GAME.G; if (g && GAME.state === 'play') lighting(g); } catch(e) {} return o; };
+  }
+
+  /* ---------- 3. the fuel window holds still ---------- */
+  document.head.insertAdjacentHTML('beforeend', `<style>
+    #modal > .pn{transform:none!important;transition:none!important;animation:none!important;
+      width:min(94vw,520px);contain:layout paint}
+    #modal .num,#modal .lbl,#modal .svcrow span,#modal button{font-variant-numeric:tabular-nums}
+    #modal .bar,#modal #fuelBar{transition:none!important}
+    #modal button{min-width:9.5em;justify-content:center}
+  </style>`);
 })();
 </script>
 <script>
