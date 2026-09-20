@@ -9495,7 +9495,7 @@ window.O2PACK={"pano":"data:image/webp;base64,UklGRkhyBQBXRUJQVlA4WAoAAAAQAAAAew
    Every read of G.traffic, from any part of the game, gets a list with
    empty slots and skipped spawns already removed. This closes the
    "reading 'parked' of null" crash no matter which spawner caused it. */
-window.OGRA_BUILD = '2026-09-21e';
+window.OGRA_BUILD = '2026-09-21f';
 (function(){
   const bad = o => !o;   /* skipped-spawn placeholders are swept between frames, not mid-update */
   function guard(G){
@@ -15069,27 +15069,31 @@ window.OGRA_BUILD = '2026-09-21e';
   };
   const hash = x => { const n = Math.sin(Math.floor(x)*12.9898)*43758.5453; return n - Math.floor(n); };
 
-  function drawImgAt(im, sx, sy, sw, sh, worldX, metres, depth){
+  /* width or height in metres, whichever the caller specifies, and a wide
+     margin so nothing appears inside the frame */
+  function drawImgAt(im, sx, sy, sw, sh, worldX, size, depth, byHeight){
     const P = RD.PPM, x = RD.sx(worldX), y = RD.sy(GAME.G.world.h(worldX), depth);
-    const w = metres*P, h = w*(sh/sw);
-    if (x < -260 || x > RD.W*RD.zoom + 260) return;
+    const h = byHeight ? size*P : (size*P)*(sh/sw);
+    const w = byHeight ? h*(sw/sh) : size*P;
+    if (x < -w - 420 || x > RD.W + w + 420) return;
     RD.ctx.drawImage(im, sx, sy, sw, sh, x - w/2, y - h, w, h);
   }
 
   /* ---------- decals along the road ---------- */
   function street(G){
     const W = G.world, P = RD.PPM, c = RD.ctx;
-    const from = Math.floor((RD.camL - 20)/10)*10, to = RD.camL + RD.W/P + 30;
+    const view = RD.W/P;                       /* metres across the screen */
+    const from = Math.floor((RD.camL - 60)/10)*10, to = RD.camL + view + 120;
     c.save();
     for (let x = from; x < to; x += 10) {
       const r = hash(x), th = (W.themeAt(x) || ''), lim = ((W.segAt && W.segAt(x) || {}).lim || 60);
       /* tarmac: a manhole or a gully every so often */
-      if (r < .13) { const im = img('manhole'); if (im) drawImgAt(im, 0, 0, im.naturalWidth, im.naturalHeight, x + r*6, 1.1, 0.25); }
-      else if (r < .2) { const im = img('drain'); if (im) drawImgAt(im, 0, 0, im.naturalWidth, im.naturalHeight, x + r*6, 1.5, -.42); }
+      if (r < .13) { const im = img('manhole'); if (im) drawImgAt(im, 0, 0, im.naturalWidth, im.naturalHeight, x + r*6, .95, 0.25); }
+      else if (r < .2) { const im = img('drain'); if (im) drawImgAt(im, 0, 0, im.naturalWidth, im.naturalHeight, x + r*6, 1.25, -.42); }
       /* pavement edge: kerb, and planters in town */
-      if (r > .55) { const im = img('kerb'); if (im) drawImgAt(im, 0, 0, im.naturalWidth, im.naturalHeight, x + 5, 11, -.62); }
+      if (r > .55) { const im = img('kerb'); if (im) drawImgAt(im, 0, 0, im.naturalWidth, im.naturalHeight, x + 5, 10, -.62); }
       if (/downtown|popular|corniche|modern|islamic/.test(th) && r > .82) {
-        const im = img('planter'); if (im) drawImgAt(im, 0, 0, im.naturalWidth, im.naturalHeight, x + 4, 7, -.66);
+        const im = img('planter'); if (im) drawImgAt(im, 0, 0, im.naturalWidth, im.naturalHeight, x + 4, 6, -.66);
       }
       /* desert and ring road: sand on the shoulder, guardrail where it is fast */
       if (/desert|openDesert|giza|sinai|windfarm|ring/.test(th) && r > .35) {
@@ -15106,20 +15110,20 @@ window.OGRA_BUILD = '2026-09-21e';
     const im = img('people'); if (!im) return;
     const W = G.world, put = (key, worldX, m, depth) => { const f = FIG[key]; drawImgAt(im, f[0], f[1], f[2], f[3], worldX, m, depth); };
     /* an officer on duty at the checkpoint */
-    if (G.cp && Math.abs(G.cp.x - G.car.x) < 300) put('officer', G.cp.x - 4.5, 1.8, -.5);
+    if (G.cp && Math.abs(G.cp.x - G.car.x) < 420) put('officer', G.cp.x - 4.5, 1.78, -.5);
     /* a mechanic at the workshop, a vendor and people waiting near the stops */
     for (const s of (W.shops || [])) {
-      if (Math.abs(s.x - RD.camL) > 260) continue;
-      if (s.t === 'mech') put('mechanic', s.x + 3, 1.5, -.6);
-      if (s.t === 'rest' || s.t === 'cafe') { put('sit1', s.x - 3, 1.35, -.66); put('sit2', s.x - 1.2, 1.3, -.66); }
-      if (s.t === 'shop' || s.t === 'gas') put('vendor', s.x + 2.5, 1.7, -.64);
+      if (Math.abs(s.x - RD.camL) > 420) continue;
+      if (s.t === 'mech') put('mechanic', s.x + 3, 1.15, -.6);
+      if (s.t === 'rest' || s.t === 'cafe') { put('sit1', s.x - 3, 1.18, -.66); put('sit2', s.x - 1.2, 1.14, -.66); }
+      if (s.t === 'shop' || s.t === 'gas') put('vendor', s.x + 2.5, 1.62, -.64);
     }
     for (const st of (W.stations || [])) {
-      if (Math.abs(st.x - RD.camL) > 260) continue;
+      if (Math.abs(st.x - RD.camL) > 420) continue;
       const r = hash(st.x);
-      if (r > .5) put('hailWoman', st.x - 1.6, 1.68, -.6);
-      if (r > .25) put('hailMan', st.x + 1.4, 1.74, -.6);
-      if (r < .4) put('walkBag', st.x + 3.2, 1.72, -.62);
+      if (r > .5) put('hailWoman', st.x - 1.6, 1.64, -.6);
+      if (r > .25) put('hailMan', st.x + 1.4, 1.76, -.6);
+      if (r < .4) put('walkBag', st.x + 3.2, 1.74, -.62);
     }
   }
 
