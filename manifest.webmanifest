@@ -1,0 +1,16 @@
+{
+ "name": "Ograaa | أجرة",
+ "short_name": "Ograaa",
+ "start_url": ".",
+ "display": "fullscreen",
+ "orientation": "landscape",
+ "background_color": "#081226",
+ "theme_color": "#081226",
+ "icons": [
+  {
+   "src": "assets/img/logo.webp",
+   "sizes": "512x512",
+   "type": "image/webp"
+  }
+ ]
+}

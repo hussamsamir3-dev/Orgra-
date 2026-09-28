@@ -1,9 +1,0 @@
-{
-  "name": "ogra",
-  "private": true,
-  "version": "1.0.0",
-  "description": "Ogra - Egyptian microbus simulator",
-  "dependencies": {
-    "@neondatabase/serverless": "^0.10.4"
-  }
-}
