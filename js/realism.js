@@ -242,11 +242,11 @@ function drawVehicle(car, opt){
  const ca = Math.cos(-car.a), sa = Math.sin(-car.a), mk = car.mirror ? -k : k;
  const P = (px, py) => { const u = (px - sw / 2) * mk, v = (py - shh / 2) * k; return [X + u * ca - v * sa, Y + u * sa + v * ca]; };
  // contact + directional shadow onto the road
- const gy = sy(terrH(car.x) + lift); ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.beginPath(); ctx.ellipse(X, gy + 1, car.L * .5 * PPM * sc, PPM * .14 * sc, 0, 0, 7); ctx.fill();
- if (opt.shadow !== false && S.set.gfx !== 'low' && G.tod !== 'night'){ const s = SUN(); ctx.save(); castShadow(src, X - (sw / 2) * mk, gy, sw * mk, shh * k, .5); ctx.restore(); }
+ if (opt.shadow !== false && S.set.gfx !== 'low') dirShadow(car, src, X, sy(terrH(car.x) + lift), sw, shh, mk, k); const gy = sy(terrH(car.x) + lift); contactShadow(car, lift, sc);
+ 
  if (car.glow){ const gr = ctx.createRadialGradient(X, gy, 0, X, gy, car.L * .6 * PPM); gr.addColorStop(0, car.glow + 'cc'); gr.addColorStop(1, car.glow + '00'); ctx.fillStyle = gr; ctx.beginPath(); ctx.ellipse(X, gy, car.L * .62 * PPM, PPM * .5, 0, 0, 7); ctx.fill(); }
  // player wheels (separate sprites, visible suspension travel)
- if (!baked) car.wh.forEach(w => { const r = w.r * PPM * sc, wx = X + (w.x - car.x) * PPM * sc, wy = Y - (w.y - car.y) * PPM * sc; ctx.save(); ctx.translate(wx, wy); if (w.flat) ctx.scale(1, .86); ctx.rotate(w.rot); const im = IMG['wh' + car.rim]; ctx.drawImage(im, -r * 1.04, -r * 1.04, r * 2.08, r * 2.08); ctx.restore(); });
+ if (!baked) car.wh.forEach(w => { const r = w.r * PPM * sc, wx = X + (w.x - car.x) * PPM * sc, wy = Y - (w.y - car.y) * PPM * sc; ctx.save(); ctx.translate(wx, wy); if (w.flat) ctx.scale(1, .86); ctx.rotate(w.rot); const im = IMG['wh' + car.rim], q = WQ(car.rim); ctx.drawImage(im, -r * q, -r * q, r * 2 * q, r * 2 * q); ctx.restore(); });
  ctx.save(); ctx.translate(X, Y); ctx.rotate(-car.a); ctx.scale(mk, k); if (opt.dim && S.set.gfx !== 'low') ctx.filter = 'brightness(.86) saturate(.85)';
  ctx.drawImage(src, -sw / 2, -shh / 2); ctx.filter = 'none';
  // baked-wheel sprites: rotate the wheel's own pixels exactly in place → perfect alignment
@@ -256,8 +256,9 @@ function drawVehicle(car, opt){
  // lights at their real positions on the artwork
  const M = META[car.spr], hl = M.hl, tl = M.tl; const lamp = (p, col, r) => { const [px, py] = P(p[0], p[1]), R = r * PPM * sc; const gr = ctx.createRadialGradient(px, py, 0, px, py, R); gr.addColorStop(0, col); gr.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(px, py, R, 0, 7); ctx.fill(); };
  const night = G.tod !== 'day', blink = Math.floor(G.time * 2.2) % 2 === 0;
- if (!car.brokenTL){ if (night) lamp(tl, 'rgba(255,30,30,.7)', .35); if (car.braking) lamp(tl, 'rgba(255,40,30,1)', .6); if (car.rev) lamp([tl[0] + (car.mirror ? -1 : 1) * 2, tl[1] - 8], 'rgba(255,255,255,.95)', .35); }
- if (!car.brokenHL){ if (car.headOn || night) lamp(hl, `rgba(${car.lightCol || '255,236,190'},1)`, car.headOn ? .7 : .45); else lamp(hl, 'rgba(255,255,255,.5)', .2); }
+ const dk = G.tod === 'night' ? 1 : G.tod === 'sunset' ? .6 : .3;
+ if (!car.brokenTL){ if (night) lamp(tl, 'rgba(255,30,30,.75)', .16 + .1 * dk); if (car.braking) lamp(tl, 'rgba(255,40,30,1)', .14 + .2 * dk); if (car.rev) lamp([tl[0] + (car.mirror ? -1 : 1) * 2, tl[1] - 8], 'rgba(255,255,255,.95)', .35); }
+ if (!car.brokenHL){ if (car.headOn || night) lamp(hl, `rgba(${car.lightCol || '255,236,190'},1)`, (car.headOn ? .13 : .1) + .22 * dk); else lamp(hl, 'rgba(255,255,255,.55)', .09); }
  if (blink && (car.ind === 1 || car.haz)){ lamp([hl[0] - 6, hl[1] + 10], 'rgba(255,165,0,1)', .45); lamp([tl[0] + 4, tl[1] + 10], 'rgba(255,165,0,1)', .42); }
  if (blink && (car.ind === -1 || car.haz)) lamp([tl[0] + 4, tl[1] - 8], 'rgba(255,165,0,.95)', .4);
  if (car.siren){ const on = Math.floor(G.time * 7) % 2; lamp([sw * (on ? .56 : .44), 6], on ? 'rgba(40,120,255,1)' : 'rgba(255,40,40,1)', 1.1); }
@@ -348,7 +349,7 @@ function updateAI(dt){
    if (a.stopT > 0){ a.stopT -= dt; v = 0; if (a.stopT <= 0 || a.x - car.x < 35){ a.stopT = 0; a.haz = false; } }
    if (G.honked && a.x > car.x && a.x - car.x < yieldD && !a.special){ a.laneTo = 1; a.passing = car; a.tgt = Math.max(a.tgt, lim); a.stopT = 0; a.haz = false; if (!a.saidHonk){ a.saidHonk = 1; say(pick(DLG.honkBack), a.x, a.y + a.yt + .8, '#fff'); } }
   }
-  if (a.lift >= .5){ for (const l of W.lights){ const line = l.x - 3.2, d = line - (a.x + a.L / 2); if (d > -.5 && d < 35 && lightState(l) !== 'g' && !(lightState(l) === 'y' && d < 6)) v = Math.min(v, Math.max(0, d * .45)); }
+  { for (const l of W.lights){ const line = l.x - 3.2, d = line - (a.x + a.L / 2); if (d > -.5 && d < 35 && lightState(l) !== 'g' && !(lightState(l) === 'y' && d < 6)) v = Math.min(v, Math.max(0, d * .45)); }
    let fl = null, fg = 1e9; for (const b of G.ai) if (b !== a && b.lift >= .5 && b.x > a.x){ const gg = b.x - b.L / 2 - (a.x + a.L / 2); if (gg < fg){ fg = gg; fl = b; } } if (fl) v = Math.min(v, Math.max(0, fl.vx + (fg - (3 + Math.abs(a.vx) * .9)) * .6)); }
   // merge back after passing
   if (a.laneTo === 1 && a.passing && a.dir > 0){ const p = a.passing; if (a.x - a.L / 2 > p.x + p.L / 2 + 8 && !G.ai.some(b => b !== a && b.lift < .5 && Math.abs(b.x - a.x) < a.L + 6)){ a.laneTo = 0; a.passing = null; } if (p.gone) a.passing = null; }
@@ -373,7 +374,7 @@ function eventsTick(dt){
  for (const e of W.ev || []){ const d = e.x - car.x;
   if (!e.warn && d < 120 && d > 0){ e.warn = 1; if (e.kind === 'works') toast((LANG === 'ar' ? 'أعمال طرق قدام — الحد ٤٠' : 'Roadworks ahead — limit 40'), 'gold'); if (e.kind === 'school') toast(LANG === 'ar' ? 'منطقة مدارس — هدّي ٤٠' : 'School zone — slow to 40', 'gold'); if (e.kind === 'breakdown') toast(LANG === 'ar' ? 'عربية عطلانة على جنب' : 'Broken-down car on the shoulder', 'gold'); }
   if (e.kind === 'wedding' && !e.done && d < 40 && d > -10){ e.done = 1; for (let k = 0; k < 3; k++){ const a = spawnAI(pick([1,2,14,18]), 1, car.x - 70 - k * 9, 1, {fast:true}); if (a){ a.wedding = true; a.haz = true; a.special = 'wed'; } } toast(LANG === 'ar' ? 'زفة فرح جاية! 🎉' : 'A wedding convoy is coming! 🎉', 'gold'); }
-  if (e.kind === 'patrol' && !e.done && d < 40 && d > -10){ e.done = 1; const a = spawnAI(pick([22,23,24,25]), 1, car.x - 80, 1, {siren:true, fast:true}); if (a){ a.special = 'pol'; a.pers.speedK = 1.1; } }
+  if (e.kind === 'patrol' && !e.done && d < 40 && d > -10){ e.done = 1; const emerg = Math.random() < .25; const a = spawnAI(pick([22,23,24,25]), 1, car.x - 80, 1, {siren:emerg, fast:emerg}); if (a){ a.special = emerg ? 'pol' : null; if (emerg) a.pers.speedK = 1.1; } }
   if (false){ e.kids = 1; G.pedX = {x:car.x + car.L / 2 + 22, k:0, d:0, t:pick([13,14,19,20]), h:1.3}; toast(t('ped'), 'bad'); }
  }
 }
@@ -395,10 +396,10 @@ function v2tick(dt, spd, full){
  const acc = (car.vx - (G._pv || 0)) / dt; G._pv = car.vx; const kmh = spd * 3.6, lim = curLimit(car.x);
  const bubble = key2 => { if (!pax || G.talkT > 0) return; G.talkT = rnd(6, 11); say(pick(DLG[key2]), car.x + car.L * .1, car.y + car.yt + .9); };
  if (acc < -6.5 && spd > 4) bubble('brake'); else if (kmh > lim + 12) bubble('fast'); else if (G.cabin > 29.5) bubble('hot'); else if (G.cabin < 18.5 && (G.fan || 0) >= 3) bubble('cold'); else if (G.fog > .6) bubble('fog');
- else if (G.radioOn && S.set.radio > .88) bubble('loud'); else if (G.talkT <= 0 && pax){ const r = Math.random(); if (G.radioOn && r < .45){ const gnr = STATIONS[S.radio.st].g; bubble(gnr); G.comfort = Math.min(100, G.comfort + (gnr === 'calm' ? 3 : 2)); } else if (G.ac && G.cabin < 25 && r < .7) bubble('niceAir'); else G.talkT = 4; }
+ else if (radioAudible() && S.set.radio > .88) bubble(STATIONS[S.radio.st].g === 'calm' ? 'calmLoud' : 'loud'); else if (G.talkT <= 0 && pax){ const r = Math.random(); if (radioAudible() && r < .45){ const gnr = STATIONS[S.radio.st].g; bubble(gnr); G.comfort = Math.min(100, G.comfort + (gnr === 'calm' ? 3 : 2)); } else if (G.ac && G.cabin < 25 && r < .7) bubble('niceAir'); else G.talkT = 4; }
  if (G.doorOpen && spd < .3){ G.idleStop = (G.idleStop || 0) + dt; if (G.idleStop > 14 && pax){ G.idleStop = 0; bubble('wait'); } } else G.idleStop = 0;
  // radio genre preference drives mood gently
- if (G.radioOn && pax){ const gnr = STATIONS[S.radio.st].g; G.comfort = Math.min(100, G.comfort + (gnr === 'calm' ? .12 : .06) * dt); }
+ if (radioAudible() && pax){ const gnr = STATIONS[S.radio.st].g; G.comfort = Math.min(100, G.comfort + (gnr === 'calm' ? .12 : .06) * dt); }
  // AI learns: tailgating the car ahead
  for (const a of G.ai) if (a.lift < .3 && a.x > car.x){ const gap = a.x - a.L / 2 - (car.x + car.L / 2); if (gap < 3 && spd > 6){ aiMem().tail += dt; } }
  if (G.fog > 0){ const el = $('#fatigue'); }

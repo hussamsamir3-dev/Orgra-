@@ -6,8 +6,11 @@
 /* ---------------- cabin mask covers the whole window (hides painted-in passengers) ---------------- */
 function cabinMask(V){ if (CABM[V.id]) return CABM[V.id]; const M = paintMask(V.spr), w = M.w, h = M.h, c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d'), d = x.createImageData(w, h), drv = (DRV[V.id] || .8) * w, lim = Math.round(h * .64);
  let minX = w, maxX = 0, top = h; const bots = [];
- for (let px = Math.ceil(w * .03); px < drv; px++){ let y0 = -1, y1 = -1; for (let py = 0; py < lim; py++) if (M.win[py * w + px]){ if (y0 < 0) y0 = py; y1 = py; }
-  if (y0 >= 0 && y1 - y0 > h * .06){ for (let py = y0; py <= y1; py++){ const p = (py * w + px) * 4; d.data[p + 3] = M.src[p + 3] > 150 ? 255 : 0; } minX = Math.min(minX, px); maxX = Math.max(maxX, px); top = Math.min(top, y0); bots.push(y1); } }
+ const Y0 = new Int16Array(w).fill(-1), Y1 = new Int16Array(w).fill(-1); for (let px = Math.ceil(w * .03); px < drv; px++) for (let py = 0; py < lim; py++) if (M.win[py * w + px]){ if (Y0[px] < 0) Y0[px] = py; Y1[px] = py; }
+ const ys = Array.from(Y1).filter(v => v > 0).sort((a, b) => a - b), base = ys.length ? ys[ys.length >> 1] : lim;
+ for (let px = Math.ceil(w * .03); px < drv; px++){ let y0 = Y0[px], y1 = Math.min(Y1[px], base + Math.round(h * .02));
+  let dk = 0; if (y0 >= 0) for (let py = y0; py <= y1; py++){ const q = (py * w + px) * 4, Lq = M.src[q] * .3 + M.src[q + 1] * .59 + M.src[q + 2] * .11; if (Lq < 34) dk++; }
+  const pillar = y0 >= 0 && dk / (y1 - y0 + 1) > .8; if (!pillar && y0 >= 0 && y1 - y0 > h * .06){ const e = Math.max(1, Math.round(h * .008)); y0 += e; y1 -= e; for (let py = y0; py <= y1; py++){ const p = (py * w + px) * 4; d.data[p + 3] = M.src[p + 3] > 150 ? 255 : 0; } minX = Math.min(minX, px); maxX = Math.max(maxX, px); top = Math.min(top, y0); bots.push(y1); } }
  x.putImageData(d, 0, 0); x.filter = 'blur(0.6px)'; x.drawImage(c, 0, 0); x.filter = 'none'; bots.sort((a, b) => a - b);
  return CABM[V.id] = {c, minX, maxX, sill:bots.length ? bots[bots.length >> 1] : h * .5, top, w, h}; }
 for (const k in CABM) delete CABM[k]; for (const k in CAB) delete CAB[k];

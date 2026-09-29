@@ -101,7 +101,7 @@ function drawKerbProps(){
  for (const c of W.cps){ if (c.x < x0 - 20 || c.x > x1 + 20) continue; const im = IMG.ai22, L = 4.5, h = L * im.height / im.width * PPM, w = L * PPM, X = sx(c.x + 11), Y = sy(terrH(c.x + 11) + 1.95);
   ctx.drawImage(im, X - w / 2, Y - h, w, h); const on = Math.floor(G.time * 6) % 2; const g = ctx.createRadialGradient(X, Y - h * .96, 0, X, Y - h * .96, PPM * 1.3); g.addColorStop(0, on ? 'rgba(60,130,255,.9)' : 'rgba(255,50,50,.9)'); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(X, Y - h * .96, PPM * 1.3, 0, 7); ctx.fill();
   // painted STOP line on the road before the officer
-  const lx = c.x - 7; ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.beginPath(); ctx.moveTo(sx(lx), sy(terrH(lx) + 1.4)); ctx.lineTo(sx(lx + .35), sy(terrH(lx + .35) + 1.4)); ctx.lineTo(sx(lx + .35), sy(terrH(lx + .35) - .2)); ctx.lineTo(sx(lx), sy(terrH(lx) - .2)); ctx.fill(); }
+  const lx = c.x - 4; ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.beginPath(); ctx.moveTo(sx(lx), sy(terrH(lx) + 1.4)); ctx.lineTo(sx(lx + .35), sy(terrH(lx + .35) + 1.4)); ctx.lineTo(sx(lx + .35), sy(terrH(lx + .35) - .2)); ctx.lineTo(sx(lx), sy(terrH(lx) - .2)); ctx.fill(); }
 }
 /* ---------------- animated, dynamic stop markers on the road ---------------- */
 function roadQuad(a, b, y0, y1){ ctx.beginPath(); for (let x = a; x <= b + .01; x += .5) ctx.lineTo(sx(x), sy(terrH(x) + y0)); for (let x = b; x >= a - .01; x -= .5) ctx.lineTo(sx(x), sy(terrH(x) + y1)); ctx.closePath(); }

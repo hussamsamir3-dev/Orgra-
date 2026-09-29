@@ -136,7 +136,7 @@ buildControls = function(){ _bc6();
  $('#ctrls').insertAdjacentHTML('beforeend', `<button class="cb" id="bTrunk" data-act6="trunk"><span class="pbi">🧳</span><span class="k">T</span><em>${L2('الشنطة', 'Storage')}</em></button>`);
  $('#hud').insertAdjacentHTML('beforeend', `<div class="pan" id="trunkP"></div><button id="svcBtn"></button><div id="busyBar"><span id="busyTxt"></span><i></i></div>`);
  document.body.insertAdjacentHTML('beforeend', `<div class="modal" id="svcM"><div class="mbox wide" id="svcBox"></div></div><div class="modal" id="setM"><div class="mbox wide" id="setBox"><div class="mbtns" style="justify-content:flex-end;margin:0"><button class="btn sm sec" id="setClose">✕</button></div></div></div>`);
- $$('[data-act6]').forEach(e => e.addEventListener('pointerdown', ev => { ev.preventDefault(); AU.init(); if (G.mode !== 'play') return; if (e.dataset.act6 === 'park') togglePark(); else { $$('.pan').forEach(p => p.id !== 'trunkP' && p.classList.remove('on')); $('#trunkP').classList.toggle('on'); renderTrunk(); } }));
+ $$('[data-act6]').forEach(e => e.addEventListener('pointerdown', ev => { ev.preventDefault(); ev.stopPropagation(); AU.init(); if (G.mode !== 'play') return; if (e.dataset.act6 === 'park') togglePark(); else { $$('.pan').forEach(p => p.id !== 'trunkP' && p.classList.remove('on')); $('#trunkP').classList.toggle('on'); renderTrunk(); } }));
  $('#svcBtn').onpointerdown = e => { e.preventDefault(); if (G.svcNear) openSvc(G.svcNear); };
  // settings from the pause menu
  $('#pauseM .mbtns').insertAdjacentHTML('afterbegin', `<button class="btn sec" id="pSet">⚙ ${t('settings')}</button>`);

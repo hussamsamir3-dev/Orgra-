@@ -174,7 +174,7 @@ function drawPreview(canvas, vid, cosOver){
  const gl = COS.glow.find(g => g.id === cos.glow); if (gl && gl.c){ const g = x.createRadialGradient(w / 2, h * .88, 0, w / 2, h * .88, bw * .6); g.addColorStop(0, gl.c + 'dd'); g.addColorStop(1, gl.c + '00'); x.fillStyle = g; x.fillRect(0, h * .6, w, h * .4); }
  x.fillStyle = 'rgba(0,0,0,.45)'; x.beginPath(); x.ellipse(w / 2, h * .88 + 2, bw * .48, bh * .06, 0, 0, 7); x.fill();
  const rim = (COS.rim.find(r => r.id === cos.rim) || {wh:V.rim}).wh, t0 = performance.now() / 1000;
- if (!V.baked) for (const [cx, cy, r] of M.wheels){ x.save(); x.translate(ox + cx * k, oy + cy * k); x.rotate(t0 * 1.5); const R = r * k * 1.04; x.drawImage(IMG['wh' + rim], -R, -R, R * 2, R * 2); x.restore(); }
+ if (!V.baked) for (const [cx, cy, r] of M.wheels){ x.save(); x.translate(ox + cx * k, oy + cy * k); x.rotate(t0 * 1.5); const R = r * k * WQ(rim); x.drawImage(IMG['wh' + rim], -R, -R, R * 2, R * 2); x.restore(); }
  x.drawImage(b, ox, oy, bw, bh);
  const demo = Array.from({length:Math.ceil(V.seats * .55)}, (_, i) => ({t:(i * 5 + 3) % META.peds.length, h:1.62 + (i % 3) * .07}));
  x.save(); x.translate(ox, oy); x.scale(k, k); try{ x.drawImage(cabinCanvas(V, cos, demo, true), 0, 0); drawAccessories(x, V, cos); }catch(e){} x.restore();

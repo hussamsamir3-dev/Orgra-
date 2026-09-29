@@ -21,8 +21,22 @@ js/streets.js           ← panoramas, building placement, tolls
 js/services.js          ← trunk storage, cafés, fuel stations, workshops
 js/premium.js           ← window passengers, fire & debris, fatigue, market, dev mode, anti-cheat
 js/polish.js            ← dynamic cabin, coloured service bays, calm sounds, LCD alignment
+js/career-fx.js         ← career mode, recorded sounds, lighting & light rays, particles, motion blur, g-force passengers
+js/career-scene.js      ← animated career screen: live vehicles with spinning wheels, Cairo backdrop, auto-zoom
+js/hud-layout.js        ← measured HUD layout (no overlaps on any screen), pedestrian scale fix
+js/audio-fix.js         ← robust sound loading, speed wind above 60 km/h
+js/wheels-windows.js    ← hub-centred full-tyre wheels at true scale, original window frames kept
+js/fuel-lights.js       ← fuel economy, walk-to-station rescue, drop-off stops, traffic-light countdowns
+js/cabin-rain-sky.js    ← window-cell passenger seating, wet-road spray, continuous skyline
+js/career-2.js          ← Career 2.0 (shift board, objectives, team rankings, journey), engine voices, menus
+js/police-horn.js       ← calm police patrols (sirens only on emergencies), instant horn
+js/doors-bubbles.js     ← correct door sounds, outline flash for drop-offs, attached non-repeating speech
+js/shadows.js           ← directional vehicle shadows (sun, street lamps, headlights) + tyre contact shadows
+js/traffic-variety.js   ← AI paint colours, tints & stripes; Alexandria corniche skyline; minivan window fit
+js/officer.js           ← traffic officer motion set driven by the checkpoint situation; boarding matches free seats
+js/damage.js            ← physical damage: crushed edges, folded creases, pushed-in panels, scuffs, glass, lamps, sagging bumpers
 assets/img/             ← optimised WebP sprites (vehicles, buildings, props, people, UI)
-assets/audio/           ← menu music
+assets/audio/           ← menu music, calm street ambience, rain on the roof, horns, sirens
 play-offline.html       ← single-file build for double-click offline play
 manifest.webmanifest    ← install as an app (PWA)
 ```

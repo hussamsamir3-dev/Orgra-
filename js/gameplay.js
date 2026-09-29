@@ -94,7 +94,7 @@ function update(dt){
   // cabin climate (A/C)
   acStep(dt);
   
-  if (G.radioOn && G.onboard.length){ const vol = S.set.radio; if (vol > .85) G.comfort -= .5 * dt; else G.comfort += (.25 + .08 * upl(G.vid, 'audio')) * dt; }
+  if (radioAudible() && G.onboard.length){ const vol = S.set.radio; if (vol > .85) G.comfort -= .5 * dt; else G.comfort += (.25 + .08 * upl(G.vid, 'audio')) * dt; }
   if (G.doorOpen && spd > 2){ G.comfort -= 4 * dt; if (!G.warned.door){ G.warned.door = 1; toast(t('doorDrive'), 'bad'); } } else G.warned.door = 0;
   G.comfort = clamp(G.comfort, 0, 100); if (G.onboard.length){ G.T.comfortSum += G.comfort * dt; G.T.comfortN += dt; }
   // engine temperature
@@ -109,7 +109,7 @@ function update(dt){
   if (G.engOn) burn += .00035 * dt * (G.V.lp100 / 12) * acFuel() * 1.2;
   G.fuel = Math.max(0, G.fuel - burn); G.T.fuelL += burn;
   if (G.fuel < G.fuelMax * .12 && !G.warned.fuel){ G.warned.fuel = 1; toast(t('fuelLow'), 'bad'); }
-  if (G.fuel <= 0 && spd < .4){ G.fuelOutT += dt; if (G.fuelOutT > 2) endRun('fuel'); }
+  if (G.fuel <= 0 && spd < .4 && !G.walkFuel && !G.fuelAsk){ G.fuelOutT += dt; if (G.fuelOutT > 1.2) fuelOutPrompt(); }
   if (car.roof && Math.cos(car.a) < .3) endRun('crash');
   if (Math.cos(car.a) < -.1){ G.upsideT += dt; if (G.upsideT > 1.2) endRun('crash'); } else G.upsideT = 0;
   if (!G.test && G.cond.body <= 0 && G.cond.engine <= 5) endRun('broke');
@@ -120,7 +120,7 @@ function update(dt){
  const ca = Math.cos(car.a), sa = Math.sin(car.a), ex = car.x - car.L / 2 * ca - (car.yb + .1) * sa, ey = car.y - car.L / 2 * sa + (car.yb + .1) * ca;
  if (G.engOn && Math.random() < (gas ? .9 : .25)) puff(ex, ey, -1 - Math.random(), .4 + Math.random() * .5, gas ? 1.1 : .7, gas ? .09 : .05, G.V.cls === 'micro' && gas ? '#2a2a2a' : '#8a8f96', 'smoke');
  for (const w of car.wh) if (w.ground && (w.slip > 1.6 || (spd > 6 && BIOME[W.route.biome].urban < .2 && Math.random() < .5))) puff(w.x - w.r * .5, w.y - w.r, -Math.random() * 2, Math.random() * 1.5, .9, .12, W.biome.ground, 'dust');
- if (G.weather === 'rain' && spd > 5) for (const w of car.wh) if (w.ground && Math.random() < .6) puff(w.x - w.r, w.y - w.r * .8, -spd * .15, 1 + Math.random(), .5, .05, '#c9d6e6', 'spark');
+
  if (full && G.cond.engine < 45 && Math.random() < (45 - G.cond.engine) / 60){ puff(car.x + car.L * .38 * ca - (car.yt - .4) * sa, car.y + car.L * .38 * sa + (car.yt - .4) * ca, rnd(-.5, .5), 1 + Math.random(), 1.4, .12, G.cond.engine < 20 ? '#1a1a1a' : '#9aa0a8', 'smoke'); }
  updParts(dt);
  // ambient pedestrians
@@ -165,10 +165,10 @@ function gameplay(dt, spd){
   const d = c.x - front;
   if (c.state === 'idle' && d < 60 && d > 0){ c.state = 'signal'; c.t = 0; toast(t('cpAhead'), 'bad'); AU.whistle(); }
   if (c.state === 'signal'){ c.t += dt; c.oFrame = Math.min(4, 2 + Math.floor(c.t * 3)); c.oFace = -1;
-   if (d < 7 && d > -3 && stopped){ c.state = 'check'; c.t = 0; G.cp = c; say(pick(DLG.officer.slice(0, G.belt ? 1 : 2)), c.ox, terrH(c.ox) + 3.1, '#ffd35a'); }
-   else if (d < -3){ c.state = 'done'; addFine('run', true); c.oFrame = 6; } }
-  else if (c.state === 'check'){ c.t += dt; c.oFrame = c.t < .5 ? 1 : 7; c.oFace = 1; c.ox = c.x - 1 + Math.min(1.5, c.t) * .6;
-   if (c.t > 1.8){ c.state = 'done'; G.cp = null; const fs = [];  if (G.tod === 'night' && !car.headOn) fs.push('lights'); if (G.doorOpen) fs.push('door'); if (!G.test && Date.now() - GV(G.vid).inspT > 14 * DAY) fs.push('insp'); if (!G.test && (S.lic.suspUntil > Date.now() || !hasLic(G.V.cls) || licExpired())) fs.push('lic'); if (!G.test && vlicExpired(G.vid)) fs.push('vlic');
+   if (d < 18 && d > 4 && stopped){ c.state = 'check'; c.t = 0; G.cp = c; c.plan = typeof cpPlan === 'function' ? cpPlan(c) : null; say(pick(DLG.officer.slice(0, G.belt ? 1 : 2)), c.ox, terrH(c.ox) + 3.1, '#ffd35a'); }
+   else if (d < 3){ c.state = 'done'; addFine('run', true); c.oFrame = 6; } }
+  else if (c.state === 'check'){ c.t += dt; c.oFrame = c.t < .5 ? 1 : 7; c.oFace = 1; 
+   if (c.t > (c.plan ? c.plan.dur : 1.8)){ c.state = 'done'; c.doneT = 0; G.cp = null; const fs = [];  if (G.tod === 'night' && !car.headOn) fs.push('lights'); if (G.doorOpen) fs.push('door'); if (!G.test && Date.now() - GV(G.vid).inspT > 14 * DAY) fs.push('insp'); if (!G.test && (S.lic.suspUntil > Date.now() || !hasLic(G.V.cls) || licExpired())) fs.push('lic'); if (!G.test && vlicExpired(G.vid)) fs.push('vlic');
     if (fs.length){ fs.forEach(k => addFine(k, false)); AU.whistle(); } else { toast(t('cpOk'), 'good'); G.T.pro++; } c.oFrame = 5; } }
   else if (c.state === 'done'){ if (d < -20) c.oFrame = 0; }
  }
@@ -193,7 +193,7 @@ function gameplay(dt, spd){
  // ----- random events -----
  G.evT -= dt; if (G.evT <= 0){ G.evT = 18 + Math.random() * 20; randomEvent(); }
  // ----- ambulance behind -----
- if (G.ambEv){ const a = G.ambEv.car; if (!a || a.gone){ G.ambEv = null; } else { const gap = car.x - car.L / 2 - (a.x + a.L / 2); if (gap < 18 && !G.ambEv.told){ G.ambEv.told = 1; toast(t('amb'), 'bad', null, 6); } if (G.ambEv.told){ G.ambEv.t += dt; if (spd < 1.2 && !G.ambEv.ok){ G.ambEv.ok = true; a.laneTo = 1; a.tgt = 19; toast(t('ambOk'), 'good'); G.T.pro += 2; S.xp += 20; } if (G.ambEv.t > 9 && !G.ambEv.ok && !G.ambEv.fined){ G.ambEv.fined = true; addFine('amb', true); a.laneTo = 1; } } } }
+ if (G.ambEv){ const a = G.ambEv.car; if (!a || a.gone){ G.ambEv = null; } else { const gap = car.x - car.L / 2 - (a.x + a.L / 2); if (gap < 18 && !G.ambEv.told){ G.ambEv.told = 1; toast(t('amb'), 'bad', null, 6); } if (G.ambEv.told){ G.ambEv.t += dt; if (spd < 1.2 && !G.ambEv.ok){ G.ambEv.ok = true; a.laneTo = 1; a.tgt = 19; toast(t('ambOk'), 'good'); G.T.pro += 2; S.xp += 20; } if (G.ambEv.t > 9 && !G.ambEv.ok && !G.ambEv.fined){ G.ambEv.fined = true; a.laneTo = 1; } } } }
 }
 function randomEvent(){
  const car = G.car, V = G.V, opts = [], nx = W.stops[G.nextIdx], far = nx && nx.x - car.x > 140;
@@ -202,7 +202,7 @@ function randomEvent(){
  if (W.biome.urban > .3 && !G.pedX) opts.push('ped', 'ped');
  if (!G.ambEv) opts.push('amb');
  if (G.onboard.length && !G.ac && G.cabin > 30) opts.push('hot');
- if (G.onboard.length && G.radioOn) opts.push(S.set.radio > .85 ? 'loud' : 'like');
+ if (G.onboard.length && radioAudible()) opts.push(S.set.radio > .85 ? 'loud' : STATIONS[S.radio.st].g === 'calm' ? 'calmR' : 'like');
  if (!opts.length) return; const e = pick(opts);
  if (e === 'side'){ G.side = {p:pick(G.onboard), t:10}; toast(t('sideStop'), 'gold', null, 5); }
  else if (e === 'change') toast(t('change'), '', [[t('giveChange'), () => { G.comfort = Math.min(100, G.comfort + 4); }], [t('askPax'), () => { G.comfort -= 3; }]], 6);
@@ -210,6 +210,7 @@ function randomEvent(){
  else if (e === 'amb'){ const spec = pick(AI_EMG); const a = spawnAI(spec, 0, car.x - car.L / 2 - 70, 1, {fast:true}); if (a){ a.siren = AIV[spec].siren; a.amb = true; a.special = 'amb'; G.ambEv = {car:a, t:0}; } }
  else if (e === 'hot') toast(t('hot'), 'gold');
  else if (e === 'loud') toast(t('loud'), 'gold');
+ else if (e === 'calmR'){ say(pick(DLG.calm), G.car.x, G.car.y + G.car.yt + .9); G.comfort = Math.min(100, G.comfort + 4); }
  else if (e === 'like'){ toast(t('likeRadio'), 'good'); G.comfort = Math.min(100, G.comfort + 5); }
 }
 function addFine(k, camera){
