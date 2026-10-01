@@ -899,7 +899,7 @@ function gameplay(dt, spd){
   if (!r.warn && r.x - car.x < 220 && r.x > car.x){ r.warn = 1; toast(t('radar') + ' — ' + t('limit') + ' ' + fmt(r.limit) + ' ' + t('kmh'), 'gold'); }
   if (!r.done && car.x > r.x){ r.done = true; if (spd * 3.6 > r.limit + 3){ r.flash = .25; addFine('radar', true); AU.noiseHit(.1, 6000, .3); } } }
  // ----- potholes → flat tyres -----
- for (const hx of W.holes){ if (G.holesHit.has(hx)) continue; for (const w of car.wh) if (Math.abs(w.x - hx) < .5 && spd > 8){ G.holesHit.add(hx); const p = .08 + (100 - (G.test ? 100 : GV(G.vid).cond.tyres)) / 400; if (Math.random() < p && !w.flat){ w.flat = true; w.r = w.r0 * .9; toast(t('flat'), 'bad'); AU.noiseHit(.6, 2500, .4, 0, 'highpass'); } } }
+ for (const hx of W.holes){ if (G.holesHit.has(hx)) continue; for (const w of car.wh) if (Math.abs(w.x - hx) < .5 && spd > 8){ G.holesHit.add(hx); const p = .02 + (100 - (G.test ? 100 : GV(G.vid).cond.tyres)) / 1400; if (Math.random() < p && !w.flat){ w.flat = true; w.r = w.r0 * .9; toast(t('flat'), 'bad'); AU.noiseHit(.6, 2500, .4, 0, 'highpass'); } } }
  // ----- pedestrian crossing -----
  if (G.pedX){ const p = G.pedX; p.k += dt / 5.5; p.d += dt * 1.2; if (p.k >= 1){ if (!p.bad){ toast(t('pedOk'), 'good'); G.T.pro++; say(pick(DLG.ped), p.x, terrH(p.x) + 2.4); } G.pedX = null; }
   else if (p.k > .25 && p.k < .85 && front > p.x - .6 && car.x - car.L / 2 < p.x && !p.bad){ p.bad = true; addFine('ped', false); G.comfort -= 15; p.k = .9; } }
@@ -1097,7 +1097,7 @@ const AMBI = {
   const set = (b, v, tc) => b.g.gain.setTargetAtTime(on ? v : 0, tt, tc || .6);
   set(n.city, .05 + urban * .12); set(n.crowd, nearStop ? .07 : urban * .02); set(n.wind, W.biome && W.biome.urban < .2 ? .05 + clamp(spd / 30, 0, 1) * .06 : .015); set(n.sea, water ? .09 : 0);
   n.sea.g.gain.setTargetAtTime(on && water ? .06 + .05 * Math.sin(c.currentTime * .4) : 0, tt, .3);
-  set(n.fan, G.fan ? G.fan * .018 : 0, .3); set(n.cabin, G.engOn ? .05 : 0);
+  set(n.fan, G.fan ? G.fan * .009 : 0, .3); set(n.cabin, G.engOn ? .05 : 0);
   if (!on) return; this.bird -= dt; this.horn -= dt;
   if (this.bird < 0){ this.bird = rnd(2, 7); if (!night && urban < .95 && G.weather !== 'rain'){ const f = rnd(2600, 4200); for (let k = 0; k < 3; k++) AU.tone(f + k * 180, .07, 'sine', .018, k * .09, rnd(-500, 400)); } else if (night) { for (let k = 0; k < 6; k++) AU.tone(4400, .03, 'sine', .012, k * .06); } }
   if (this.horn < 0){ this.horn = rnd(10, 25) / Math.max(.3, urban); if (urban > .3 && Math.random() < .5){ const f = rnd(330, 480); AU.tone(f, .2, 'sine', .005); AU.tone(f * 1.26, .2, 'sine', .004); } }
@@ -3704,6 +3704,102 @@ addDent = function(car, lx, ly, sev, glass){ if (!car.cv) return; const g = car.
  const ty = glass ? 2 : sev > 11 ? 3 : Math.random() < .35 ? 1 : 0, dd = [u, v, clamp(.025 + sev * .004, .025, .07), ty]; const list = [dd];
  const M = META[car.spr]; if (!glass && sev > 6 && M){ const near = (p, n) => p && Math.abs(p[0] / M.w - u) < .12 && Math.abs(p[1] / M.h - v) < .25; if (near(M.hl) && !car.brokenHL){ list.push([M.hl[0] / M.w, M.hl[1] / M.h, .03, 4]); car.brokenHL = true; } if (near(M.tl) && !car.brokenTL){ list.push([M.tl[0] / M.w, M.tl[1] / M.h, .025, 4]); car.brokenTL = true; } }
  drawDents(car.cv.getContext('2d'), list, w, h); if (car.dents){ car.dents.push(...list); if (car.dents.length > 45) car.dents.splice(0, car.dents.length - 45); } SILC.delete(car.cv); };
+
+/* ======================= fleet-fx.js ======================= */
+"use strict";
+/* =====================================================================
+   OGRAAA v23 — new fleet (6 premium player vehicles with real wheels,
+   19 real-model vans/minibuses/coaches as AI traffic and showroom cars),
+   soft long-travel bus suspension, heavier fuel use, quieter A/C,
+   fewer punctures, and hand-painted particle effects for punctures
+   and crashes (sparks, dust, smoke, steam, water, flying parts)
+   ===================================================================== */
+/* ---------------- vehicle catalogue ---------------- */
+const VT = id => VEHS.find(v => v.id === id);
+function addVeh(tpl, o){ if (VT(o.id)) return; const v = Object.assign({}, VT(tpl), o); VEHS.push(v); }
+// premium player vehicles (separate wheels, full cosmetics)
+addVeh('hiace', {id:'hiace2', spr:'pn0', rim:12, name:['تويوتا هايس الجيل الجديد','Toyota HiAce (New Gen)'], len:5.4, mass:2300, seats:14, price:34000, lvl:3, acc:3.5, vmax:36, lp100:11, store:130});
+addVeh('hiace', {id:'hiaceB', spr:'pn1', rim:13, name:['هايس كلاسيك الخط الأزرق','HiAce Classic Blue Line'], len:5.3, mass:2200, seats:14, price:15000, lvl:1, acc:3.1, vmax:32, lp100:12.5, store:110});
+addVeh('coaster', {id:'kinglong', spr:'pn2', rim:14, name:['كينج لونج ميني باص فضي','King Long Silver Minibus'], len:6.1, mass:3100, seats:18, stand:2, price:39000, lvl:3, acc:3.0, vmax:32, tank:80, lp100:14, store:160});
+addVeh('coaster', {id:'rosa', spr:'pn3', rim:15, name:['ميتسوبيشي روزا','Mitsubishi Rosa'], len:7.0, mass:4500, seats:26, stand:4, price:46000, lvl:4, acc:2.8, vmax:30, tank:100, lp100:17, store:240});
+addVeh('redbus', {id:'redbus2', spr:'pn4', rim:16, name:['أتوبيس المدينة الجديد','New City Bus'], len:10.8, mass:10200, seats:32, stand:34, price:72000, lvl:5, acc:2.35, vmax:26, tank:200, lp100:30, store:320});
+addVeh(VEHS.find(v => v.cls === 'coach').id, {id:'coachN', spr:'pn5', rim:17, name:['أتوبيس سفر أزرق فاخر','Navy Executive Coach'], len:12, mass:13500, seats:49, stand:0, price:210000, lvl:7, acc:2.1, vmax:33, tank:420, lp100:29, store:900});
+// real-model fleet from the reference sheet (baked wheels, paintable white bodies)
+const NV = [
+ ['suzuki','minivan','micro',['سوزوكي فان','Suzuki Van'],4.1,1300,7,9000,1,40,8],
+ ['fotonC2','minivan','micro',['فوتون C2','Foton C2'],4.6,1600,10,13000,1,50,9],
+ ['joyA4','minivan','micro',['جوي لونج A4','Joylong A4'],4.8,1800,11,15000,1,55,9.5],
+ ['joyA5','hiace','micro',['جوي لونج A5','Joylong A5'],5.3,2100,14,19000,2,65,11],
+ ['hiaceW','hiace','micro',['تويوتا هايس أبيض','Toyota HiAce (White)'],5.4,2250,14,24000,2,70,11.5],
+ ['kingWB','hiace','micro',['كينج لونج فان عريض','King Long Wide Body Van'],5.9,2600,16,30000,3,75,12.5],
+ ['gdx6532','coaster','micro',['جولدن دراجون XML6532','Golden Dragon XML6532'],6.0,3000,18,36000,3,80,14],
+ ['coasterW','coaster','micro',['تويوتا كوستر أبيض','Toyota Coaster (White)'],7.0,4300,26,44000,4,95,17],
+ ['fotonView','coaster','micro',['فوتون فيو C2','Foton View C2 Minibus'],6.0,3000,18,33000,3,80,14],
+ ['xmq6600','coaster','micro',['كينج لونج XMQ6600','King Long XMQ6600'],6.0,3200,19,38000,3,85,14.5],
+ ['joyA6','coaster','micro',['جوي لونج A6','Joylong A6'],6.0,3300,19,40000,4,85,14.5],
+ ['isuzuNPR','redbus','bus',['إيسوزو NPR أتوبيس','Isuzu NPR Bus'],7.6,5500,30,52000,4,120,19],
+ ['rosaW','coaster','micro',['ميتسوبيشي روزا أبيض','Mitsubishi Rosa (White)'],7.0,4500,26,45000,4,100,17],
+ ['higer6720','redbus','bus',['هايجر KLQ6720','Higer KLQ6720'],7.2,5800,29,55000,4,120,19],
+ ['zk6770','redbus','bus',['يوتونج ZK6770','Yutong ZK6770'],7.7,6200,31,60000,5,130,20],
+ ['xmq6127','coach','coach',['كينج لونج XMQ6127','King Long XMQ6127'],12,13000,53,190000,6,400,28],
+ ['gdx6125','coach','coach',['جولدن دراجون XML6125','Golden Dragon XML6125'],12,13200,51,195000,6,400,28],
+ ['zk6128','coach','coach',['يوتونج ZK6128','Yutong ZK6128'],12.2,13400,53,205000,7,420,28.5],
+ ['tourismo','coach','coach',['مرسيدس توريزمو','Mercedes-Benz Tourismo'],12.1,13800,49,260000,7,440,27]];
+NV.forEach(([id, tpl, cls, name, len, mass, seats, price, lvl, tank, lp], i) => { const T = tpl === 'coach' ? VEHS.find(v => v.cls === 'coach').id : tpl;
+ addVeh(T, {id, spr:'nv' + i, baked:true, rim:0, cls, name, len, mass, seats, stand:cls === 'bus' ? Math.round(seats * .8) : cls === 'micro' && len > 6.5 ? 4 : 0, price, lvl, tank, lp100:lp, store:Math.round(len * len * 3), rack:cls === 'micro', door:cls === 'bus' ? .35 : .12}); });
+// which lines each vehicle may run (minibuses serve both microbus and bus lines)
+for (const v of VEHS){ const mini = v.len >= 5.9 && v.len <= 7.8 && v.cls !== 'coach'; if (v.cls === 'micro' && !CLS_OK.micro.includes(v.id)) CLS_OK.micro.push(v.id); if ((v.cls === 'bus' || mini) && !CLS_OK.bus.includes(v.id)) CLS_OK.bus.push(v.id); if (v.cls === 'coach' && !CLS_OK.coach.includes(v.id)) CLS_OK.coach.push(v.id); if (v.cls === 'bus' && v.len < 8 && !CLS_OK.micro.includes(v.id)) CLS_OK.micro.push(v.id); }
+// their own wheels join the rim catalogue
+[['جنط هايس جديد','HiAce alloy'],['جنط كلاسيك','Classic steel'],['جنط كينج لونج','King Long steel'],['جنط روزا','Rosa hub-cap'],['جنط أتوبيس','City-bus steel'],['جنط مرسيدس','Coach alloy']].forEach((n, i) => { if (!COS.rim.find(r => r.wh === 12 + i)) COS.rim.push({id:'w' + (12 + i), wh:12 + i, p:500 + i * 120, n}); });
+// cabins, engines
+Object.assign(DRV, {hiace2:.7, hiaceB:.7, kinglong:.78, rosa:.8, redbus2:.87, coachN:.86});
+Object.assign(ENGP, {hiace2:ENGP.hiace, hiaceB:ENGP.hiace, kinglong:ENGP.coaster, rosa:ENGP.coaster, redbus2:ENGP.redbus, coachN:ENGP.coachB});
+NV.forEach(([id, tpl]) => { ENGP[id] = ENGP[tpl === 'coach' ? 'coachB' : tpl] || ENGP.hiace; });
+// AI traffic: the same real models drive around, in many colours
+NV.forEach(([id, tpl, cls, name, len, mass], i) => { const spec = AIV.length; AIV.push({spr:'nv' + i, len, v:cls === 'coach' ? [70, 95] : cls === 'bus' ? [45, 65] : [45, 80], mass}); AI_CIV.push(spec); if (typeof AIPAINTABLE !== 'undefined') AIPAINTABLE.add('nv' + i); });
+/* ---------------- buses: soft, slow, long-travel suspension ---------------- */
+function softSusp(c, len){ if (!c || len < 6.5) return; const n = c.wh.length, m = c.base; c.f = len > 9 ? .92 : 1.12; c.zeta = Math.min(c.zeta, .3); c.travel = Math.max(c.travel, len > 9 ? .24 : .21);
+ c.k = (m / n) * Math.pow(2 * Math.PI * c.f, 2); c.cd = 2 * c.zeta * Math.sqrt(c.k * m / n); c.kb = c.k * 12; }
+const _sr23 = startRoute;
+startRoute = function(route, opt){ _sr23(route, opt); if (G.car && G.V) softSusp(G.car, G.V.len); };
+const _sp23 = spawnAI;
+spawnAI = function(spec, lane, x, dir, opt){ const c = _sp23(spec, lane, x, dir, opt); if (c && AIV[spec]) softSusp(c, AIV[spec].len); return c; };
+/* ---------------- fuel: twice the previous consumption ---------------- */
+function fuelFactor(){ const V = G.V, r = G.route; if (!V || !r) return 1; const perTrip = V.lp100 / 100 * r.km; return clamp((V.tank / 1.25) / Math.max(.1, perTrip), 1, 64); }
+/* ---------------- painted particle effects ---------------- */
+const FX = [], SCORCH = [];
+function spawnFX(kind, x, y, size, o){ o = o || {}; if (FX.length > 40) FX.shift(); FX.push({kind, x, y, size, t:0, dur:o.dur || .9, vx:o.vx || 0, vy:o.vy || 0, flip:Math.random() < .5, alpha:o.alpha ?? 1, ground:!!o.ground, add:kind === 'spark'}); }
+function updFX(dt){ for (let i = FX.length - 1; i >= 0; i--){ const f = FX[i]; f.t += dt; f.x += f.vx * dt; f.y += f.vy * dt; if (f.t >= f.dur) FX.splice(i, 1); } }
+function drawFX(){ for (const f of FX){ const k = Math.min(5, Math.floor(f.t / f.dur * 6)), im = IMG['fx_' + f.kind + k]; if (!im || !im.width) continue; const w = f.size * PPM, h = w * im.height / im.width, X = sx(f.x), Y = sy(f.y);
+  if (X < -w || X > VW + w) continue; const fade = f.t / f.dur > .75 ? 1 - (f.t / f.dur - .75) / .25 : 1; ctx.save(); ctx.globalAlpha = f.alpha * fade; if (f.add) ctx.globalCompositeOperation = 'lighter'; ctx.translate(X, Y); if (f.flip) ctx.scale(-1, 1); ctx.drawImage(im, -w / 2, f.ground ? -h : -h / 2, w, h); ctx.restore(); } }
+function drawScorch(){ const [x0, x1] = viewX(), im = IMG.deb_scorch; if (!im) return; for (const s of SCORCH){ if (s.x < x0 - 5 || s.x > x1 + 5) continue; const w = s.w * PPM, h = w * im.height / im.width * .35; ctx.save(); ctx.globalAlpha = .55; ctx.translate(sx(s.x), sy(terrH(s.x) + s.y)); ctx.drawImage(im, -w / 2, -h / 2, w, h); ctx.restore(); } }
+function throwPart(key, x, y, vx, vy, sizeM){ const im = IMG[key]; if (!im || !im.width || DEBRIS.length > 40) return; DEBRIS.push({c:im, x, y, vx, vy, a:0, w:(Math.random() - .5) * 10, s:sizeM / im.width, life:28}); }
+/* crashes: sparks at the contact point, dust where it touches the road, flying parts that match what was hit */
+const _ad23 = addDent;
+addDent = function(car, lx, ly, sev, glass){ _ad23(car, lx, ly, sev, glass); if (G.mode !== 'play' || !car || sev < 5) return;
+ const ca = Math.cos(car.a), sa = Math.sin(car.a), wx = car.x + lx * ca - ly * sa, wy = car.y + lx * sa + ly * ca, front = lx > car.L * .35, rear = lx < -car.L * .35, dir = Math.sign(lx) || 1, s = clamp(sev / 12, .4, 1.6);
+ spawnFX('spark', wx, wy, 1.1 * s, {dur:.55});
+ if (wy - terrH(wx) < 1.2) spawnFX('dust', wx, terrH(wx) + .05, 1.6 * s, {ground:true, dur:1.1, alpha:.8});
+ if (glass) throwPart('deb_glass', wx, wy, car.vx * .5 + dir * 1.5, 2.5, .45);
+ else if ((front || rear) && sev > 10){ throwPart(Math.random() < .55 ? 'deb_bumper' : 'deb_plate', wx, wy - .2, car.vx * .5 + dir * 2.5, 3, Math.random() < .55 ? 1.3 : .5); if (Math.random() < .5) SCORCH.push({x:wx, y:-.1 + Math.random() * .6, w:2.6}); }
+ else if (sev > 9) throwPart(ly > (car.yt - car.yb) * .2 ? 'deb_mirror' : 'deb_panel', wx, wy, car.vx * .5 + dir * 2, 3.2, ly > 0 ? .4 : .7);
+ if (sev > 11 && car === G.car) spawnFX('smoke', wx - dir * .3, wy + .4, 2.2 * s, {dur:1.6, vy:.4, alpha:.85}); };
+/* punctures: far rarer, and when it happens — a burst of dust and rubber smoke at the tyre */
+function onPuncture(w){ spawnFX('dust', w.x, terrH(w.x) + .02, 1.4, {ground:true, dur:1, alpha:.9}); spawnFX('smoke', w.x - .2, terrH(w.x) + w.r, 1.1, {dur:1.3, vy:.5, alpha:.55}); throwPart('deb_scorch', w.x, terrH(w.x) + .1, -1.5, 1.2, .4); }
+/* engine distress & puddles */
+let fxT = 0; const splashed = new Set();
+const _upd23 = update;
+update = function(dt){ const flats0 = G.car ? G.car.wh.map(w => !!w.flat) : []; _upd23(dt); if (G.mode !== 'play') return; const car = G.car; updFX(dt);
+ car.wh.forEach((w, i) => { if (w.flat && !flats0[i]) onPuncture(w); });
+ fxT -= dt; if (fxT <= 0){ fxT = .45; const [ex, ey] = engineBay(); if (G.fire > 0) spawnFX('smoke', ex, ey + 1, 2.4, {dur:1.8, vy:.8, alpha:.9}); else if (!G.test && GV(G.vid).cond.engine < 22) spawnFX('smoke', ex, ey + .6, 1.4, {dur:1.6, vy:.5, alpha:.5}); else if (G.temp > 106) spawnFX('steam', ex, ey + .7, 1.6, {dur:1.5, vy:.5, alpha:.7}); }
+ if (G.weather === 'rain' && speedOf(car) > 3) for (const w of car.wh){ const cell = Math.floor(w.x / 17), px = cell * 17 + hash(cell) * 8, key = cell + ':' + Math.round(w.x0 || 0); if (Math.abs(w.x - px) < 1.4 && !splashed.has(cell + '|' + car.wh.indexOf(w))){ splashed.add(cell + '|' + car.wh.indexOf(w)); spawnFX('splash', w.x, terrH(w.x) + .02, 1.2 + speedOf(car) * .05, {ground:true, dur:.8, alpha:.85}); } }
+ if (splashed.size > 400) splashed.clear(); };
+const _dp23 = drawParts;
+drawParts = function(){ _dp23(); try{ drawFX(); }catch(e){ reportErr('fx23', e); } };
+const _dw23 = drawWorld;
+drawWorld = function(){ _dw23(); drawScorch(); };
+const _sr23b = startRoute;
+startRoute = function(r, o){ _sr23b(r, o); FX.length = 0; SCORCH.length = 0; splashed.clear(); };
 
 /* ======================= atlas-loader.js ======================= */
 /* =====================================================================
