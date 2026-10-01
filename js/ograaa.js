@@ -4434,7 +4434,7 @@ update = function(dt){ const car = G.car, play = G.mode === 'play' && car;
  if (play && G.fuel > lastFuel30 + .5 && lastFuel30 <= 1) clearFuelOut();
  _upd36(dt); if (!play || dt <= 0) return; lastFuel30 = G.fuel;
  const sp = speedOf(car), hard = (key.brake || G.brkT) && sp > 2.5 && !G.paused && car.wh.some(w => w.ground);
- LOCK.held = hard ? 1 : 0; LOCK.on = hard; SQ.held = hard ? 1.5 : 0;   // lock and squeal start the instant you brake hard
+ G._bh = hard ? (G._bh || 0) + dt : 0; const go = G._bh >= .4; LOCK.held = go ? 1 : 0; LOCK.on = go; SQ.held = go ? 1.5 : 0;   // squeal & lock 0.4 s after you start braking hard
  if (!LOCK.on) for (const w of car.wh) w.rotLock = null;
  // AI damage emitters (smoke & sparks on the AI vehicle that got hit)
  for (const a of G.ai){ if (!a.em || Math.abs(a.x - car.x) > 70) continue; const ca = Math.cos(a.a), sa = Math.sin(a.a); for (const e of a.em){ e.t += dt; const wx = a.x + e.lx * ca - e.ly * sa, wy = a.y + (a.lift || 0) + e.lx * sa + e.ly * ca, dens = Math.max(.1, 1 - e.t / 30); if (Math.random() < dt * 10 * dens) puff(wx, wy, -a.vx * .3 + rnd(-.3, .3), .5 + rnd(0, .4), 1.4, .14, e.t < 5 ? '#2e2e2e' : '#606060', 'smoke'); if (Math.abs(a.vx) > 1.5 && Math.random() < dt * 6 * dens) puff(wx, wy, -a.vx * .4 + rnd(-1.5, 1.5), rnd(.5, 2.5), .3, .03, '#FFD24A', 'spark'); } } };
