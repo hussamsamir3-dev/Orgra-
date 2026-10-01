@@ -4248,6 +4248,102 @@ Object.assign(TX, {c_rad:['الردياتير','Radiator'], c_gbx:['الفتيس
 const _ff31 = fuelFactor;
 fuelFactor = function(){ return _ff31() * 1.5; };
 
+/* ======================= squeal-dirt.js ======================= */
+"use strict";
+/* =====================================================================
+   OGRAAA v32 — real tyre squeal (tonal stick-slip, not hiss) after
+   1.5 s of hard braking · vehicles get dirty with distance, weather &
+   roads; wash at garages, fuel stations and workshops
+   ===================================================================== */
+/* ---------------- tyre squeal ---------------- */
+const SQ = {n:null, held:0, pv:0};
+function squealInit(){ const c = AU.ctx; if (!c || SQ.n) return; const out = c.createGain(); out.gain.value = 0;
+ // two slightly detuned tonal partials + a harmonic: the classic rubber "eeeee"
+ const mk = (type, f) => { const o = c.createOscillator(); o.type = type; o.frequency.value = f; o.start(); return o; };
+ const o1 = mk('triangle', 920), o2 = mk('triangle', 934), o3 = mk('sine', 1840);
+ const g3 = c.createGain(); g3.gain.value = .35; o3.connect(g3);
+ // stick-slip chatter: fast amplitude flutter + slow pitch wander
+ const am = c.createGain(); am.gain.value = .7; const fl = mk('sine', 38), flg = c.createGain(); flg.gain.value = .3; fl.connect(flg).connect(am.gain);
+ const wob = mk('sine', 2.3), wobg = c.createGain(); wobg.gain.value = 18; wob.connect(wobg); wobg.connect(o1.frequency); wobg.connect(o2.frequency);
+ const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1100; bp.Q.value = 1.2; const hs = c.createBiquadFilter(); hs.type = 'highshelf'; hs.frequency.value = 2500; hs.gain.value = -6;
+ o1.connect(am); o2.connect(am); g3.connect(am); am.connect(bp).connect(hs).connect(out).connect(AU.sfxG);
+ // a little road roar under it
+ const len = c.sampleRate, b = c.createBuffer(1, len, c.sampleRate), d = b.getChannelData(0); for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1; const ns = c.createBufferSource(); ns.buffer = b; ns.loop = true; const nlp = c.createBiquadFilter(); nlp.type = 'lowpass'; nlp.frequency.value = 500; const ng = c.createGain(); ng.gain.value = 0; ns.connect(nlp).connect(ng).connect(AU.sfxG); ns.start();
+ SQ.n = {out, o1, o2, o3, fl, ng}; }
+function brakeScreech(dt){ const c = AU.ctx, car = G.car; if (!c || !car) return; squealInit(); if (!SQ.n) return; const sp = speedOf(car), braking = !!(key.brake || G.brkT) && !G.paused && G.mode === 'play';
+ SQ.held = braking && sp > 3 ? SQ.held + dt : 0; const decel = (SQ.pv - car.vx) / Math.max(dt, .001) * Math.sign(car.vx || 1); SQ.pv = car.vx;
+ let k = 0; if (SQ.held > 1.5 && car.wh.some(w => w.ground)) k = clamp((decel - 2.5) / 5, .25, 1) * clamp((sp - 3) / 10, 0, 1) * Math.min(1, (SQ.held - 1.5) / .25);
+ const t = c.currentTime, n = SQ.n, base = 760 + sp * 14 + (G.V && G.V.cls !== 'micro' ? -140 : 0);
+ n.o1.frequency.setTargetAtTime(base, t, .08); n.o2.frequency.setTargetAtTime(base * 1.016, t, .08); n.o3.frequency.setTargetAtTime(base * 2.01, t, .08); n.fl.frequency.setTargetAtTime(30 + sp * .9, t, .1);
+ n.out.gain.setTargetAtTime(k * .085, t, k > n.out.gain.value ? .05 : .12); n.ng.gain.setTargetAtTime(k * .05, t, .1); }
+/* ---------------- dirt: accumulates with distance, worse on dusty roads and in rain ---------------- */
+const DIRT = {};
+function dirtTex(spr){ if (DIRT[spr]) return DIRT[spr]; const im = IMG[spr], M = META[spr]; if (!im || !im.width) return null; const w = im.width, h = im.height, c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d'), r = mulberry(spr.length * 97 + w);
+ // light dust film over everything
+ x.fillStyle = 'rgba(150,128,96,.16)'; x.fillRect(0, 0, w, h);
+ // heavier grime toward the bottom
+ const g = x.createLinearGradient(0, h * .45, 0, h); g.addColorStop(0, 'rgba(118,96,66,0)'); g.addColorStop(.6, 'rgba(110,88,60,.35)'); g.addColorStop(1, 'rgba(84,66,44,.6)'); x.fillStyle = g; x.fillRect(0, h * .45, w, h * .55);
+ // mud spray fanning back from each wheel
+ for (const [cx, cy, wr] of (M.wheels || [])){ for (let i = 0; i < 160; i++){ const a = Math.PI * (.55 + r() * .75), d = wr * (1.05 + r() * 1.9), px = cx + Math.cos(a) * d * 1.25 - wr * .2, py = cy + Math.sin(a) * d * .55 - wr * .1; x.fillStyle = `rgba(${90 + r() * 30 | 0},${70 + r() * 20 | 0},${46 + r() * 14 | 0},${.12 + r() * .3})`; x.beginPath(); x.ellipse(px, py, 1 + r() * wr * .1, .8 + r() * wr * .06, r() * 3, 0, 7); x.fill(); } }
+ // rain streaks running down from the window line
+ for (let i = 0; i < w / 6; i++){ const px = r() * w, y0 = h * (.32 + r() * .2), len = h * (.08 + r() * .25); const sg = x.createLinearGradient(0, y0, 0, y0 + len); sg.addColorStop(0, 'rgba(100,82,58,.25)'); sg.addColorStop(1, 'rgba(100,82,58,0)'); x.fillStyle = sg; x.fillRect(px, y0, 1 + r() * 1.5, len); }
+ // speckle
+ for (let i = 0; i < w * h / 90; i++){ x.fillStyle = `rgba(80,62,42,${r() * .25})`; x.fillRect(r() * w, h * (.3 + r() * .7), 1, 1); }
+ x.globalCompositeOperation = 'destination-in'; x.drawImage(im, 0, 0); return DIRT[spr] = c; }
+const dirtOf = vid => 1 - ((GV(vid).cond.clean ?? 100) / 100);
+/* the old flat tint is replaced by the textured layer */
+const _bpc32 = buildPlayerCanvas;
+buildPlayerCanvas = function(vid, cos, cond, dents){ const c = _bpc32(vid, cos, Object.assign({}, cond, {clean:100}), dents); const dt = dirtTex(VBY(vid).spr), d = 1 - ((cond && cond.clean != null ? cond.clean : 100) / 100); if (dt && d > .03){ const x = c.getContext('2d'); x.save(); x.globalAlpha = Math.min(1, d * 1.15); x.drawImage(dt, 0, 0); x.restore(); } return c; };
+for (const k in PREV) delete PREV[k];
+/* in game the layer is drawn live so the vehicle visibly gets dirtier during the trip */
+const _dv32 = drawVehicle;
+drawVehicle = function(car, opt){ _dv32(car, opt); if (!car.player || !G.V || G.test) return; const d = dirtOf(G.vid) - (G.dirt0 ?? dirtOf(G.vid)); if (d <= .01) return; const tex = dirtTex(car.spr); if (!tex) return; const src = car.cv || IMG[car.spr], k = PPM * car.g.s;
+ ctx.save(); ctx.translate(sx(car.x), sy(car.y)); ctx.rotate(-car.a); ctx.scale(car.mirror ? -k : k, k); ctx.translate(-src.width / 2, -src.height / 2); ctx.globalAlpha = Math.min(1, d * 1.15); ctx.drawImage(tex, 0, 0); ctx.restore(); };
+const _sr32 = startRoute;
+startRoute = function(r, o){ _sr32(r, o); G.dirt0 = G.test ? 0 : dirtOf(G.vid); G._dx = G.car ? G.car.x : 0; SQ.held = 0; };
+const _upd32 = update;
+update = function(dt){ _upd32(dt); if (G.mode !== 'play' || G.test || !G.car) return; const dx = Math.abs(G.car.x - (G._dx ?? G.car.x)); G._dx = G.car.x; if (dx <= 0 || dx > 50) return; const b = W.route.biome, dusty = ['desert','sinai','redsea','upper'].includes(b) ? 2 : 1, wet = G.weather === 'rain' ? 2.5 : G.weather === 'sand' ? 3 : 1, c = GV(G.vid).cond;
+ c.clean = Math.max(0, (c.clean ?? 100) - dx * .002 * dusty * wet);
+ // passengers don't love a filthy bus
+ if (c.clean < 35 && G.onboard.length) G.comfort = Math.max(0, G.comfort - dt * .03); };
+/* ---------------- washing ---------------- */
+const _svc32 = svcOptions;
+svcOptions = function(type){ const o = _svc32(type); if (G.test || (type !== 'fuel' && type !== 'shop')) return o; const c = GV(G.vid).cond, V = G.V, price = Math.round(25 + V.len * 9);
+ const wash = {ic:'🧽', n:['غسيل العربية','Car wash'], p:price, t:5, dis:(c.clean ?? 100) > 96, fx:() => { c.clean = 100; G.dirt0 = 0; for (const k in PREV) delete PREV[k]; const car = G.car; try{ car.cv = buildPlayerCanvas(G.vid, GV(G.vid).cos, GV(G.vid).cond, GV(G.vid).dents); SILC.delete(car.cv); }catch(e){} toastUI('🧽 ' + L2('العربية بقت تلمع', 'Squeaky clean!'), 'good'); }};
+ o.splice(type === 'fuel' ? 3 : 0, 0, wash); return o; };
+
+/* ======================= brake-lock.js ======================= */
+"use strict";
+/* =====================================================================
+   OGRAAA v33 — hard braking past 1.5 s: wheels lock (no ABS) or pulse
+   (ABS), tyre smoke, dust and skid marks on the road
+   ===================================================================== */
+const OLD_NO_ABS = new Set(['fiat128','hiaceB','hiace','coaster','minivan','suzuki','fotonC2']);
+function hasABS(){ if (!G.V) return false; return !OLD_NO_ABS.has(G.V.id) || (!G.test && upl(G.vid, 'brakes') >= 1); }
+let LOCK = {on:false, t:0, abs:false};
+const _ps33 = physStep;
+physStep = function(c, h, ctl){ _ps33(c, h, ctl); if (c !== G.car || !LOCK.on) return;
+ // without ABS the wheels stay locked; with ABS they are released ~14×/s so they keep turning in short bursts
+ const locked = !LOCK.abs || (LOCK.t % .07) < .042; if (locked) for (const w of c.wh) if (w.ground) w.om = 0; };
+const SKID = [];
+const _upd33 = update;
+update = function(dt){ _upd33(dt); const car = G.car; if (G.mode !== 'play' || !car || dt <= 0) return; const sp = speedOf(car);
+ LOCK.held = (key.brake || G.brkT) && sp > 2.5 && !G.paused ? (LOCK.held || 0) + dt : 0; LOCK.abs = hasABS(); LOCK.on = LOCK.held > 1.5; if (LOCK.on){ LOCK.t += dt; if (LOCK.abs) car.absT = .2; } else LOCK.t = 0;
+ if (!LOCK.on) return; const k = clamp(sp / 18, .25, 1), dir = Math.sign(car.vx) || 1, smokeK = LOCK.abs ? .45 : 1;
+ for (const w of car.wh){ if (!w.ground) continue; const gx = w.x, gy = terrH(gx);
+  if (Math.random() < dt * 30 * k * smokeK) puff(gx - dir * w.r * .4, gy + .08, -car.vx * .25 + rnd(-.4, .4), .3 + rnd(0, .5), 1.2 + rnd(0, .8), .1 + .07 * k, Math.random() < .5 ? '#d9dcdf' : '#c6c9cc', 'smoke');
+  if (Math.random() < dt * 4 * k * smokeK) spawnFX('dust', gx - dir * w.r * .8, gy + .02, .9 + k * .9, {ground:true, dur:.9, alpha:.7, vx:-car.vx * .15});
+  // skid marks (broken into dashes with ABS)
+  const last = SKID[SKID.length - 1]; if (!LOCK.abs || (LOCK.t % .07) < .042){ if (last && last.w === w && Math.abs(last.x1 - gx) < 1.5) last.x1 = gx; else SKID.push({w, x0:gx, x1:gx, y:gy, a:.5 * k}); } }
+ if (SKID.length > 120) SKID.splice(0, SKID.length - 120); };
+const _dw33 = drawWorld;
+drawWorld = function(){ _dw33(); const [x0, x1] = viewX(); ctx.save(); ctx.lineCap = 'round'; for (const s of SKID){ if (s.x1 < x0 - 2 || s.x0 > x1 + 2) continue; ctx.strokeStyle = `rgba(18,18,20,${s.a})`; ctx.lineWidth = Math.max(2, PPM * .1); ctx.beginPath(); ctx.moveTo(sx(Math.min(s.x0, s.x1)), sy(terrH(s.x0)) + 1); ctx.lineTo(sx(Math.max(s.x0, s.x1)), sy(terrH(s.x1)) + 1); ctx.stroke(); } ctx.restore(); };
+const _sr33 = startRoute;
+startRoute = function(r, o){ _sr33(r, o); SKID.length = 0; LOCK = {on:false, t:0, abs:false}; };
+/* squeal: harsher when locked, pulsing with ABS */
+const _bs33 = brakeScreech;
+brakeScreech = function(dt){ _bs33(dt); if (!SQ.n || !AU.ctx || !LOCK.on) return; const t = AU.ctx.currentTime, g = SQ.n.out.gain; if (LOCK.abs){ g.setTargetAtTime((LOCK.t % .07) < .042 ? .07 : .015, t, .008); } else g.setTargetAtTime(.1, t, .04); };
+
 /* ======================= atlas-loader.js ======================= */
 /* =====================================================================
    Ograaa — atlas loader: loads a handful of texture atlases and one audio
