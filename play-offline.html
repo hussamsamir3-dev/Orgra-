@@ -465,7 +465,7 @@ const BIOME = {
  sinai:{amp:2.6, big:12, bumps:.1, urban:0, layers:'sinai', ground:'#b5764a', temp:36},
  upper:{amp:1.5, big:4, bumps:.3, urban:.2, layers:'upper', ground:'#a88b5a', temp:40}
 };
-const DIESEL = 20.5;               // EGP per litre (in-game, adjustable)
+const DIESEL = 2;                  // EGP per litre (in-game, adjustable)
 const TERMINAL_FEE = {micro:15, bus:30, coach:120};
 const FINE = {belt:100, lights:300, door:200, over:500, insp:500, lic:1000, red:1000, radar:500, run:2000, amb:1000, crash:400, ped:500};
 const PTS = {red:2, radar:1, run:4, amb:2, crash:1, ped:1, lic:0, belt:0, lights:1, door:0, over:1, insp:0};
@@ -1147,7 +1147,7 @@ function update(dt){
   if (G.fuel <= 0 && spd < .4 && !G.walkFuel && !G.fuelAsk){ G.fuelOutT += dt; if (G.fuelOutT > 1.2) fuelOutPrompt(); }
   if (car.roof && Math.cos(car.a) < .3) endRun('crash');
   if (Math.cos(car.a) < -.1){ G.upsideT += dt; if (G.upsideT > 1.2) endRun('crash'); } else G.upsideT = 0;
-  if (!G.test && G.cond.body <= 0 && G.cond.engine <= 5) endRun('broke');
+  if (!G.test && G.cond.body <= 0 && G.cond.engine <= 5) towOffer();
   gameplay(dt, spd);
   if (G.crank > 0){ G.crank -= dt; if (G.crank <= 0){ G.engOn = true; $('#startBtn').classList.remove('on'); } }
  }
@@ -1908,7 +1908,7 @@ function renderGarage(){
  $$('[data-it]').forEach(b => b.onclick = () => { const id = b.dataset.it, pr = +b.dataset.pr; if (GCAT === 'horn'){ AU.init(); AU.horn(id, V.cls !== 'micro'); } if (pr > 0){ GPREV = {v:GV_ID, cat:GCAT, id, pr}; renderGarage(); return; } GPREV = null; g.cos[GCAT] = id; save(); renderGarage(); });
  const pb = $('#pBuy'); if (pb) pb.onclick = () => { const it = COS[GCAT].find(x => x.id === GPREV.id); if (!spend(GPREV.pr, nm(V.name) + ' · ' + nm(it.n), COS_ICON[GCAT])) return; S.inv[GV_ID + ':' + GCAT + ':' + GPREV.id] = 1; g.cos[GCAT] = GPREV.id; GPREV = null; toastUI(t('bought'), 'good'); checkBadges(); save(); renderGarage(); }; const pc = $('#pCancel'); if (pc) pc.onclick = () => { GPREV = null; renderGarage(); };
  $$('[data-up]').forEach(b => b.onclick = () => { const k = b.dataset.up, l = g.up[k] || 0; if (!spend(upCost(V, k, l), t('up_' + k) + ' ' + (l + 1), UP_ICON[k])) return; g.up[k] = l + 1; AU.levelUp(); save(); renderGarage(); });
- const fix = k => { const c = repairCost(V, k, g); if (c <= 0) return true; if (!spend(c, t('fix_' + k), 'repair')) return false; if (k === 'fuel') g.fuel = V.tank * (1 + .2 * (g.up.tank || 0)); else g.cond[k] = 100; if (k === 'body') g.dents = []; return true; };
+ const fix = k => { if (k === 'body' && g.cond.body >= 99.5){ g.dents = []; for (const q in PREV) delete PREV[q]; } const c = repairCost(V, k, g); if (c <= 0) return true; if (!spend(c, t('fix_' + k), 'repair')) return false; if (k === 'fuel') g.fuel = V.tank * (1 + .2 * (g.up.tank || 0)); else g.cond[k] = 100; if (k === 'body') g.dents = []; return true; };
  $$('[data-fix]').forEach(b => b.onclick = () => { if (fix(b.dataset.fix)){ save(); renderGarage(); } });
  const fa = $('#fixAll'); if (fa) fa.onclick = () => { for (const k of ['fuel','oil','brakes','tyres','clean','susp','engine','body']) if (!fix(k)) break; save(); renderGarage(); };
  const rb = $('#rackB'); if (rb) rb.onclick = () => { if (spend(900, 'Roof rack', 'garage')){ S.inv[GV_ID + ':rack'] = 1; g.cos.rack = true; save(); renderGarage(); } };
@@ -2994,7 +2994,7 @@ update = function(dt){ const car = G.car, full = G.mode === 'play', prevAlert = 
  if (S.fatigue < 50) G.fw = false;
  // fire progression
  if (!(G.fire > 0) && GV(G.vid).cond.engine < 8 && G.temp > 115 && Math.random() < dt * .1) igniteFire();
- if (G.fire > 0){ G.fire = Math.min(1, G.fire + dt * .02); G.fireT += dt; if (!G.test) GV(G.vid).cond.engine = Math.max(0, GV(G.vid).cond.engine - dt * 1.2); G.comfort -= dt * 6; if (G.onboard.length && !G.doorOpen && speedOf(car) < .5) setDoor(true); if (G.fireT > 28){ if (!G.test){ GV(G.vid).cond.engine = 0; GV(G.vid).cond.body = Math.max(0, GV(G.vid).cond.body - 40); } G.fire = 0; endRun('broke'); toastUI('🔥 ' + t('fireEnd'), 'bad', null, 5); } }
+ if (G.fire > 0){ G.fire = Math.min(1, G.fire + dt * .02); G.fireT += dt; if (!G.test) GV(G.vid).cond.engine = Math.max(0, GV(G.vid).cond.engine - dt * 1.2); G.comfort -= dt * 6; if (G.onboard.length && !G.doorOpen && speedOf(car) < .5) setDoor(true); if (G.fireT > 28){ if (!G.test){ GV(G.vid).cond.engine = 0; GV(G.vid).cond.body = Math.max(0, GV(G.vid).cond.body - 40); } G.fire = 0; towOffer(); toastUI('🔥 ' + t('fireEnd'), 'bad', null, 5); } }
  // smoke types: steam when overheating, blue oil smoke when oil is low
  const ca = Math.cos(car.a), sa = Math.sin(car.a);
  if (G.temp > 106 && Math.random() < .5){ const [ex, ey] = engineBay(); puff(ex, ey + .6, rnd(-.4, .4), 1.6, 1.4, .14, '#f1f4f8', 'smoke'); }
@@ -4593,7 +4593,7 @@ function squealInit(){ const c = AU.ctx; if (!c || SQ.n) return; const out = c.c
  SQ.n = {out, o1, o2, o3, fl, ng}; }
 function brakeScreech(dt){ const c = AU.ctx, car = G.car; if (!c || !car) return; squealInit(); if (!SQ.n) return; const sp = speedOf(car), braking = !!(key.brake || G.brkT) && !G.paused && G.mode === 'play';
  SQ.held = braking && sp > 3 ? SQ.held + dt : 0; const decel = (SQ.pv - car.vx) / Math.max(dt, .001) * Math.sign(car.vx || 1); SQ.pv = car.vx;
- let k = 0; if (SQ.held > 1.5 && car.wh.some(w => w.ground)) k = clamp((decel - 2.5) / 5, .25, 1) * clamp((sp - 3) / 10, 0, 1) * Math.min(1, (SQ.held - 1.5) / .25);
+ let k = 0; if (SQ.held > .8 && car.wh.some(w => w.ground)) k = clamp((decel - 2.5) / 5, .25, 1) * clamp((sp - 3) / 10, 0, 1) * Math.min(1, (SQ.held - .8) / .2);
  const t = c.currentTime, n = SQ.n, base = 760 + sp * 14 + (G.V && G.V.cls !== 'micro' ? -140 : 0);
  n.o1.frequency.setTargetAtTime(base, t, .08); n.o2.frequency.setTargetAtTime(base * 1.016, t, .08); n.o3.frequency.setTargetAtTime(base * 2.01, t, .08); n.fl.frequency.setTargetAtTime(30 + sp * .9, t, .1);
  n.out.gain.setTargetAtTime(k * .085, t, k > n.out.gain.value ? .05 : .12); n.ng.gain.setTargetAtTime(k * .05, t, .1); }
@@ -4649,7 +4649,7 @@ physStep = function(c, h, ctl){ _ps33(c, h, ctl); if (c !== G.car || !LOCK.on) r
 const SKID = [];
 const _upd33 = update;
 update = function(dt){ _upd33(dt); const car = G.car; if (G.mode !== 'play' || !car || dt <= 0) return; const sp = speedOf(car);
- LOCK.held = (key.brake || G.brkT) && sp > 2.5 && !G.paused ? (LOCK.held || 0) + dt : 0; LOCK.abs = hasABS(); LOCK.on = LOCK.held > 1.5; if (LOCK.on){ LOCK.t += dt; if (LOCK.abs) car.absT = .2; } else LOCK.t = 0;
+ LOCK.held = (key.brake || G.brkT) && sp > 2.5 && !G.paused ? (LOCK.held || 0) + dt : 0; LOCK.abs = hasABS(); LOCK.on = LOCK.held > .8; if (LOCK.on){ LOCK.t += dt; if (LOCK.abs) car.absT = .2; } else LOCK.t = 0;
  if (!LOCK.on) return; const k = clamp(sp / 18, .25, 1), dir = Math.sign(car.vx) || 1, smokeK = LOCK.abs ? .45 : 1;
  for (const w of car.wh){ if (!w.ground) continue; const gx = w.x, gy = terrH(gx);
   if (Math.random() < dt * 30 * k * smokeK) puff(gx - dir * w.r * .4, gy + .08, -car.vx * .25 + rnd(-.4, .4), .3 + rnd(0, .5), 1.2 + rnd(0, .8), .1 + .07 * k, Math.random() < .5 ? '#d9dcdf' : '#c6c9cc', 'smoke');
@@ -4664,5 +4664,139 @@ startRoute = function(r, o){ _sr33(r, o); SKID.length = 0; LOCK = {on:false, t:0
 /* squeal: harsher when locked, pulsing with ABS */
 const _bs33 = brakeScreech;
 brakeScreech = function(dt){ _bs33(dt); if (!SQ.n || !AU.ctx || !LOCK.on) return; const t = AU.ctx.currentTime, g = SQ.n.out.gain; if (LOCK.abs){ g.setTargetAtTime((LOCK.t % .07) < .042 ? .07 : .015, t, .008); } else g.setTargetAtTime(.1, t, .04); };
+</script>
+<script>
+"use strict";
+/* =====================================================================
+   OGRAAA v34 — repairs really repair: bodywork at 100% always means a
+   clean body (no leftover dents, crushed edges, broken lamps or smoke)
+   ===================================================================== */
+function healBody(vid){ const g = GV(vid); if (g.cond.body >= 99.5 && g.dents && g.dents.length){ g.dents = []; for (const q in PREV) delete PREV[q]; save(); } }
+/* entering the garage / showroom or starting a trip cleans up any vehicle whose bodywork is fully repaired */
+const _rg34 = renderGarage; renderGarage = function(){ VEHS.forEach(v => { if (GV(v.id).owned) healBody(v.id); }); _rg34(); };
+const _sr34 = startRoute; startRoute = function(r, o){ if (o && o.vid && !o.test) healBody(o.vid); _sr34(r, o); };
+/* roadside workshop: panel work removes dents proportionally and rebuilds the bodywork you see; a full body clears everything */
+function rebuildBody(){ const car = G.car; if (!car || G.test) return; const g = GV(G.vid); try{ car.cv = buildPlayerCanvas(G.vid, g.cos, g.cond, g.dents); car.dents = g.dents; car._alpha = null; SILC.delete(car.cv); }catch(e){ reportErr('rebuild', e); }
+ car.brokenHL = false; car.brokenTL = false; lightFlags(car); if (g.cond.body > 80) G.dmgEm = []; else if (G.dmgEm) G.dmgEm = G.dmgEm.slice(-Math.ceil(G.dmgEm.length / 2)); DEBRIS.length = 0; }
+const _svc34 = svcOptions;
+svcOptions = function(type){ const o = _svc34(type); if (type !== 'shop' || G.test) return o; const g = GV(G.vid);
+ for (const it of o){ if (it.n && it.n[1] && /panel fix/i.test(it.n[1])){ const f0 = it.fx; it.fx = () => { f0(); const keep = Math.floor(g.dents.length * Math.max(0, (100 - g.cond.body) / 100)); g.dents = g.dents.slice(g.dents.length - keep); healBody(G.vid); rebuildBody(); }; } }
+ // a proper full bodywork option at the workshop
+ const miss = 100 - g.cond.body; o.splice(2, 0, {ic:'🛠', n:['سمكرة ودهان كاملة','Full bodywork & paint'], p:Math.round(miss * (8 + G.V.mass * .004) * .9) + 200, t:8, dis:miss < 1 && !g.dents.length, fx:() => { g.cond.body = 100; g.dents = []; rebuildBody(); toastUI('🛠 ' + L2('العربية رجعت زي الفبريكة', 'Good as new!'), 'good'); }});
+ return o; };
+</script>
+<script>
+"use strict";
+/* =====================================================================
+   OGRAAA v35 — tow service · real engine power (kW) & mass based
+   acceleration with upgrades and load · front crashes kill lights &
+   horn · smoother, calmer engine sound
+   ===================================================================== */
+/* ---------------- tow truck to the nearest workshop ---------------- */
+function nearestShop(){ const car = G.car; let best = null; for (const p of W.poi || []) if (p.type === 'shop'){ const d = Math.abs(p.x - car.x); if (!best || d < best.d) best = {p, d}; } return best; }
+function towCost(){ const ns = nearestShop(), km = ns ? ns.d * kmPerM() : 3; return Math.round(120 + G.V.len * 35 + G.V.mass * .008 + km * (18 + G.V.len * 2.5)); }
+function towOffer(manual){ if (G.towAsk || G.mode !== 'play') return; if (G.test){ endRun('broke'); return; } G.towAsk = true; const ns = nearestShop(), cost = towCost();
+ const acts = [[L2('🚛 ونش لأقرب ورشة', '🚛 Tow to nearest workshop') + ` (${money(cost)})`, () => doTow(cost)]]; if (!manual) acts.push([L2('إنهاء الرحلة', 'End trip'), () => { G.towAsk = false; endRun('broke'); }]); else acts.push([L2('إلغاء', 'Cancel'), () => { G.towAsk = false; }]);
+ toastUI('🛑 ' + (manual ? L2('تطلب ونش؟', 'Call a tow truck?') : L2('العربية عطلت خالص!', 'The vehicle is completely broken!')) + (ns ? ' · ' + L2('أقرب ورشة ', 'Nearest workshop ') + fmt(Math.round(ns.d * kmPerM() * 10) / 10) + ' km' : ''), manual ? 'gold' : 'bad', acts, 30); }
+function doTow(cost){ if (!spend(cost, L2('ونش', 'Tow truck'), 'repair')){ G.towAsk = false; return; } const ns = nearestShop(); const car = G.car; G.busyT = 5; G.busyMsg = L2('🚛 الونش بيسحب العربية…', '🚛 Towing to the workshop…'); G.fire = 0; G.engOn = false;
+ if (G.onboard.length){ toastUI(L2('الركاب نزلوا وكمّلوا بمواصلة تانية', 'Passengers got off to find another ride'), 'gold'); G.onboard.length = 0; G.comfort = Math.max(0, G.comfort - 20); }
+ setTimeout(() => { if (ns){ const tx = ns.p.x - 1, dx = tx - car.x, dy = terrH(tx) - terrH(car.x); car.x += dx; car.y += dy; car.vx = car.vy = car.w = 0; car.wh.forEach(w => { w.x += dx; w.y += dy; w.vx = w.vy = 0; w.om = 0; }); cam.x = car.x; G.lastX = car.x; G._dx = car.x; }
+  const c = GV(G.vid).cond; c.engine = Math.max(c.engine, 8); G.temp = Math.min(G.temp, 80); G.towAsk = false; G.fuelOutT = 0; G.dmgEm = (G.dmgEm || []).slice(-1); toastUI('🔧 ' + L2('وصلت الورشة — صلّح العربية', 'Arrived at the workshop — get her fixed'), 'good', null, 5);
+  if (ns && typeof openSvc === 'function') setTimeout(() => openSvc(ns.p), 400); }, 5000); }
+const _sr35 = startRoute; startRoute = function(r, o){ _sr35(r, o); G.towAsk = false; };
+/* a "call tow" button in the trunk when the vehicle is in a bad way */
+const _rt35 = renderTrunk;
+renderTrunk = function(){ _rt35(); if (G.test || !G.vid) return; const c = GV(G.vid).cond, bad = c.engine < 30 || c.body < 20 || (G.car && G.car.wh.some(w => w.flat) && !inv(G.vid).spare); if (!bad || $('#trunkP .towb')) return;
+ $('#trunkP').insertAdjacentHTML('beforeend', `<button class="btn red towb" style="width:100%;margin-top:.5rem">🚛 ${L2('اطلب ونش', 'Call a tow truck')} (${money(towCost())})</button>`); $('#trunkP .towb').onpointerdown = e => { e.preventDefault(); e.stopPropagation(); towOffer(true); }; };
+/* ---------------- real engine power → acceleration (load, upgrades, damage) ----------------
+   kW figures from manufacturers' data for each model's typical Egyptian-market engine */
+const KW = {fiat128:44, minivan:102, hiace:75, hiaceB:75, hiace2:130, coaster:100, kinglong:95, rosa:110, redbus:162, mcv:162, redbus2:180, coachB:250, coachO:280, coachN:300,
+ suzuki:35, fotonC2:75, joyA4:90, joyA5:100, hiaceW:75, kingWB:105, gdx6532:105, coasterW:100, joyA6:110, xmq6600:105, higer6720:118, zk6770:125, xmq6127:247, gdx6125:247, zk6128:265, tourismo:315};
+function driveForce(){ const V = G.V, kw = KW[V.id] || (V.mass * .022), e = G.test ? 0 : upl(G.vid, 'engine'), gb = G.test ? 0 : upl(G.vid, 'gear'); return kw * 1000 * (1 + .08 * e) * (.85 + .02 * gb) / 11; }
+const _upd35 = update;
+update = function(dt){ const car = G.car; if (G.mode === 'play' && car && G.V){ const F = driveForce(); car.acc0 = clamp(F / Math.max(500, car.m), .45, 3.4); } _upd35(dt); };
+/* ---------------- front crashes: lamps out, horn dead ---------------- */
+const _ad35 = addDent;
+addDent = function(car, lx, ly, sev, glass){ _ad35(car, lx, ly, sev, glass); if (car !== G.car || G.mode !== 'play' || glass) return; const u = lx / car.L + .5;
+ if (u > .82 && sev > 8){ car.brokenHL = true; if (sev > 9 && !G.test){ GV(G.vid).hornBroken = true; G.car.horn = 'dead'; toastUI('📯 ' + L2('الكلاكس باظ من الخبطة', 'The horn died in the crash'), 'bad'); } } };
+const _horn35 = horn;
+horn = function(){ if (G.mode === 'play' && !G.test && GV(G.vid).hornBroken){ if (AU.ctx){ AU.noiseHit(.08, 300, .05, 0, 'lowpass', 1); AU.tone(140, .06, 'square', .03); } return; } _horn35(); };
+const _heal35 = healBody; healBody = function(vid){ _heal35(vid); const g = GV(vid); if (g.cond.body >= 99.5) g.hornBroken = false; };
+const _svc35 = svcOptions;
+svcOptions = function(type){ const o = _svc35(type); if (type !== 'shop' || G.test) return o; const g = GV(G.vid); o.splice(1, 0, {ic:'📯', n:['تصليح الكلاكس والنور','Fix horn & lights'], p:180, t:3, dis:!g.hornBroken && !(G.car && G.car.brokenHL), fx:() => { g.hornBroken = false; G.car.brokenHL = false; G.car.brokenTL = false; G.car.horn = g.cos.horn || 'stock'; }}); return o; };
+/* ---------------- calmer, smoother engine sound ---------------- */
+const _eng35 = AU.engine.bind(AU);
+AU.engine = function(on, rpm, load, speed, big){ _eng35(on, rpm, load, speed, big); const e = this.eng, c = this.ctx; if (!e || !c) return; const t = c.currentTime + .02, P = (typeof ENGP !== 'undefined' && G.V && ENGP[G.V.id]) || {b:30, m:86, lp:660, n:.1, t:0, g:1}, up = G.test || !G.vid ? 0 : upl(G.vid, 'engine');
+ const f = (P.b + rpm * P.m * .92) * (1 + up * .03); e.o1.frequency.setTargetAtTime(f, t, .22); e.o2.frequency.setTargetAtTime(f * .5, t, .22); e.o3.frequency.setTargetAtTime(f * .25, t, .22); e.lfo.frequency.setTargetAtTime(f / 4, t, .25);
+ e.lp.frequency.setTargetAtTime((P.lp * .72 + load * 650 + rpm * 260), t, .3); e.out.gain.setTargetAtTime(on ? (.1 + load * .1) * P.g : 0, t, .3); e.ng.gain.setTargetAtTime(on ? P.n * .45 * (.6 + load * .6) : 0, t, .3); if (e.tbg) e.tbg.gain.setTargetAtTime(on ? P.t * .6 * load * clamp(rpm, 0, 1) : 0, t, .3); };
+</script>
+<script>
+"use strict";
+/* =====================================================================
+   OGRAAA v36 — realism & performance pass
+   real fuel use (real L/100 km × real route km, diesel 2 EGP/L) ·
+   instant squeal & lock on hard braking (pitch by wheel size, ABS
+   pulses) · adaptive performance mode for phones · motion-blurred air
+   particles · gentler small-vehicle acceleration · AI vehicles shed
+   parts, smoke and spark too · police & ambulances only 2% of the time
+   ===================================================================== */
+/* ---------------- fuel: pure real-world numbers ---------------- */
+fuelFactor = function(){ return G.engThirst || 1; };   // base burn already = real L/100km × real km driven × throttle × load
+// realistic tanks (litres) and consumption (L/100 km, Egyptian traffic) per model
+const TANK = {fiat128:38, minivan:55, hiace:70, hiaceB:70, hiace2:70, coaster:95, kinglong:80, rosa:100, redbus:200, mcv:200, redbus2:220, coachB:400, coachO:420, coachN:420, suzuki:37, fotonC2:50, joyA4:55, joyA5:70, hiaceW:70, kingWB:80, gdx6532:90, coasterW:95, joyA6:90, xmq6600:95, higer6720:120, zk6770:130, xmq6127:400, gdx6125:400, zk6128:420, tourismo:480};
+const LP = {fiat128:9, minivan:10.5, hiace:11.5, hiaceB:12, hiace2:10.5, coaster:16, kinglong:13, rosa:17, redbus:32, mcv:32, redbus2:30, coachB:30, coachO:29, coachN:28, suzuki:7, fotonC2:9, joyA4:10, joyA5:11, hiaceW:11.5, kingWB:12, gdx6532:13.5, coasterW:16, joyA6:13.5, xmq6600:14, higer6720:18, zk6770:19, xmq6127:28, gdx6125:28, zk6128:28.5, tourismo:27};
+for (const v of VEHS){ if (TANK[v.id]) v.tank = TANK[v.id]; if (LP[v.id]) v.lp100 = LP[v.id]; }
+/* after refuelling, out-of-fuel warnings disappear and the rescue resets */
+let lastFuel30 = 0;
+function clearFuelOut(){ G.fuelAsk = false; G.fuelOutT = 0; G.jerryAsk = false; $$('#toasts .toast').forEach(d => { if (/⛽|بنزين|fuel/i.test(d.textContent)) d.remove(); }); }
+/* ---------------- braking: instant squeal & lock, no delay ---------------- */
+const _upd36 = update;
+update = function(dt){ const car = G.car, play = G.mode === 'play' && car;
+ if (play && G.fuel > lastFuel30 + .5 && lastFuel30 <= 1) clearFuelOut();
+ _upd36(dt); if (!play || dt <= 0) return; lastFuel30 = G.fuel;
+ const sp = speedOf(car), hard = (key.brake || G.brkT) && sp > 2.5 && !G.paused && car.wh.some(w => w.ground);
+ LOCK.held = hard ? 1 : 0; LOCK.on = hard; SQ.held = hard ? 1.5 : 0;   // lock and squeal start the instant you brake hard
+ if (!LOCK.on) for (const w of car.wh) w.rotLock = null;
+ // AI damage emitters (smoke & sparks on the AI vehicle that got hit)
+ for (const a of G.ai){ if (!a.em || Math.abs(a.x - car.x) > 70) continue; const ca = Math.cos(a.a), sa = Math.sin(a.a); for (const e of a.em){ e.t += dt; const wx = a.x + e.lx * ca - e.ly * sa, wy = a.y + (a.lift || 0) + e.lx * sa + e.ly * ca, dens = Math.max(.1, 1 - e.t / 30); if (Math.random() < dt * 10 * dens) puff(wx, wy, -a.vx * .3 + rnd(-.3, .3), .5 + rnd(0, .4), 1.4, .14, e.t < 5 ? '#2e2e2e' : '#606060', 'smoke'); if (Math.abs(a.vx) > 1.5 && Math.random() < dt * 6 * dens) puff(wx, wy, -a.vx * .4 + rnd(-1.5, 1.5), rnd(.5, 2.5), .3, .03, '#FFD24A', 'spark'); } } };
+/* wheels completely frozen without ABS (angle held, not just speed) */
+const _ps36 = physStep;
+physStep = function(c, h, ctl){ _ps36(c, h, ctl); if (c !== G.car || !LOCK.on || LOCK.abs) return; for (const w of c.wh){ if (!w.ground) continue; if (w.rotLock == null) w.rotLock = w.rot; w.rot = w.rotLock; w.om = 0; } };
+/* squeal pitch follows wheel size (small wheels squeal higher, big bus tyres lower) */
+const _bs36 = brakeScreech;
+brakeScreech = function(dt){ _bs36(dt); if (!SQ.n || !AU.ctx || !G.car) return; const r = G.car.wh[0] ? G.car.wh[0].r : .33, t = AU.ctx.currentTime, base = (620 + speedOf(G.car) * 12) * Math.pow(.33 / r, .55);
+ SQ.n.o1.frequency.setTargetAtTime(base, t, .06); SQ.n.o2.frequency.setTargetAtTime(base * 1.016, t, .06); SQ.n.o3.frequency.setTargetAtTime(base * 2.01, t, .06); };
+/* ---------------- acceleration: realistic for small engines ---------------- */
+driveForce = function(){ const V = G.V, kw = KW[V.id] || (V.mass * .022), e = G.test ? 0 : upl(G.vid, 'engine'), gb = G.test ? 0 : upl(G.vid, 'gear'), small = kw < 60 ? .82 : kw < 90 ? .9 : 1; return kw * 1000 * (1 + .08 * e) * (.82 + .02 * gb) * small / 14; };
+/* ---------------- AI vehicles: parts fall off, smoke & spark from the hit spot ---------------- */
+const _ad36 = addDent;
+addDent = function(car, lx, ly, sev, glass){ _ad36(car, lx, ly, sev, glass); if (G.mode !== 'play' || !car || car === G.car || glass) return;
+ if (sev > 6 && car.cv) spawnDebris(car, lx, ly, Math.max(sev, 9));
+ if (sev > 9){ car.em = car.em || []; if (car.em.length < 3){ const p = onBody(car, lx, ly); car.em.push({lx:p[0], ly:p[1], t:0}); } }
+ const ca = Math.cos(car.a), sa = Math.sin(car.a); spawnFX('spark', car.x + lx * ca - ly * sa, car.y + (car.lift || 0) + lx * sa + ly * ca, .9, {dur:.5}); };
+/* ---------------- police & ambulances: 2% chance ---------------- */
+{ for (let i = AI_CIV.length - 1; i >= 0; i--){ const s = AIV[AI_CIV[i]]; if (s && /^(ai10|ai11|ai22|ai23|ai24|ai25|ai26|ai27)$/.test(s.spr)) AI_CIV.splice(i, 1); } }
+const _re36 = randomEvent;
+randomEvent = function(){ const block = !G.ambEv && Math.random() > .02; if (block) G.ambEv = {car:null, dummy:true}; try{ _re36(); } finally { if (G.ambEv && G.ambEv.dummy) G.ambEv = null; } };
+const _sr36 = startRoute;
+startRoute = function(r, o){ _sr36(r, o); if (W.ev) W.ev = W.ev.filter(e => e.kind !== 'patrol' || Math.random() < .02); lastFuel30 = G.fuel; };
+/* ---------------- air particles streak with speed (motion blur) ---------------- */
+drawMotes = function(){ if (S.set.gfx === 'low' || PERF.low) return; const night = G.tod === 'night', t = G.time, col = night ? '190,210,255' : G.weather === 'sand' ? '230,190,130' : '255,245,220', v = G.car ? G.car.vx : 0, streak = clamp(Math.abs(v) / 25, 0, 1);
+ ctx.save(); ctx.lineCap = 'round'; for (const m of MOTES){ let x = (m.x * VW * 1.3 - cam.x * PPM * .05 * m.z + t * 8 * m.z) % (VW * 1.3); if (x < 0) x += VW * 1.3; x -= VW * .15; const y = (m.y * VH + Math.sin(t * .4 + m.ph) * 14 * m.z) % VH, a = (.08 + .14 * m.z) * (.6 + .4 * Math.sin(t * .9 + m.ph));
+  const len = streak * m.z * 26; if (len > 1.5){ ctx.strokeStyle = `rgba(${col},${a * .8})`; ctx.lineWidth = m.s * m.z; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.sign(v || 1) * len, y); ctx.stroke(); } else { ctx.fillStyle = `rgba(${col},${a})`; ctx.beginPath(); ctx.arc(x, y, m.s * m.z, 0, 7); ctx.fill(); } } ctx.restore(); };
+/* ---------------- performance: adaptive low-FX mode for phones / slow devices ---------------- */
+const PERF = {low:false, ft:16, n:0};
+const isPhone = matchMedia('(pointer:coarse)').matches || Math.min(screen.width, screen.height) < 600;
+if (isPhone) PERF.low = true;
+(function perfLoop(t0){ let last = t0; const f = t => { const d = t - last; last = t; if (G.mode === 'play' && d < 200){ PERF.ft = PERF.ft * .95 + d * .05; PERF.n++; if (PERF.n > 120){ if (!PERF.low && PERF.ft > 24) PERF.low = true; else if (PERF.low && !isPhone && PERF.ft < 15) PERF.low = false; PERF.n = 0; } } requestAnimationFrame(f); }; requestAnimationFrame(f); })(performance.now());
+// lighter rendering when PERF.low: cap pixel ratio, skip blur/rays/AI shadows, fewer particles
+const _resize36 = resize;
+resize = function(){ _resize36(); if (PERF.low && DPR > 1.25){ DPR = 1.25; cv.width = Math.round(VW * DPR); cv.height = Math.round(VH * DPR); } };
+setInterval(() => { if (PERF.low && DPR > 1.25) resize(); }, 3000);
+{ const _mb = motionBlur; motionBlur = function(){ if (PERF.low) return; _mb(); }; }
+{ const _sr = drawSunRays; drawSunRays = function(){ if (PERF.low){ return; } _sr(); }; }
+{ const _ds = dirShadow; dirShadow = function(car, src, X, gy, sw, shh, mk, k){ if (PERF.low && !car.player) return; _ds(car, src, X, gy, sw, shh, mk, k); }; }
+{ const _pf = puff; puff = function(...a){ if (PERF.low && Math.random() < .45) return; _pf(...a); }; }
+{ const _cc = cabinCanvas; let skip = 0; const cache = new Map(); cabinCanvas = function(V, cos, pax, forPreview){ if (!PERF.low || forPreview) return _cc(V, cos, pax, forPreview); skip = (skip + 1) % 3; const k = V.id; if (skip && cache.has(k)) return cache.get(k); const r = _cc(V, cos, pax, forPreview); cache.set(k, r); return r; }; }
 </script>
 </body></html>
