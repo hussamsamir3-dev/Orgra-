@@ -466,7 +466,7 @@ function resize(){
  const s = Math.min(VW / 1280, VH / 720); document.documentElement.style.fontSize = (16 * clamp(Math.pow(s, .55), .6, 1.9)) + 'px';
  document.body.classList.toggle('portrait', VH > VW * 1.05); calcPPM();
 }
-function calcPPM(){ const L = G.car ? G.car.L : 5.4; const vw = L * 3.1 + 17, vh = 13 + L * .45; PPM = Math.min(VW / vw, VH / vh) * cam.zoom; if (VH > VW) PPM = VW / (L * 1.9 + 7) * cam.zoom; }
+function calcPPM(){ const L = G.car ? G.car.L : 5.4; const vw = L * 1.55 + 19, vh = 12.5 + L * .2; PPM = Math.min(VW / vw, VH / vh) * cam.zoom; if (VH > VW) PPM = VW / (L * 1.9 + 7) * cam.zoom; }
 window.addEventListener('resize', resize);
 const SX0 = () => VW * (G.mode === 'attract' ? .5 : .33), SY0 = () => VH * (VH > VW ? .56 : VH < 560 ? .55 : .66);
 const sx = x => (x - cam.x) * PPM + SX0(), sy = y => SY0() - (y - cam.y) * PPM;
