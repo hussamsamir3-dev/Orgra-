@@ -899,7 +899,7 @@ function gameplay(dt, spd){
   if (!r.warn && r.x - car.x < 220 && r.x > car.x){ r.warn = 1; toast(t('radar') + ' — ' + t('limit') + ' ' + fmt(r.limit) + ' ' + t('kmh'), 'gold'); }
   if (!r.done && car.x > r.x){ r.done = true; if (spd * 3.6 > r.limit + 3){ r.flash = .25; addFine('radar', true); AU.noiseHit(.1, 6000, .3); } } }
  // ----- potholes → flat tyres -----
- for (const hx of W.holes){ if (G.holesHit.has(hx)) continue; for (const w of car.wh) if (Math.abs(w.x - hx) < .5 && spd > 8){ G.holesHit.add(hx); const p = .02 + (100 - (G.test ? 100 : GV(G.vid).cond.tyres)) / 1400; if (Math.random() < p && !w.flat){ w.flat = true; w.r = w.r0 * .9; toast(t('flat'), 'bad'); AU.noiseHit(.6, 2500, .4, 0, 'highpass'); } } }
+ for (const hx of W.holes){ if (G.holesHit.has(hx)) continue; for (const w of car.wh) if (Math.abs(w.x - hx) < .5 && spd > 8){ G.holesHit.add(hx); const p = (.008 + (100 - (G.test ? 100 : GV(G.vid).cond.tyres)) / 2600) * (1 - .15 * (G.test ? 0 : upl(G.vid, 'tires'))); if (Math.random() < p && !w.flat){ w.flat = true; w.r = w.r0 * .9; toast(t('flat'), 'bad'); AU.noiseHit(.6, 2500, .4, 0, 'highpass'); } } }
  // ----- pedestrian crossing -----
  if (G.pedX){ const p = G.pedX; p.k += dt / 5.5; p.d += dt * 1.2; if (p.k >= 1){ if (!p.bad){ toast(t('pedOk'), 'good'); G.T.pro++; say(pick(DLG.ped), p.x, terrH(p.x) + 2.4); } G.pedX = null; }
   else if (p.k > .25 && p.k < .85 && front > p.x - .6 && car.x - car.L / 2 < p.x && !p.bad){ p.bad = true; addFine('ped', false); G.comfort -= 15; p.k = .9; } }
@@ -1280,7 +1280,7 @@ function drawFront(){
 /* ---------------- vehicles: aligned wheels, shadows, real light positions ---------------- */
 function drawVehicle(car, opt){
  opt = opt || {}; const g = car.g, lift = opt.lift || 0, sc = opt.scale || 1, k = PPM * g.s * sc, X = sx(car.x), Y = sy(car.y + lift);
- const src = car.cv || IMG[car.spr], sw = src.width, shh = src.height, baked = !car.player || (G.V && car.player && G.V.baked) || car.baked;
+ const src = car.cv || IMG[car.spr], sw = src.width, shh = src.height, baked = car.whRim != null ? false : (!car.player || (G.V && car.player && G.V.baked) || car.baked);
  const ca = Math.cos(-car.a), sa = Math.sin(-car.a), mk = car.mirror ? -k : k;
  const P = (px, py) => { const u = (px - sw / 2) * mk, v = (py - shh / 2) * k; return [X + u * ca - v * sa, Y + u * sa + v * ca]; };
  // contact + directional shadow onto the road
@@ -1288,7 +1288,7 @@ function drawVehicle(car, opt){
  
  if (car.glow){ const gr = ctx.createRadialGradient(X, gy, 0, X, gy, car.L * .6 * PPM); gr.addColorStop(0, car.glow + 'cc'); gr.addColorStop(1, car.glow + '00'); ctx.fillStyle = gr; ctx.beginPath(); ctx.ellipse(X, gy, car.L * .62 * PPM, PPM * .5, 0, 0, 7); ctx.fill(); }
  // player wheels (separate sprites, visible suspension travel)
- if (!baked) car.wh.forEach(w => { const r = w.r * PPM * sc, wx = X + (w.x - car.x) * PPM * sc, wy = Y - (w.y - car.y) * PPM * sc; ctx.save(); ctx.translate(wx, wy); if (w.flat) ctx.scale(1, .86); ctx.rotate(w.rot); const im = IMG['wh' + car.rim], q = WQ(car.rim); ctx.drawImage(im, -r * q, -r * q, r * 2 * q, r * 2 * q); ctx.restore(); });
+ if (!baked) car.wh.forEach(w => { const r = w.r * PPM * sc, wx = X + (w.x - car.x) * PPM * sc, wy = Y - (w.y - car.y) * PPM * sc; ctx.save(); ctx.translate(wx, wy); if (w.flat) ctx.scale(1, .86); ctx.rotate(w.rot); const wr = car.whRim ?? car.rim, im = IMG['wh' + wr], q = WQ(wr); ctx.drawImage(im, -r * q, -r * q, r * 2 * q, r * 2 * q); ctx.restore(); });
  ctx.save(); ctx.translate(X, Y); ctx.rotate(-car.a); ctx.scale(mk, k); if (opt.dim && S.set.gfx !== 'low') ctx.filter = 'brightness(.86) saturate(.85)';
  ctx.drawImage(src, -sw / 2, -shh / 2); ctx.filter = 'none';
  // baked-wheel sprites: rotate the wheel's own pixels exactly in place → perfect alignment
@@ -3239,8 +3239,9 @@ function centreWheels(){}  /* images are pre-centred on the hub at build time */
 /* window mask: glass only — the artwork's own frames, seals and pillars stay visible */
 function cabinMask(V){ if (CABM[V.id]) return CABM[V.id]; const M = paintMask(V.spr), w = M.w, h = M.h, drv = (DRV[V.id] || .8) * w, lim = Math.round(h * .64), L = new Float32Array(w * h), R = new Uint8Array(w * h);
  for (let p = 0; p < w * h; p++){ const q = p * 4; L[p] = M.src[q] * .3 + M.src[q + 1] * .59 + M.src[q + 2] * .11; }
- const Y0 = new Int16Array(w).fill(-1), Y1 = new Int16Array(w).fill(-1); const isWin = p => { if (M.win[p]) return true; const q = p * 4, r = M.src[q], g = M.src[q + 1], b = M.src[q + 2], mx = Math.max(r, g, b), mn = Math.min(r, g, b); return M.src[q + 3] > 200 && L[p] < M.dL * .56 && (mx - mn) / (mx + 1) < .22; };
+ const Y0 = new Int16Array(w).fill(-1), Y1 = new Int16Array(w).fill(-1); const isWin = p => { if (M.win[p]) return true; const q = p * 4, r = M.src[q], g = M.src[q + 1], b = M.src[q + 2], mx = Math.max(r, g, b), mn = Math.min(r, g, b); return !/^nw/.test(V.spr) && M.src[q + 3] > 200 && L[p] < M.dL * .56 && (mx - mn) / (mx + 1) < .22; };
  for (let px = Math.ceil(w * .03); px < w * .97; px++) for (let py = 0; py < lim; py++) if (isWin(py * w + px)){ if (Y0[px] < 0) Y0[px] = py; Y1[px] = py; }
+ if (/^nw/.test(V.spr)){ for (let px = Math.ceil(w * .03); px < w * .97; px++){ let best = null, rs = -1, re = -1, gap = 0; for (let py = 0; py <= lim; py++){ const on = py < lim && isWin(py * w + px); if (on){ if (rs < 0) rs = py; re = py; gap = 0; } else if (rs >= 0){ if (++gap > 4 || py === lim){ if (!best || re - rs > best[1] - best[0]) best = [rs, re]; rs = -1; gap = 0; } } } if (best && best[1] - best[0] > h * .08){ Y0[px] = best[0]; Y1[px] = best[1]; } else { Y0[px] = -1; Y1[px] = -1; } } }
  const ys = Array.from(Y1).filter(v => v > 0).sort((a, b) => a - b), base = ys.length ? ys[ys.length >> 1] : lim;
  const ok = new Uint8Array(w), top1 = new Int16Array(w), bot1 = new Int16Array(w);
  for (let px = Math.ceil(w * .03); px < w * .97; px++){ const y0 = Y0[px]; if (y0 < 0) continue; const y1 = Math.min(Y1[px], base + Math.round(h * .02)); if (y1 - y0 < h * .06) continue; let dk = 0; for (let py = y0; py <= y1; py++) if (L[py * w + px] < 34) dk++; ok[px] = dk / (y1 - y0 + 1) > .8 ? 2 : 1; top1[px] = y0; bot1[px] = y1; }
@@ -3248,7 +3249,7 @@ function cabinMask(V){ if (CABM[V.id]) return CABM[V.id]; const M = paintMask(V.
  for (let px = 0; px < w; px++){ if (ok[px] !== 2) continue; const r0 = px; while (px < w && ok[px] === 2) px++; const narrow = px - r0 < w * .03; for (let q = r0; q < px; q++) ok[q] = narrow ? 0 : 1; }
  // group columns into window cells; keep only whole cells behind the driver (never cut through the driver's window)
  const cells = []; for (let px = 0; px < w; px++){ if (ok[px]){ const c0 = px; while (px < w && ok[px]) px++; if (px - c0 > w * .025) cells.push([c0, px - 1]); } }
- for (const [c0, c1] of cells){ if (c1 > drv || c1 < w * .09) continue; const ppmS = w / V.len; for (let px = c0; px <= c1; px++) for (let py = Math.max(top1[px], bot1[px] - Math.round(1.05 * ppmS)); py <= bot1[px]; py++) if (M.src[(py * w + px) * 4 + 3] > 150) R[py * w + px] = 1; }
+ for (let [c0, c1] of cells){ if (c1 > drv && drv - c0 > w * .3) c1 = Math.floor(drv - w * .01); if (c1 > drv || c1 < w * .09) continue; const ppmS = w / V.len; for (let px = c0; px <= c1; px++) for (let py = Math.max(top1[px], bot1[px] - Math.round(1.05 * ppmS)); py <= bot1[px]; py++) if (M.src[(py * w + px) * 4 + 3] > 150) R[py * w + px] = 1; }
  // erode: keep a frame band (rubber seal + black surround) from the artwork around every window cell
  const e = Math.max(2, Math.round(h * .03)); let A = R, B = new Uint8Array(w * h);
  for (let it = 0; it < e; it++){ B.fill(0); for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++){ const p = y * w + x; if (A[p] && A[p - 1] && A[p + 1] && A[p - w] && A[p + w]) B[p] = 1; } const T = A; A = B; B = T; }
@@ -3726,27 +3727,25 @@ addVeh('redbus', {id:'redbus2', spr:'pn4', rim:16, name:['أتوبيس المد�
 addVeh(VEHS.find(v => v.cls === 'coach').id, {id:'coachN', spr:'pn5', rim:17, name:['أتوبيس سفر أزرق فاخر','Navy Executive Coach'], len:12, mass:13500, seats:49, stand:0, price:210000, lvl:7, acc:2.1, vmax:33, tank:420, lp100:29, store:900});
 // real-model fleet from the reference sheet (baked wheels, paintable white bodies)
 const NV = [
- ['suzuki','minivan','micro',['سوزوكي فان','Suzuki Van'],4.1,1300,7,9000,1,40,8],
- ['fotonC2','minivan','micro',['فوتون C2','Foton C2'],4.6,1600,10,13000,1,50,9],
- ['joyA4','minivan','micro',['جوي لونج A4','Joylong A4'],4.8,1800,11,15000,1,55,9.5],
- ['joyA5','hiace','micro',['جوي لونج A5','Joylong A5'],5.3,2100,14,19000,2,65,11],
- ['hiaceW','hiace','micro',['تويوتا هايس أبيض','Toyota HiAce (White)'],5.4,2250,14,24000,2,70,11.5],
- ['kingWB','hiace','micro',['كينج لونج فان عريض','King Long Wide Body Van'],5.9,2600,16,30000,3,75,12.5],
- ['gdx6532','coaster','micro',['جولدن دراجون XML6532','Golden Dragon XML6532'],6.0,3000,18,36000,3,80,14],
- ['coasterW','coaster','micro',['تويوتا كوستر أبيض','Toyota Coaster (White)'],7.0,4300,26,44000,4,95,17],
- ['fotonView','coaster','micro',['فوتون فيو C2','Foton View C2 Minibus'],6.0,3000,18,33000,3,80,14],
- ['xmq6600','coaster','micro',['كينج لونج XMQ6600','King Long XMQ6600'],6.0,3200,19,38000,3,85,14.5],
- ['joyA6','coaster','micro',['جوي لونج A6','Joylong A6'],6.0,3300,19,40000,4,85,14.5],
- ['isuzuNPR','redbus','bus',['إيسوزو NPR أتوبيس','Isuzu NPR Bus'],7.6,5500,30,52000,4,120,19],
- ['rosaW','coaster','micro',['ميتسوبيشي روزا أبيض','Mitsubishi Rosa (White)'],7.0,4500,26,45000,4,100,17],
+ // id, template, class, name, real length (m), kerb+gross-ish mass (kg), seats, price, level, tank (L), L/100km
+ ['suzuki','minivan','micro',['سوزوكي إيفري فان','Suzuki Every Van'],3.4,1050,7,9000,1,40,8],
+ ['fotonC2','minivan','micro',['فوتون C2','Foton C2'],4.2,1500,9,13000,1,50,9],
+ ['joyA4','minivan','micro',['جوي لونج A4','Joylong A4'],4.9,1850,11,16000,1,60,10],
+ ['joyA5','hiace','micro',['جوي لونج A5','Joylong A5'],5.3,2150,14,20000,2,70,11],
+ ['hiaceW','hiace','micro',['تويوتا هايس أبيض','Toyota HiAce (White)'],5.38,2250,14,24000,2,70,11.5],
+ ['kingWB','hiace','micro',['كينج لونج فان عريض','King Long Wide Body Van'],5.99,2650,16,30000,3,80,12.5],
+ ['gdx6532','coaster','micro',['جولدن دراجون XML6532','Golden Dragon XML6532'],5.99,3200,19,36000,3,85,14],
+ ['coasterW','coaster','micro',['تويوتا كوستر أبيض','Toyota Coaster (White)'],6.99,4300,26,44000,4,95,17],
+ ['joyA6','coaster','micro',['جوي لونج A6','Joylong A6'],5.99,3300,19,40000,4,85,14.5],
+ ['xmq6600','coaster','micro',['كينج لونج XMQ6600','King Long XMQ6600'],6.0,3500,19,38000,3,90,15],
  ['higer6720','redbus','bus',['هايجر KLQ6720','Higer KLQ6720'],7.2,5800,29,55000,4,120,19],
  ['zk6770','redbus','bus',['يوتونج ZK6770','Yutong ZK6770'],7.7,6200,31,60000,5,130,20],
  ['xmq6127','coach','coach',['كينج لونج XMQ6127','King Long XMQ6127'],12,13000,53,190000,6,400,28],
  ['gdx6125','coach','coach',['جولدن دراجون XML6125','Golden Dragon XML6125'],12,13200,51,195000,6,400,28],
  ['zk6128','coach','coach',['يوتونج ZK6128','Yutong ZK6128'],12.2,13400,53,205000,7,420,28.5],
- ['tourismo','coach','coach',['مرسيدس توريزمو','Mercedes-Benz Tourismo'],12.1,13800,49,260000,7,440,27]];
+ ['tourismo','coach','coach',['مرسيدس توريزمو','Mercedes-Benz Tourismo'],12.14,13800,49,260000,7,440,27]];
 NV.forEach(([id, tpl, cls, name, len, mass, seats, price, lvl, tank, lp], i) => { const T = tpl === 'coach' ? VEHS.find(v => v.cls === 'coach').id : tpl;
- addVeh(T, {id, spr:'nv' + i, baked:true, rim:0, cls, name, len, mass, seats, stand:cls === 'bus' ? Math.round(seats * .8) : cls === 'micro' && len > 6.5 ? 4 : 0, price, lvl, tank, lp100:lp, store:Math.round(len * len * 3), rack:cls === 'micro', door:cls === 'bus' ? .35 : .12}); });
+ addVeh(T, {id, spr:'nw' + i, baked:false, rim:18 + i, cls, name, len, mass, seats, stand:cls === 'bus' ? Math.round(seats * .8) : cls === 'micro' && len > 6.5 ? 4 : 0, price, lvl, tank, lp100:lp, store:Math.round(len * len * 3), rack:cls === 'micro', door:cls === 'bus' ? .35 : .12, acc:cls === 'coach' ? 2.1 : cls === 'bus' ? 2.4 : len < 5 ? 3.6 : len < 6.2 ? 3.2 : 2.8, vmax:cls === 'coach' ? 33 : cls === 'bus' ? 27 : len < 5 ? 31 : 33}); });
 // which lines each vehicle may run (minibuses serve both microbus and bus lines)
 for (const v of VEHS){ const mini = v.len >= 5.9 && v.len <= 7.8 && v.cls !== 'coach'; if (v.cls === 'micro' && !CLS_OK.micro.includes(v.id)) CLS_OK.micro.push(v.id); if ((v.cls === 'bus' || mini) && !CLS_OK.bus.includes(v.id)) CLS_OK.bus.push(v.id); if (v.cls === 'coach' && !CLS_OK.coach.includes(v.id)) CLS_OK.coach.push(v.id); if (v.cls === 'bus' && v.len < 8 && !CLS_OK.micro.includes(v.id)) CLS_OK.micro.push(v.id); }
 // their own wheels join the rim catalogue
@@ -3756,7 +3755,7 @@ Object.assign(DRV, {hiace2:.7, hiaceB:.7, kinglong:.78, rosa:.8, redbus2:.87, co
 Object.assign(ENGP, {hiace2:ENGP.hiace, hiaceB:ENGP.hiace, kinglong:ENGP.coaster, rosa:ENGP.coaster, redbus2:ENGP.redbus, coachN:ENGP.coachB});
 NV.forEach(([id, tpl]) => { ENGP[id] = ENGP[tpl === 'coach' ? 'coachB' : tpl] || ENGP.hiace; });
 // AI traffic: the same real models drive around, in many colours
-NV.forEach(([id, tpl, cls, name, len, mass], i) => { const spec = AIV.length; AIV.push({spr:'nv' + i, len, v:cls === 'coach' ? [70, 95] : cls === 'bus' ? [45, 65] : [45, 80], mass}); AI_CIV.push(spec); if (typeof AIPAINTABLE !== 'undefined') AIPAINTABLE.add('nv' + i); });
+NV.forEach(([id, tpl, cls, name, len, mass], i) => { const spec = AIV.length; AIV.push({spr:'nw' + i, len, v:cls === 'coach' ? [70, 95] : cls === 'bus' ? [45, 65] : [45, 80], mass, whRim:18 + i}); AI_CIV.push(spec); if (typeof AIPAINTABLE !== 'undefined') AIPAINTABLE.add('nw' + i); });
 /* ---------------- buses: soft, slow, long-travel suspension ---------------- */
 function softSusp(c, len){ if (!c || len < 6.5) return; const n = c.wh.length, m = c.base; c.f = len > 9 ? .92 : 1.12; c.zeta = Math.min(c.zeta, .3); c.travel = Math.max(c.travel, len > 9 ? .24 : .21);
  c.k = (m / n) * Math.pow(2 * Math.PI * c.f, 2); c.cd = 2 * c.zeta * Math.sqrt(c.k * m / n); c.kb = c.k * 12; }
@@ -3800,6 +3799,90 @@ const _dw23 = drawWorld;
 drawWorld = function(){ _dw23(); drawScorch(); };
 const _sr23b = startRoute;
 startRoute = function(r, o){ _sr23b(r, o); FX.length = 0; SCORCH.length = 0; splashed.clear(); };
+
+/* ======================= fleet-ui.js ======================= */
+"use strict";
+/* =====================================================================
+   OGRAAA v24 — every vehicle easy to find: showroom grid per category
+   (with NEW badges), purchasable vehicles shown in the route picker,
+   correct fuel % with upgraded tanks
+   ===================================================================== */
+const NEWV = new Set(['hiace2','hiaceB','kinglong','rosa','redbus2','coachN', ...NV.map(n => n[0])]);
+const tankOf = id => VBY(id).tank * (1 + .2 * ((GV(id).up || {}).tank || 0));
+const _rr24 = renderRoutes;
+renderRoutes = function(){ _rr24(); const vp = $('#s-routes .vpick'), r = ROUTES.find(q => q.id === RSEL); if (!r) return;
+ $$('#s-routes [data-v]').forEach(b => { const id = b.dataset.v, s = b.querySelector('.muted'); if (s) s.textContent = '⛽' + Math.min(100, Math.round(GV(id).fuel / tankOf(id) * 100)) + '%'; });
+ const L = lvlOf(S.xp).l, buy = VEHS.filter(v => CLS_OK[r.type].includes(v.id) && !GV(v.id).owned);
+ if (!buy.length) return; const html = `<div class="buyrow"><div class="muted" style="margin:.5rem 0 .3rem">🛒 ${L2('مركبات تقدر تشتريها للخط ده', 'Vehicles you can buy for this line')} (${fmt(buy.length)})</div><div class="vpick">${buy.map(v => `<button class="vchip buyv" data-buyv="${v.id}"><img src="${ASSETS[v.spr]}">${nm(v.name)}${NEWV.has(v.id) ? ' <em class="newb">NEW</em>' : ''} <span class="${L < v.lvl ? 'muted' : 'gold'}">${L < v.lvl ? '🔒 ' + t('lvl') + ' ' + fmt(v.lvl) : money(v.price)}</span></button>`).join('')}</div></div>`;
+ const card = $('#s-routes .facts') && $('#s-routes .facts').closest('.card'), mb = card && card.querySelector('.mbtns'); if (mb) mb.insertAdjacentHTML('beforebegin', html); else if (card) card.insertAdjacentHTML('beforeend', html); else if (vp) vp.insertAdjacentHTML('afterend', html);
+ $$('[data-buyv]').forEach(b => b.onclick = () => { SR = VEHS.findIndex(v => v.id === b.dataset.buyv); show('showroom'); }); };
+const _rs24 = renderShowroom;
+renderShowroom = function(){ _rs24(); const V = VEHS[SR], list = VEHS.map((v, i) => [v, i]).filter(([v]) => v.cls === V.cls), L = lvlOf(S.xp).l;
+ const html = `<div class="srgrid">${list.map(([v, i]) => { const g = GV(v.id); return `<button class="srcard ${i === SR ? 'on' : ''}" data-sr="${i}">${NEWV.has(v.id) ? '<em class="newb">NEW</em>' : ''}<img src="${ASSETS[v.spr]}"><b>${nm(v.name)}</b><span>${g.owned ? '✓ ' + t('owned') : L < v.lvl ? '🔒 ' + t('lvl') + ' ' + fmt(v.lvl) : money(v.price)}</span><small>${fmt(v.seats + (v.stand || 0))} ${L2('راكب', 'pax')} · ${fmt(v.len, 1)} m</small></button>`; }).join('')}</div>`;
+ const tabs = $('#s-showroom .tabs'); if (tabs) tabs.insertAdjacentHTML('afterend', html);
+ $$('[data-sr]').forEach(b => b.onclick = () => { SR = +b.dataset.sr; AU.click(); renderShowroom(); }); };
+{ const st = document.createElement('style'); st.textContent = `
+.srgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(10.5rem,1fr));gap:.5rem;margin:.6rem 0 .9rem;max-height:17rem;overflow:auto;padding:.2rem}
+.srcard{position:relative;display:flex;flex-direction:column;align-items:center;gap:.2rem;padding:.55rem .4rem;border-radius:.8rem;background:rgba(6,14,32,.65);border:1px solid var(--line);font-size:.78rem;text-align:center}
+.srcard img{height:2.6rem;max-width:95%;object-fit:contain}.srcard b{font-size:.8rem}.srcard span{color:var(--gold2);font-weight:700}.srcard small{color:var(--mut)}
+.srcard.on{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold) inset,0 .4rem 1rem rgba(0,0,0,.4);background:rgba(245,178,27,.12)}.srcard:hover{border-color:var(--gold)}
+.newb{position:absolute;top:.3rem;inset-inline-start:.3rem;font-style:normal;font-size:.62rem;font-weight:800;padding:.05rem .35rem;border-radius:.4rem;background:#ff4d5e;color:#fff}
+.vchip .newb{position:static;margin-inline-start:.3rem}.vchip.buyv{opacity:.92;border-style:dashed}`; document.head.appendChild(st); }
+
+/* ======================= fleet-physics-career.js ======================= */
+"use strict";
+/* =====================================================================
+   OGRAAA v25 — real-model fleet with true separate wheels, realistic
+   long-travel bus suspension that responds to upgrades & wear, fewer
+   tyre events, wheel shadows, reorganised career ladder
+   ===================================================================== */
+/* AI copies of the fleet also roll on separate wheels */
+const _sp25 = spawnAI;
+spawnAI = function(spec, lane, x, dir, opt){ const c = _sp25(spec, lane, x, dir, opt); if (c && AIV[spec] && AIV[spec].whRim != null) c.whRim = AIV[spec].whRim; return c; };
+/* driver zones for passenger windows */
+Object.assign(DRV, {suzuki:.56, fotonC2:.6, joyA4:.66, joyA5:.68, hiaceW:.7, kingWB:.7, gdx6532:.78, coasterW:.79, joyA6:.8, xmq6600:.82, higer6720:.82, zk6770:.82, xmq6127:.88, gdx6125:.88, zk6128:.88, tourismo:.88});
+/* ---------------- suspension: buses float and pitch slowly, vans stay firm ----------------
+   real buses: ~0.8–1.0 Hz body frequency, light damping (ζ≈0.18–0.25), 25+ cm travel (air bags);
+   suspension upgrades add damping/stiffness, a worn suspension gets floatier */
+function softSusp(c, len){ if (!c || len < 5.8) return; const isP = c === G.car, up = isP && !G.test ? upl(G.vid, 'susp') : 0, wear = isP && !G.test ? GV(G.vid).cond.susp / 100 : 1, n = c.wh.length, m = c.base;
+ const f0 = len > 11 ? .82 : len > 9 ? .9 : len > 6.5 ? 1.0 : 1.15, z0 = len > 9 ? .18 : len > 6.5 ? .21 : .25;
+ c.f = f0 * (1 + .035 * up); c.zeta = (z0 + .035 * up) * (.7 + .3 * wear); c.travel = (len > 9 ? .27 : .23) + .012 * up;
+ c.k = (m / n) * Math.pow(2 * Math.PI * c.f, 2); c.cd = 2 * c.zeta * Math.sqrt(c.k * m / n); c.kb = c.k * 10; }
+/* upgrades with real consequences on heavy vehicles: armour adds mass, engine tuning drinks a little more */
+const _sr25 = startRoute;
+startRoute = function(route, opt){ _sr25(route, opt);
+ if (W.holes && W.holes.length > 2) W.holes = W.holes.filter((_, i) => i % 2 === 0);   // smoother roads: half the potholes
+ const car = G.car; if (!car || G.test || !G.V) return; const a = upl(G.vid, 'armor'), e = upl(G.vid, 'engine'); car.base *= 1 + .015 * a; car.m = car.base; G.engThirst = 1 + .03 * e; };
+const _ff25 = fuelFactor;
+fuelFactor = function(){ return _ff25() * (G.engThirst || 1); };
+/* ---------------- wheels cast the same directional shadows as the body ---------------- */
+const _ds25 = dirShadow;
+dirShadow = function(car, src, X, gy, sw, shh, mk, k){ const calls = [], orig = projShadow; projShadow = function(s, x, b, w, h, m, kk, dx, ly, al, blur){ calls.push([dx, ly, al, blur]); return orig.apply(this, arguments); };
+ try{ _ds25(car, src, X, gy, sw, shh, mk, k); } finally { projShadow = orig; }
+ const wr = car.whRim != null ? car.whRim : (car.player && G.V && !G.V.baked ? car.rim : null); if (wr == null) return; const im = IMG['wh' + wr]; if (!im || !im.width) return; const q = WQ(wr), lift = car.lift || 0;
+ for (const [dx, ly, al, blur] of calls) for (const w of car.wh){ const d = w.r * 2 * q * PPM, s = d / im.width, Xw = sx(w.x), Gy = sy(terrH(w.x) + lift) + 1; orig(im, Xw, Gy, im.width, im.height * .52, s, s, dx, ly, al * .9, blur); } };
+/* ---------------- saves that pointed at retired models ---------------- */
+const _el25 = ensureLicences;
+ensureLicences = function(){ _el25(); if (!VEHS.find(v => v.id === S.sel)) S.sel = 'hiace'; const c = S.career; if (c && c.done) for (const id in c.done) if (!CAREER_N.find(n => n.id === id)) delete c.done[id]; };
+/* ---------------- career ladder rebuilt around the whole fleet ---------------- */
+CAREER_N.length = 0; CAREER_N.push(
+ {id:'c0', x:800, y:500, big:true, v:'hiaceB', t:['سواق تحت التدريب','Trainee Driver'], d:['أول يوم في شركة أجرة للنقل — هايس كلاسيك تحت عين المشرف.','Day one at Ograaa Transport — a classic HiAce under a supervisor\'s eye.'], req:[['lic','micro']], pre:[], rw:{sal:180, com:.08, veh:['hiaceB','suzuki']}},
+ {id:'n1', x:1020, y:500, v:'hiace', t:['سواق خط ميكروباص','Microbus Line Driver'], d:['خطك الثابت ورقمك في الموقف.','Your own line and a number at the terminal.'], req:[['shifts',3],['stars2',2]], pre:['c0'], rw:{sal:260, com:.12, veh:['hiace','fotonC2','joyA4']}},
+ {id:'n2', x:600, y:380, v:'fiat128', t:['رخصة تاكسي سرفيس','Service Taxi Endorsement'], d:['الفيات ١٢٨ للمشاوير القصيرة.','The Fiat 128 for short service runs.'], req:[['clean',2]], pre:['c0'], rw:{sal:200, com:.1, veh:['fiat128']}},
+ {id:'n13', x:420, y:260, v:'minivan', t:['سرفيس الميني فان','Minivan Express'], d:['٧ ركاب وسرعة وتوفير.','Seven seats, speed and economy.'], req:[['perfect',10]], pre:['n2'], rw:{sal:240, com:.12, veh:['minivan']}},
+ {id:'n3', x:960, y:320, v:'hiace', night:true, t:['شهادة الوردية الليلي','Night Shift Endorsement'], d:['ورديات بالليل بحافز ٢٥٪.','Night shifts with a 25% allowance.'], req:[['night',2]], pre:['n1'], rw:{perk:'night'}},
+ {id:'n4', x:960, y:690, v:'hiaceW', t:['نجمة الأمان','Safety Star'], d:['٥ ورديات من غير ولا مخالفة.','Five shifts without a single fine.'], req:[['clean',5]], pre:['n1'], rw:{bonus:40}},
+ {id:'v1', x:1200, y:640, v:'hiace2', t:['كابتن فانات أول','Senior Van Captain'], d:['الهايس الجديد والفانات العريضة.','The new-gen HiAce and the wide-body vans.'], req:[['shifts',8],['level',3]], pre:['n1'], rw:{sal:320, com:.12, veh:['hiace2','joyA5','hiaceW','kingWB']}},
+ {id:'n5', x:1240, y:400, v:'coaster', t:['كابتن ميني باص','Minibus Captain'], d:['الكوستر والميني باصات.','The Coaster and the minibus fleet.'], req:[['level',3],['exam','m4']], pre:['n1'], rw:{sal:380, com:.12, veh:['coaster','kinglong','gdx6532','coasterW','joyA6']}},
+ {id:'v2', x:1430, y:250, v:'rosa', t:['كابتن ميني باص أول','Senior Minibus Captain'], d:['روزا وكينج لونج وهايجر ويوتونج.','Rosa, King Long, Higer and Yutong minibuses.'], req:[['shifts',15],['rating',4.3]], pre:['n5'], rw:{sal:470, com:.12, veh:['rosa','xmq6600','higer6720','zk6770']}},
+ {id:'n6', x:1440, y:540, v:'redbus', t:['سواق أتوبيس المدينة','City Bus Driver'], d:['درجة تانية وأول أتوبيس.','Grade 2 and your first bus.'], req:[['lic','bus'],['exam','b1']], pre:['n5'], rw:{sal:600, com:.1, veh:['redbus']}},
+ {id:'n7', x:1400, y:780, v:'mcv', t:['سواق نقل عام أول','Senior Public Transport'], d:['الأتوبيس الأزرق والأتوبيس الجديد.','The blue bus and the new city bus.'], req:[['bus',8]], pre:['n6'], rw:{sal:780, com:.1, veh:['mcv','redbus2']}},
+ {id:'n10', x:1120, y:880, v:'redbus2', t:['مشرف خط','Line Supervisor'], d:['بتشرف على ٦ سواقين — مكافأة يومية.','You supervise six drivers — daily bonus.'], req:[['shifts',30]], pre:['n7'], rw:{bonus:300, perk:'daily'}},
+ {id:'n8', x:1620, y:560, v:'coachB', t:['كابتن أتوبيس سفر','Intercity Coach Captain'], d:['درجة أولى وطرق السفر.','Grade 1 and the highways.'], req:[['lic','coach'],['exam','c1']], pre:['n7'], rw:{sal:1150, com:.08, veh:['coachB','xmq6127','gdx6125']}},
+ {id:'n9', x:1660, y:330, v:'coachO', t:['كابتن السفر الفاخر','Luxury Coach Captain'], d:['رحلات الغردقة وشرم.','Hurghada and Sharm runs.'], req:[['rating',4.6],['exam','c3']], pre:['n8'], rw:{sal:1600, com:.08, veh:['coachO','zk6128','coachN']}},
+ {id:'v3', x:1600, y:110, v:'tourismo', t:['كابتن مرسيدس التنفيذي','Executive Tourismo Captain'], d:['أفخم أتوبيس في الأسطول.','The flagship of the fleet.'], req:[['rating',4.7],['perfect',60]], pre:['n9'], rw:{sal:2000, com:.08, veh:['tourismo']}},
+ {id:'n11', x:1180, y:150, v:'coachN', t:['مدير الأسطول','Fleet Manager'], d:['بتدير أسطول الشركة كله.','You run the whole company fleet.'], req:[['earned',150000]], pre:['n9','n10'], rw:{sal:2600, perk:'daily'}},
+ {id:'n12', x:820, y:120, v:'tourismo', t:['شريك في الشركة','Company Partner'], d:['نسبة ١٥٪ من كل مكسب بتعمله.','15% share on everything you earn.'], req:[['perfect',100]], pre:['n11'], rw:{perk:'partner'}});
 
 /* ======================= atlas-loader.js ======================= */
 /* =====================================================================
