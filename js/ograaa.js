@@ -1568,8 +1568,8 @@ function renderGarage(){
  } else if (GT === 'performance'){
   body = `<div class="items">${UPS.map(k => { const l = g.up[k] || 0, c = upCost(V, k, l); return `<div class="item">${icon(UP_ICON[k])}<b>${t('up_' + k)}</b><div class="bar gold" style="width:100%"><i style="width:${l * 20}%"></i></div><span class="muted">${fmt(l)}/٥</span>${l < 5 ? `<button class="btn sm" data-up="${k}">${money(c)}</button>` : `<small>MAX</small>`}</div>`; }).join('')}</div>`;
  } else if (GT === 'maintenance'){
-  const ks = ['body','engine','susp','tyres','brakes','oil','clean','fuel'];
-  body = ks.map(k => { const v = k === 'fuel' ? g.fuel / (V.tank * (1 + .2 * (g.up.tank || 0))) * 100 : g.cond[k], c = repairCost(V, k, g); return `<div class="set"><label>${icon({body:'crash', engine:'engine', susp:'repair', tyres:'tyre', brakes:'crash', oil:'battery', clean:'wash', fuel:'fuel'}[k])}${t('c_' + k)}</label><div class="sp">${bar(v)}</div><span style="width:3rem">${fmt(pct(v))}%</span><button class="btn sm" data-fix="${k}" ${c <= 0 ? 'disabled' : ''}>${t('fix_' + k)} · ${money(c)}</button></div>`; }).join('') + `<div class="mbtns"><button class="btn" id="fixAll">${icon('repair')} ${t('repair')} ✱</button></div>`;
+  const ks = ['body','engine','rad','gbx','susp','tyres','rim','brakes','oil','clean','fuel']; for (const q of ['rad','gbx','rim']) if (g.cond[q] == null) g.cond[q] = 100;
+  body = ks.map(k => { const v = k === 'fuel' ? g.fuel / (V.tank * (1 + .2 * (g.up.tank || 0))) * 100 : g.cond[k], c = repairCost(V, k, g); return `<div class="set"><label>${icon({body:'crash', engine:'engine', rad:'engine', gbx:'upgrade', rim:'tyre', susp:'repair', tyres:'tyre', brakes:'crash', oil:'battery', clean:'wash', fuel:'fuel'}[k])}${t('c_' + k)}</label><div class="sp">${bar(v)}</div><span style="width:3rem">${fmt(pct(v))}%</span><button class="btn sm" data-fix="${k}" ${c <= 0 ? 'disabled' : ''}>${t('fix_' + k)} · ${money(c)}</button></div>`; }).join('') + `<div class="mbtns"><button class="btn" id="fixAll">${icon('repair')} ${t('repair')} ✱</button></div>`;
  } else {
   const cap = V.store * (1 + .2 * (g.up.store || 0)) + (g.cos.rack && V.rack ? 150 : 0);
   body = `<div class="set"><label>${icon('terminal')} ${t('cap')}</label><b class="gold">${fmt(Math.round(cap))} ${t('kg')}</b></div>${V.rack ? `<div class="set"><label>${icon('garage')} ${LANG === 'ar' ? 'شبكة سقف (+١٥٠ كجم)' : 'Roof rack (+150 kg)'}</label><span class="sp"></span>${S.inv[GV_ID + ':rack'] ? `<button class="btn sm ${g.cos.rack ? '' : 'sec'}" id="rackT">${g.cos.rack ? t('equipped') : t('equip')}</button>` : `<button class="btn sm" id="rackB">${money(900)}</button>`}</div>` : ''}<p class="muted">${LANG === 'ar' ? 'الطرود بتزود وزن المركبة وبتأثر على الفيزياء. الحاجات القابلة للكسر بتتكسر من المطبات والنطات.' : 'Parcels add real weight that changes the handling. Fragile items can break on hard landings and bumps.'}</p>`;
@@ -3225,7 +3225,7 @@ setTimeout(function retry(){ if (AU.ctx && !Object.keys(SND.buf).length){ SND.lo
 /* speed wind: silent below 60 km/h, rising smoothly with speed above it */
 const _eng12 = AU.engine.bind(AU);
 AU.engine = function(on, rpm, load, speed, big){ _eng12(on, rpm, load, speed, big); const e = this.eng; if (!e) return; const t = this.ctx.currentTime + .05, kmh = (speed || 0) * 3.6, k = clamp((kmh - 60) / 60, 0, 1.4);
- e.wg.gain.setTargetAtTime(G.paused ? 0 : .16 * Math.pow(k, 1.4), t, .35); e.wf.frequency.setTargetAtTime(380 + k * 1500, t, .35); };
+ e.wg.gain.setTargetAtTime(G.paused ? 0 : .096 * Math.pow(k, 1.4), t, .35); e.wf.frequency.setTargetAtTime(380 + k * 1500, t, .35); };
 
 /* ======================= wheels-windows.js ======================= */
 "use strict";
@@ -4172,6 +4172,81 @@ function drawSunRays(){ const sunset = G.tod === 'sunset', hz = horizon(), sxp =
  const t = performance.now() / 1000, a = (sunset ? .75 : .5) * (G.weather === 'rain' ? .25 : G.weather === 'sand' ? .55 : 1) * (.92 + .08 * Math.sin(t * .3));
  ctx.save(); ctx.globalCompositeOperation = 'screen'; ctx.globalAlpha = a; ctx.translate(sxp, syp); ctx.rotate(Math.sin(t * .05) * .02); ctx.translate(-sxp, -syp); ctx.drawImage(RAYC.c, 0, 0, VW, VH); ctx.restore(); }
 addEventListener('resize', () => { RAYC = null; });
+
+/* ======================= damage-systems.js ======================= */
+"use strict";
+/* =====================================================================
+   OGRAAA v31 — component damage model (engine, radiator, gearbox, rims,
+   tyres, suspension) driven by where/how hard you hit · field repairs
+   with the tool kit · speed-based camera zoom · tyre screech · sparks
+   anchored on real bodywork · fuel +50% · quieter wind
+   ===================================================================== */
+const PART = ['rad','gbx','rim'];
+function condOf(){ const c = GV(G.vid).cond; for (const k of PART) if (c[k] == null) c[k] = 100; return c; }
+/* ---------------- where the hit lands decides what breaks ---------------- */
+const _ad31 = addDent;
+addDent = function(car, lx, ly, sev, glass){ _ad31(car, lx, ly, sev, glass);
+ if (car !== G.car || G.mode !== 'play') return;
+ // keep the persistent smoke/spark emitter on real bodywork (never in empty space past a crushed edge)
+ const E = G.dmgEm; if (E && E.length){ const e = E[E.length - 1]; if (e.lx === lx && e.ly === ly){ const p = onBody(car, lx, ly); e.lx = p[0]; e.ly = p[1]; } }
+ if (G.test || glass || S.devGod) return; const c = condOf(), V = G.V, u = lx / car.L + .5, h = (ly - car.yb) / (car.yt - car.yb), s = Math.max(0, sev - 4);
+ const engFront = V.cls === 'micro' || V.baked, nearEngine = engFront ? u > .72 : u < .26;
+ if (nearEngine){ c.engine = Math.max(0, c.engine - s * 2.4); c.rad = Math.max(0, c.rad - s * 3.2); if (s > 6) toastUI('🌡 ' + L2('الضربة جت في الموتور والردياتير', 'The hit damaged the engine and radiator'), 'bad'); }
+ // wheels near the impact: bent rims, punctures, suspension
+ car.wh.forEach((w, i) => { const wl = (w.x - car.x) * Math.cos(car.a) + (w.y - car.y) * Math.sin(car.a); if (Math.abs(wl - lx) < w.r * 1.8 && h < .55){ c.rim = Math.max(0, c.rim - s * 4.5); c.susp = Math.max(0, c.susp - s * 2.5); G.rimBent = G.rimBent || []; G.rimBent[i] = clamp((G.rimBent[i] || 0) + s * .07, 0, 1); if (sev > 10 && Math.random() < .45){ w.flat = true; } } });
+ // drivetrain: low, central or very violent hits reach the gearbox
+ if ((u > .3 && u < .7 && h < .35) || sev > 14) c.gbx = Math.max(0, c.gbx - s * 2.2);
+ save(); };
+function onBody(car, lx, ly){ const cv = car.cv; if (!cv) return [lx, ly]; let d = car._alpha; if (!d || car._alphaV !== cv){ try{ d = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data; car._alpha = d; car._alphaV = cv; }catch(e){ return [lx, ly]; } }
+ const w = cv.width, h = cv.height, g = car.g, toPx = (X, Y) => [((car.mirror ? -X : X) / g.len + .5) * w, (.5 - Y / g.h) * h], toL = (px, py) => [((px / w - .5) * g.len) * (car.mirror ? -1 : 1), (.5 - py / h) * g.h];
+ let [px, py] = toPx(lx, ly); const cx = w / 2, cy = h * .6; for (let i = 0; i < 40; i++){ const ix = Math.round(px), iy = Math.round(py); if (ix >= 0 && iy >= 0 && ix < w && iy < h && d[(iy * w + ix) * 4 + 3] > 200) break; px += (cx - px) * .06; py += (cy - py) * .06; }
+ // a little inside the broken edge
+ px += (cx - px) * .03; return toL(px, py); }
+/* ---------------- consequences every frame ---------------- */
+let screech = null;
+const _upd31 = update;
+update = function(dt){ const car = G.car, full = G.mode === 'play'; if (full && car && car.acc0 == null){ car.acc0 = car.acc; car.vmax0 = car.vmax; }
+ _upd31(dt); if (!full || !car || dt <= 0) return; const c = G.test ? {engine:100, rad:100, gbx:100, rim:100} : condOf(), fix = G.fieldFix, sp = speedOf(car);
+ // engine power & top speed
+ let pf = .35 + .65 * c.engine / 100; if (c.gbx < 20) pf *= .7; if (fix) pf = Math.max(pf, .68); car.acc = car.acc0 * pf; car.vmax = car.vmax0 * (.62 + .38 * Math.max(fix ? 60 : 0, c.engine) / 100);
+ // radiator leak: the engine runs hot, steams, and overheats if pushed
+ if (c.rad < 75 && G.engOn){ const leak = (75 - c.rad) / 75 * (fix ? .35 : 1); G.temp += dt * leak * (1.2 + sp * .12); if (Math.random() < dt * leak * 8){ const [ex, ey] = engineBay(); puff(ex, ey + .5, -car.vx * .3, 1.2, 1.4, .14, '#eef3f8', 'smoke'); } if (Math.random() < dt * leak * 3){ const [ex] = engineBay(); puff(ex, terrH(ex) + .2, 0, -.3, 3, .04, '#3d8b5a', 'dust'); } }
+ // gearbox: lost gears, slipping, grinding
+ const maxG = c.gbx > 60 || fix ? 5 : c.gbx > 35 ? 4 : c.gbx > 15 ? 3 : 2; if (car.gear > maxG) car.gear = maxG;
+ if (c.gbx < 50 && !fix && sp > 2 && Math.random() < dt * (50 - c.gbx) / 90){ car.shiftT = .45; AU.noiseHit(.25, 900, .05, 0, 'bandpass', 4); }
+ // bent rims: drag, vibration, scraping sparks when the tyre is flat on a bent rim
+ const rb = G.rimBent || []; let wob = 0; car.wh.forEach((w, i) => { const b = (rb[i] || 0) * (fix ? .5 : 1); if (!b) return; wob += b; if (w.flat && sp > 2 && Math.random() < dt * 25 * b) puff(w.x - Math.sign(car.vx) * w.r * .6, terrH(w.x) + .03, -car.vx * .5 + rnd(-1.5, 1.5), rnd(.5, 2.5), .3, .03, '#FFD24A', 'spark'); });
+ if (wob){ car.vx *= 1 - dt * .02 * wob; car.wh.forEach(w => { w.vx *= 1 - dt * .02 * wob; }); if (S.set.shake !== false) cam.shake = Math.max(cam.shake || 0, Math.min(.12, wob * Math.min(1, sp / 14) * .08)); }
+ // tyre screech under hard braking
+ brakeScreech(dt);
+ // speed-based camera zoom (closer when slow, wider when fast)
+ const target = 1.06 - clamp(sp / 26, 0, 1) * .24; cam.zs = cam.zs == null ? target : cam.zs + (target - cam.zs) * Math.min(1, dt * .9); if (Math.abs((cam.zoom || 1) - cam.zs) > .002){ cam.zoom = cam.zs; calcPPM(); } };
+function brakeScreech(dt){ const c = AU.ctx, car = G.car; if (!c) return; if (!screech){ const len = c.sampleRate * 2, b = c.createBuffer(1, len, c.sampleRate), d = b.getChannelData(0); for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1; const s = c.createBufferSource(); s.buffer = b; s.loop = true; const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1700; bp.Q.value = 2.5; const bp2 = c.createBiquadFilter(); bp2.type = 'peaking'; bp2.frequency.value = 2600; bp2.gain.value = 8; const g = c.createGain(); g.gain.value = 0; s.connect(bp).connect(bp2).connect(g).connect(AU.sfxG); s.start(); screech = {s, bp, g, pv:car.vx}; }
+ const decel = (screech.pv - car.vx) / Math.max(dt, .001) * Math.sign(car.vx || 1); screech.pv = car.vx; const sp = speedOf(car), braking = key.brake || G.brkT, onGround = car.wh.some(w => w.ground);
+ let k = braking && onGround ? clamp((decel - 4) / 5, 0, 1) * clamp((sp - 3) / 12, 0, 1) : 0; if (car.absT > 0 && sp > 4) k = Math.max(k, .45); if (G.paused) k = 0;
+ const t = c.currentTime; screech.g.gain.setTargetAtTime(k * .22, t, .06); screech.bp.frequency.setTargetAtTime(1300 + sp * 28 + Math.sin(t * 13) * 80, t, .05); }
+/* engine sound: misfires and knocking on a damaged engine */
+const _eng31 = AU.engine.bind(AU);
+AU.engine = function(on, rpm, load, speed, big){ _eng31(on, rpm, load, speed, big); const e = this.eng; if (!e || !on || G.test || !G.vid || G.mode !== 'play') return; const c = condOf(); if (c.engine < 50){ const bad = (50 - c.engine) / 50, t = this.ctx.currentTime + .03; if (Math.random() < .12 * bad) e.out.gain.setTargetAtTime(e.out.gain.value * .25, t, .01); e.ng.gain.setTargetAtTime(e.ng.gain.value + .06 * bad, t, .05); } };
+/* ---------------- tool kit: field repair (once per trip) ---------------- */
+{ const T = IBY('tools'); if (T){ T.use = 'field'; T.passive = false; T.d = ['تصليح مؤقت: يرجّع العربية تمشي لحد الورشة', 'Field repair: keeps you running to a workshop']; } }
+const _ui31 = useItem;
+useItem = function(id){ if (id !== 'tools') return _ui31(id); if (G.mode !== 'play') return; if (G.fieldFix){ toastUI(L2('عملت تصليح مؤقت خلاص', 'Field repair already done this trip'), 'gold'); return; } if (speedOf(G.car) > .5){ toastUI(L2('وقف الأول', 'Stop first'), 'bad'); return; }
+ G.busyT = 10; G.busyMsg = L2('🧰 بتصلّح تصليح مؤقت…', '🧰 Field repair in progress…'); AU.noiseHit(.6, 1200, .08, 0, 'bandpass', 3);
+ setTimeout(() => { G.fieldFix = true; if (!G.test){ const c = condOf(); c.engine = Math.max(c.engine, 45); c.rad = Math.max(c.rad, 50); c.gbx = Math.max(c.gbx, 40); } G.rimBent = (G.rimBent || []).map(b => b * .5); G.temp = Math.min(G.temp, 95); toastUI('🧰 ' + L2('اتصلحت مؤقتاً — روح أقرب ورشة', 'Patched up — head to the nearest workshop'), 'good', null, 4); save(); if (typeof renderTrunk === 'function') renderTrunk(); }, 10000); };
+const _sr31 = startRoute;
+startRoute = function(r, o){ _sr31(r, o); G.fieldFix = false; G.rimBent = []; if (G.car){ G.car.acc0 = G.car.acc; G.car.vmax0 = G.car.vmax; } cam.zs = null; };
+/* workshop repairs the new components too */
+const _svc31 = svcOptions;
+svcOptions = function(type){ const o = _svc31(type); if (type !== 'shop' || G.test) return o; const c = condOf(), V = G.V, base = 8 + V.mass * .004;
+ o.splice(2, 0, {ic:'🌡', n:['ردياتير جديد','Radiator repair'], p:Math.round((100 - c.rad) * base * .45) + 150, t:4, dis:c.rad > 95, fx:() => { c.rad = 100; G.temp = Math.min(G.temp, 85); }},
+  {ic:'⚙️', n:['تصليح الفتيس','Gearbox repair'], p:Math.round((100 - c.gbx) * base * .7) + 300, t:5, dis:c.gbx > 95, fx:() => { c.gbx = 100; }},
+  {ic:'🛞', n:['عدل الجنوط','Straighten rims'], p:Math.round((100 - c.rim) * base * .3) + 120, t:3, dis:c.rim > 95 && !(G.rimBent || []).some(b => b > 0), fx:() => { c.rim = 100; G.rimBent = []; }}); return o; };
+Object.assign(TX, {c_rad:['الردياتير','Radiator'], c_gbx:['الفتيس','Gearbox'], c_rim:['الجنوط','Rims']});
+{ const _rc31 = repairCost; repairCost = function(V, k, g){ if (PART.includes(k)) return Math.round((100 - (g.cond[k] ?? 100)) * (8 + V.mass * .004) * {rad:.45, gbx:.7, rim:.3}[k]); return _rc31(V, k, g); }; }
+/* ---------------- fuel +50% again ---------------- */
+const _ff31 = fuelFactor;
+fuelFactor = function(){ return _ff31() * 1.5; };
 
 /* ======================= atlas-loader.js ======================= */
 /* =====================================================================
