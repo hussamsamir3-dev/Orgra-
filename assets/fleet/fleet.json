@@ -1,0 +1,367 @@
+{
+ "v_suzuki_van": {
+  "label": "Suzuki Van",
+  "file": "assets/fleet/v_suzuki_van.webp",
+  "w": 171,
+  "h": 100,
+  "L": 3.9,
+  "wheels": [
+   {
+    "x": 0.21,
+    "y": 0.82,
+    "r": 0.16
+   },
+   {
+    "x": 0.785,
+    "y": 0.82,
+    "r": 0.16
+   }
+  ],
+  "estimated": true
+ },
+ "v_foton_c2": {
+  "label": "Foton C2",
+  "file": "assets/fleet/v_foton_c2.webp",
+  "w": 208,
+  "h": 111,
+  "L": 4.5,
+  "wheels": [
+   {
+    "x": 0.2091,
+    "y": 0.8378,
+    "r": 0.1554
+   },
+   {
+    "x": 0.7837,
+    "y": 0.8333,
+    "r": 0.1599
+   }
+  ]
+ },
+ "v_joylong_a4": {
+  "label": "Joylong A4",
+  "file": "assets/fleet/v_joylong_a4.webp",
+  "w": 207,
+  "h": 109,
+  "L": 5.0,
+  "wheels": [
+   {
+    "x": 0.21,
+    "y": 0.82,
+    "r": 0.16
+   },
+   {
+    "x": 0.785,
+    "y": 0.82,
+    "r": 0.16
+   }
+  ],
+  "estimated": true
+ },
+ "v_joylong_a5": {
+  "label": "Joylong A5",
+  "file": "assets/fleet/v_joylong_a5.webp",
+  "w": 252,
+  "h": 115,
+  "L": 5.4,
+  "wheels": [
+   {
+    "x": 0.2163,
+    "y": 0.8261,
+    "r": 0.1674
+   },
+   {
+    "x": 0.744,
+    "y": 0.8261,
+    "r": 0.1978
+   }
+  ]
+ },
+ "v_hiace": {
+  "label": "Toyota HiAce",
+  "file": "assets/fleet/v_hiace.webp",
+  "w": 320,
+  "h": 137,
+  "L": 5.4,
+  "wheels": [
+   {
+    "x": 0.2094,
+    "y": 0.8175,
+    "r": 0.1788
+   },
+   {
+    "x": 0.9641,
+    "y": 0.7226,
+    "r": 0.1113
+   }
+  ]
+ },
+ "v_kinglong_wide": {
+  "label": "King Long Wide Body Van",
+  "file": "assets/fleet/v_kinglong_wide.webp",
+  "w": 357,
+  "h": 151,
+  "L": 6.0,
+  "wheels": [
+   {
+    "x": 0.1933,
+    "y": 0.8377,
+    "r": 0.1606
+   },
+   {
+    "x": 0.8095,
+    "y": 0.8377,
+    "r": 0.1573
+   }
+  ]
+ },
+ "v_gd_6532": {
+  "label": "Golden Dragon XML6532",
+  "file": "assets/fleet/v_gd_6532.webp",
+  "w": 307,
+  "h": 125,
+  "L": 6.6,
+  "wheels": [
+   {
+    "x": 0.2524,
+    "y": 0.84,
+    "r": 0.158
+   },
+   {
+    "x": 0.7948,
+    "y": 0.84,
+    "r": 0.156
+   }
+  ]
+ },
+ "v_coaster": {
+  "label": "Toyota Coaster",
+  "file": "assets/fleet/v_coaster.webp",
+  "w": 327,
+  "h": 133,
+  "L": 6.99,
+  "wheels": [
+   {
+    "x": 0.2355,
+    "y": 0.8459,
+    "r": 0.1523
+   },
+   {
+    "x": 0.9251,
+    "y": 0.6165,
+    "r": 0.0959
+   }
+  ]
+ },
+ "v_foton_view": {
+  "label": "Foton View C2",
+  "file": "assets/fleet/v_foton_view.webp",
+  "w": 294,
+  "h": 132,
+  "L": 6.6,
+  "wheels": [
+   {
+    "x": 0.21,
+    "y": 0.82,
+    "r": 0.16
+   },
+   {
+    "x": 0.785,
+    "y": 0.82,
+    "r": 0.16
+   }
+  ],
+  "estimated": true
+ },
+ "v_kl_6600": {
+  "label": "King Long XMQ6600",
+  "file": "assets/fleet/v_kl_6600.webp",
+  "w": 303,
+  "h": 136,
+  "L": 6.9,
+  "wheels": [
+   {
+    "x": 0.2112,
+    "y": 0.8456,
+    "r": 0.1507
+   },
+   {
+    "x": 0.7706,
+    "y": 0.8493,
+    "r": 0.1471
+   }
+  ]
+ },
+ "v_joylong_a6": {
+  "label": "Joylong A6",
+  "file": "assets/fleet/v_joylong_a6.webp",
+  "w": 345,
+  "h": 143,
+  "L": 6.6,
+  "wheels": [
+   {
+    "x": 0.2014,
+    "y": 0.8427,
+    "r": 0.1503
+   },
+   {
+    "x": 0.7971,
+    "y": 0.8427,
+    "r": 0.1521
+   }
+  ]
+ },
+ "v_isuzu_npr": {
+  "label": "Isuzu NPR Bus",
+  "file": "assets/fleet/v_isuzu_npr.webp",
+  "w": 371,
+  "h": 136,
+  "L": 7.5,
+  "wheels": [
+   {
+    "x": 0.2588,
+    "y": 0.8419,
+    "r": 0.1526
+   },
+   {
+    "x": 0.7884,
+    "y": 0.8456,
+    "r": 0.1489
+   }
+  ]
+ },
+ "v_rosa": {
+  "label": "Mitsubishi Rosa",
+  "file": "assets/fleet/v_rosa.webp",
+  "w": 365,
+  "h": 132,
+  "L": 6.99,
+  "wheels": [
+   {
+    "x": 0.21,
+    "y": 0.82,
+    "r": 0.16
+   },
+   {
+    "x": 0.785,
+    "y": 0.82,
+    "r": 0.16
+   }
+  ],
+  "estimated": true
+ },
+ "v_higer_6720": {
+  "label": "Higer KLQ6720",
+  "file": "assets/fleet/v_higer_6720.webp",
+  "w": 357,
+  "h": 142,
+  "L": 7.2,
+  "wheels": [
+   {
+    "x": 0.2367,
+    "y": 0.831,
+    "r": 0.1602
+   },
+   {
+    "x": 0.8992,
+    "y": 0.6162,
+    "r": 0.0898
+   }
+  ]
+ },
+ "v_yutong_6770": {
+  "label": "Yutong ZK6770",
+  "file": "assets/fleet/v_yutong_6770.webp",
+  "w": 381,
+  "h": 143,
+  "L": 7.0,
+  "wheels": [
+   {
+    "x": 0.2467,
+    "y": 0.8322,
+    "r": 0.1573
+   },
+   {
+    "x": 0.773,
+    "y": 0.8427,
+    "r": 0.1503
+   }
+  ]
+ },
+ "v_kl_6127": {
+  "label": "King Long XMQ6127",
+  "file": "assets/fleet/v_kl_6127.webp",
+  "w": 423,
+  "h": 141,
+  "L": 12.0,
+  "wheels": [
+   {
+    "x": 0.2199,
+    "y": 0.8262,
+    "r": 0.1649
+   },
+   {
+    "x": 0.909,
+    "y": 0.6312,
+    "r": 0.133
+   }
+  ]
+ },
+ "v_gd_6125": {
+  "label": "Golden Dragon XML6125",
+  "file": "assets/fleet/v_gd_6125.webp",
+  "w": 433,
+  "h": 144,
+  "L": 12.0,
+  "wheels": [
+   {
+    "x": 0.2471,
+    "y": 0.8264,
+    "r": 0.1667
+   },
+   {
+    "x": 0.9122,
+    "y": 0.6285,
+    "r": 0.1163
+   }
+  ]
+ },
+ "v_yutong_6128": {
+  "label": "Yutong ZK6128",
+  "file": "assets/fleet/v_yutong_6128.webp",
+  "w": 416,
+  "h": 145,
+  "L": 12.0,
+  "wheels": [
+   {
+    "x": 0.2512,
+    "y": 0.8276,
+    "r": 0.1638
+   },
+   {
+    "x": 0.9195,
+    "y": 0.6207,
+    "r": 0.119
+   }
+  ]
+ },
+ "v_tourismo": {
+  "label": "Mercedes-Benz Tourismo",
+  "file": "assets/fleet/v_tourismo.webp",
+  "w": 475,
+  "h": 145,
+  "L": 13.0,
+  "wheels": [
+   {
+    "x": 0.2358,
+    "y": 0.831,
+    "r": 0.1603
+   },
+   {
+    "x": 0.7484,
+    "y": 0.831,
+    "r": 0.1621
+   }
+  ]
+ }
+}
