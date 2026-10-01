@@ -4024,6 +4024,56 @@ SKY15.city = ['pCairo2', 'pCairo', 'pResid']; SKY15.redsea = ['pHurghada', 'pGou
 const _dl26 = drawLayers;
 drawLayers = function(){ const r = W.route; if (r && r.sky){ const saved = SKY15[r.biome]; SKY15[r.biome] = r.sky; try{ _dl26(); } finally { SKY15[r.biome] = saved; } } else _dl26(); };
 
+/* ======================= polish-2.js ======================= */
+"use strict";
+/* =====================================================================
+   OGRAAA v27 — polish pass on customisation & wheels
+   wheels locked to their arches · real mud flaps · sleek LED bar ·
+   metre-scaled decals · clean paint finishes
+   ===================================================================== */
+/* ---------------- wheels for wheel-well vehicles: anchored in the body's own space ---------------- */
+drawVehicle = (function(prev){ return function(car, opt){ const M = META[car.spr]; if (!M || !M.wf) return prev(car, opt); _dv26(car, opt);
+ opt = opt || {}; const lift = opt.lift || 0, sc = opt.scale || 1, src = car.cv || IMG[car.spr], k = PPM * car.g.s * sc, mk = car.mirror ? -k : k, wr = car.whRim ?? car.rim, im = rimImg(wr, car.player ? car.rimc : null), q = WQ(wr);
+ ctx.save(); ctx.translate(sx(car.x), sy(car.y + lift)); ctx.rotate(-car.a); ctx.scale(mk, k); ctx.translate(-src.width / 2, -src.height / 2); if (opt.dim && S.set.gfx !== 'low') ctx.filter = 'brightness(.86) saturate(.85)';
+ M.wheels.forEach(([cx, cy, r], i) => { const w = car.wh[i]; if (!w) return; const R = r * q; ctx.save(); ctx.translate(cx, cy); if (w.flat) ctx.scale(1, .86); ctx.rotate(car.mirror ? -w.rot : w.rot); ctx.drawImage(im, -R, -R, R * 2, R * 2); ctx.restore(); });
+ ctx.restore(); }; })(drawVehicle);
+/* ---------------- accessories: realistic mud flaps, flush LED bar ---------------- */
+const _acc27 = drawAccessories;
+drawAccessories = function(x, V, cos, wheelsPx){ const c2 = Object.assign({}, cos); const bar = c2.roof === 'bar', mud = c2.mud; if (bar) c2.roof = 'none'; c2.mud = 'none'; _acc27(x, V, c2, wheelsPx);
+ const M = paintMask(V.spr), w = M.w, h = M.h, ppm = w / V.len, rl = roofLine(V), lit = !!(G.car && G.car.headOn && G.mode === 'play'), t = performance.now() / 1000;
+ if (bar){ // low-profile bar that follows the roof, aluminium housing, clear lenses, glow only when lit
+  const cx = w * (V.cls === 'micro' ? .47 : .52), half = Math.min(1.1, V.len * .11) * ppm, n = 18, hh = .075 * ppm; x.save();
+  const pts = []; for (let i = 0; i <= n; i++){ const px = cx - half + i * (half * 2 / n); pts.push([px, rl[clamp(Math.round(px), 0, w - 1)] - ppm * .02]); }
+  x.beginPath(); pts.forEach(([px, py], i) => i ? x.lineTo(px, py - hh) : x.moveTo(px, py - hh)); for (let i = n; i >= 0; i--) x.lineTo(pts[i][0], pts[i][1]); x.closePath();
+  const g = x.createLinearGradient(0, pts[0][1] - hh, 0, pts[0][1]); g.addColorStop(0, '#c4cad1'); g.addColorStop(.35, '#5d646c'); g.addColorStop(1, '#202328'); x.fillStyle = g; x.fill();
+  for (let i = 0; i < n; i++){ const [px, py] = pts[i], [qx, qy] = pts[i + 1], mx = (px + qx) / 2, my = (py + qy) / 2 - hh * .5, lw = (qx - px) * .72, lh = hh * .5; const on = lit ? .75 + .25 * Math.sin(t * 2.4 - i * .35) : 0;
+   if (lit){ x.shadowColor = 'rgba(205,232,255,.9)'; x.shadowBlur = 6 + 6 * on; x.fillStyle = `rgba(${230 + 25 * on | 0},245,255,1)`; } else { x.shadowBlur = 0; const lg = x.createLinearGradient(0, my - lh / 2, 0, my + lh / 2); lg.addColorStop(0, 'rgba(235,240,245,.85)'); lg.addColorStop(1, 'rgba(120,130,140,.85)'); x.fillStyle = lg; }
+   x.fillRect(mx - lw / 2, my - lh / 2, lw, lh); }
+  x.shadowBlur = 0; x.strokeStyle = 'rgba(255,255,255,.35)'; x.lineWidth = 1; x.beginPath(); pts.forEach(([px, py], i) => i ? x.lineTo(px, py - hh + 1) : x.moveTo(px, py - hh + 1)); x.stroke(); x.restore(); }
+ if (mud && mud !== 'none'){ // rubber flap hanging from the body just behind each wheel arch; swings with the physics angle
+  const col = {red:['#5e0a10','#9a1620'], black:['#0b0c0e','#24272b'], chrome:['#7d8791','#e6eaee']}[mud], ang = clamp(MF.a, -.5, .4), bodyBottom = x => { for (let y = h - 1; y > h * .5; y--) if (M.src[(y * w + Math.round(x)) * 4 + 3] > 150) return y; return h * .9; };
+  (wheelsPx || META[V.spr].wheels).forEach(([wx, wy, wr]) => { const fw = (V.len > 9 ? .13 : .1) * ppm, fx = wx - wr - fw * .45, top = wy - wr * .2, fh = (wy + wr - ppm * .12) - top;
+   x.save(); x.translate(fx, top); x.rotate(ang);
+   const g = x.createLinearGradient(-fw / 2, 0, fw / 2, 0); g.addColorStop(0, '#08090a'); g.addColorStop(.55, '#1d1f22'); g.addColorStop(1, '#0c0d0f'); x.fillStyle = g; x.beginPath(); x.moveTo(-fw / 2, 0); x.lineTo(fw / 2, 0); x.lineTo(fw / 2, fh * .97); x.quadraticCurveTo(0, fh * 1.03, -fw / 2, fh * .95); x.closePath(); x.fill();
+   x.fillStyle = col[1]; x.fillRect(fw * .12, fh * .06, fw * .3, fh * .88); x.fillStyle = 'rgba(255,255,255,.18)'; x.fillRect(fw * .14, fh * .06, fw * .06, fh * .88);
+   x.fillStyle = '#aeb5bd'; x.fillRect(-fw / 2 - 1, 0, fw + 2, Math.max(1.5, fh * .05)); x.fillStyle = 'rgba(0,0,0,.3)'; x.fillRect(-fw / 2, fh * .05, fw, Math.max(1, fh * .02));
+   x.restore(); }); }
+};
+/* ---------------- decals sized in metres (real proportions), cleaner finishes ---------------- */
+const _dec27 = decorate;
+decorate = function(c, V, cos){ const legacyNew = ['pharaoh','palms','checker','waves','stripes','misr'], d = cos.decal; const cos2 = Object.assign({}, cos, {decal:legacyNew.includes(d) ? 'none' : d, finish:cos.finish === 'metal' ? 'gloss' : cos.finish}); _dec27(c, V, cos2);
+ const G2 = bodyGeo(V), w = c.width, h = c.height, ppm = G2.ppm, x = c.getContext('2d'), mask = bodyMaskCanvas(V), layer = document.createElement('canvas'); layer.width = w; layer.height = h; const L = layer.getContext('2d');
+ const BY = G2.winBot + ppm * .12, BH = Math.max(ppm * .3, G2.archTop - BY - ppm * .05), rear = w * .04, front = w * .95;
+ if (cos.finish === 'metal'){ const r = mulberry(11); for (let i = 0; i < w * h / 60; i++){ L.fillStyle = `rgba(255,255,255,${.05 + r() * .1})`; L.fillRect(r() * w, r() * h, 1, 1); } const g = L.createLinearGradient(0, 0, 0, h); g.addColorStop(.1, 'rgba(255,255,255,.2)'); g.addColorStop(.3, 'rgba(255,255,255,0)'); g.addColorStop(.85, 'rgba(0,0,0,.07)'); L.fillStyle = g; L.fillRect(0, 0, w, h); }
+ if (d === 'pharaoh'){ const bh = .24 * ppm, y = BY + BH * .25, s = .2 * ppm; L.fillStyle = '#14316f'; L.fillRect(rear, y, front - rear, bh); L.fillStyle = '#d9ab45'; L.fillRect(rear, y, front - rear, bh * .14); L.fillRect(rear, y + bh * .86, front - rear, bh * .14); for (let px = rear + s; px < front - s; px += s * 1.4){ L.beginPath(); L.moveTo(px - s * .45, y + bh * .78); L.lineTo(px, y + bh * .24); L.lineTo(px + s * .45, y + bh * .78); L.closePath(); L.fill(); } }
+ if (d === 'palms'){ const r = mulberry(3); for (let i = 0; i < 3; i++){ const px = rear + ppm * (.45 + i * .5), base = BY + BH * .98, ht = Math.min(ppm * (1.1 - i * .15), BH * (.9 - i * .1)); L.strokeStyle = 'rgba(28,70,46,.9)'; L.lineWidth = ppm * .05; L.beginPath(); L.moveTo(px, base); L.quadraticCurveTo(px + ppm * .08, base - ht * .5, px + ppm * .03, base - ht); L.stroke(); L.fillStyle = 'rgba(30,96,58,.9)'; for (let k = 0; k < 7; k++){ const a = -Math.PI / 2 + (k - 3) * .5; L.save(); L.translate(px + ppm * .03, base - ht); L.rotate(a + Math.PI / 2); L.beginPath(); L.ellipse(0, -ht * .2, ht * .05, ht * .22, 0, 0, 7); L.fill(); L.restore(); } } }
+ if (d === 'checker'){ const s = .1 * ppm, y = BY + BH * .4; for (let px = rear, i = 0; px < front; px += s, i++) for (let rr = 0; rr < 2; rr++){ L.fillStyle = (i + rr) % 2 ? '#141414' : '#f4f4f4'; L.fillRect(px, y + rr * s, s, s); } }
+ if (d === 'waves'){ [[.35, '#1565c0', .08], [.55, '#42a5f5', .06], [.72, '#b3e5fc', .045]].forEach(([o, col, t]) => { L.strokeStyle = col; L.lineWidth = t * ppm; L.lineCap = 'round'; L.beginPath(); for (let px = rear; px <= front; px += 3){ const y = BY + BH * o + Math.sin(px / (ppm * .9)) * ppm * .07; px === rear ? L.moveTo(px, y) : L.lineTo(px, y); } L.stroke(); }); }
+ if (d === 'stripes'){ [[.3, .11, '#c8102e'], [.47, .04, '#111'], [.56, .11, '#c8102e']].forEach(([o, tt, col]) => { L.fillStyle = col; L.fillRect(rear, BY + BH * o, front - rear, tt * ppm * 1.6); }); }
+ if (d === 'misr'){ L.font = `900 ${Math.min(BH * .85, ppm * .7)}px Lalezar, serif`; L.textAlign = 'center'; L.textBaseline = 'middle'; L.fillStyle = 'rgba(200,16,46,.9)'; L.fillText('مِصْر', w * .4, BY + BH * .55); }
+ L.globalCompositeOperation = 'destination-in'; L.drawImage(mask, 0, 0); x.drawImage(layer, 0, 0); };
+for (const k in PREV) delete PREV[k];
+
 /* ======================= atlas-loader.js ======================= */
 /* =====================================================================
    Ograaa — atlas loader: loads a handful of texture atlases and one audio
