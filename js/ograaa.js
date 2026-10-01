@@ -374,7 +374,7 @@ function physStep(c, h, ctl){
   const ex = w.x - Px, ey = w.y - Py, s = ex * dx + ey * dy, lx = ex - dx * s, ly = ey - dy * s;
   const rx = Px - c.x, ry = Py - c.y, vcx = c.vx - c.w * ry, vcy = c.vy + c.w * rx;
   const rvx = w.vx - vcx, rvy = w.vy - vcy, rvd = rvx * dx + rvy * dy, rlx = rvx - dx * rvd, rly = rvy - dy * rvd;
-  let fs = -(c.k * s + c.cd * rvd);
+  let fs = -(c.k * (s - (c.pre || 0)) + c.cd * rvd);
   if (s < -c.travel){ fs += c.kb * (-c.travel - s); if (rvd < -3.2) c.impacts.push({kind:'bottom', v:-rvd}); }
   if (s > c.travel * .9) fs -= c.kb * (s - c.travel * .9);
   const fx = dx * fs - c.kl * lx - c.cl * rlx, fy = dy * fs - c.kl * ly - c.cl * rly;
@@ -4073,6 +4073,42 @@ decorate = function(c, V, cos){ const legacyNew = ['pharaoh','palms','checker','
  if (d === 'misr'){ L.font = `900 ${Math.min(BH * .85, ppm * .7)}px Lalezar, serif`; L.textAlign = 'center'; L.textBaseline = 'middle'; L.fillStyle = 'rgba(200,16,46,.9)'; L.fillText('مِصْر', w * .4, BY + BH * .55); }
  L.globalCompositeOperation = 'destination-in'; L.drawImage(mask, 0, 0); x.drawImage(layer, 0, 0); };
 for (const k in PREV) delete PREV[k];
+
+/* ======================= ride-fuel.js ======================= */
+"use strict";
+/* =====================================================================
+   OGRAAA v28 — buses ride higher on supple long-travel springs
+   (spring preload so soft springs don't sit on the bump stops),
+   fuel use +50%
+   ===================================================================== */
+const _ss28 = softSusp;
+softSusp = function(c, len){ if (!c) return; if (c.f0 == null) c.f0 = c.f; const f0 = c.f0; _ss28(c, len); if (len <= 5.8) return;
+ // softer, more supple and more travel than before
+ c.zeta *= .9; c.travel = (len > 11 ? .38 : len > 9 ? .36 : len > 6.5 ? .32 : .28) + (c === G.car && !G.test ? .012 * upl(G.vid, 'susp') : 0);
+ const n = c.wh.length; c.cd = 2 * c.zeta * Math.sqrt(c.k * c.base / n);
+ // preload: static sag of the soft spring is carried by the air bags, so the bus sits at its design height (+4 cm)
+ const sagNew = 9.8 / Math.pow(2 * Math.PI * c.f, 2), sagDef = 9.8 / Math.pow(2 * Math.PI * (f0 || 1.6), 2); c.pre = sagNew - .105; };
+/* fuel: another +50% */
+const _ff28 = fuelFactor;
+fuelFactor = function(){ return _ff28() * 1.5; };
+
+/* ======================= lamps.js ======================= */
+"use strict";
+/* =====================================================================
+   OGRAAA v29 — every head- and tail-lamp placed by hand on its artwork
+   (fractions of sprite width/height: [head x, head y], [tail x, tail y])
+   ===================================================================== */
+const LAMPS = {
+ pv0:[[.97,.58],[.015,.57]], pv1:[[.975,.7],[.012,.66]], pv2:[[.975,.825],[.02,.67]], pv3:[[.975,.815],[.012,.75]], pv4:[[.965,.86],[.02,.62]], pv5:[[.97,.86],[.012,.68]],
+ pn0:[[.965,.62],[.02,.56]], pn1:[[.97,.64],[.015,.58]], pn2:[[.97,.73],[.012,.59]], pn3:[[.975,.75],[.02,.57]], pn4:[[.97,.775],[.012,.78]], pn5:[[.965,.79],[.012,.66]],
+ nw0:[[.965,.535],[.02,.53]], nw1:[[.955,.56],[.02,.53]], nw2:[[.955,.54],[.02,.53]], nw3:[[.955,.56],[.02,.57]], nw4:[[.955,.56],[.02,.55]], nw5:[[.95,.56],[.02,.58]],
+ nw6:[[.955,.68],[.02,.61]], nw7:[[.955,.7],[.02,.61]], nw8:[[.955,.68],[.02,.61]], nw9:[[.955,.685],[.02,.61]], nw10:[[.96,.7],[.02,.62]], nw11:[[.955,.7],[.02,.62]],
+ nw12:[[.965,.745],[.02,.635]], nw13:[[.965,.73],[.02,.63]], nw14:[[.965,.745],[.02,.63]], nw15:[[.965,.735],[.02,.63]],
+ ai0:[[.975,.5],[.015,.52]], ai1:[[.955,.49],[.035,.36]], ai2:[[.96,.49],[.025,.43]], ai3:[[.96,.45],[.04,.36]], ai7:[[.96,.45],[.03,.47]], ai8:[[.97,.73],[.02,.62]], ai9:[[.97,.735],[.035,.6]],
+ ai10:[[.96,.575],[.025,.59]], ai11:[[.95,.49],[.035,.42]], ai12:[[.975,.55],[.02,.5]], ai13:[[.975,.51],[.03,.47]], ai14:[[.96,.48],[.03,.39]], ai15:[[.95,.52],[.03,.36]], ai16:[[.945,.53],[.03,.4]],
+ ai17:[[.945,.54],[.035,.4]], ai18:[[.94,.49],[.04,.36]], ai19:[[.97,.6],[.04,.68]], ai20:[[.97,.63],[.035,.67]], ai21:[[.97,.7],[.03,.66]], ai22:[[.95,.49],[.035,.4]], ai23:[[.95,.47],[.035,.36]],
+ ai24:[[.95,.44],[.02,.49]], ai25:[[.945,.57],[.02,.55]], ai26:[[.96,.585],[.02,.5]], ai27:[[.945,.55],[.02,.53]], ai28:[[.975,.69],[.035,.68]], ai29:[[.975,.69],[.03,.68]], ai30:[[.97,.69],[.03,.68]]};
+for (const k in LAMPS){ const m = META[k]; if (!m) continue; const [[hx, hy], [tx, ty]] = LAMPS[k]; m.hl = [hx * m.w, hy * m.h]; m.tl = [tx * m.w, ty * m.h]; }
 
 /* ======================= atlas-loader.js ======================= */
 /* =====================================================================
