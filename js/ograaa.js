@@ -4777,6 +4777,75 @@ drawCluster = function(){ const car = G.car; if (!car) return; const el = $('#cl
 /* hide anything the old cluster drew around it (separate lamp strips etc.) */
 { const st = document.createElement('style'); st.textContent = '#cluster{image-rendering:auto}'; document.head.appendChild(st); }
 
+/* ======================= career-story-page.js ======================= */
+"use strict";
+/* =====================================================================
+   OGRAAA v41 — one premium Career page: the Story journey with every
+   promotion, vehicle and requirement woven into its chapter ·
+   A/C button dimmed on vehicles without A/C
+   ===================================================================== */
+/* ---------------- A/C button ---------------- */
+const _upd41 = update;
+update = function(dt){ _upd41(dt); const b = $('#bAC'); if (b && G.mode === 'play') b.classList.toggle('noAC', !hasAC()); };
+/* ---------------- Career = Story ---------------- */
+CTAB = 'story';
+const CH_NODE = {}; for (const k in STORY_NODE_REQ) CH_NODE[STORY_NODE_REQ[k]] = k;
+const SIDE_NODES = ['n2','n13','n4','n10'];
+function nodeCard(n, compact){ const s = nodeState(n), V = VBY(n.v), rw = n.rw || {};
+ const reqs = n.req.map(r => `<li class="${reqMet(r) ? 'ok' : ''}">${reqMet(r) ? '✓' : '○'} ${reqText(r)}</li>`).join('') + (n.pre.length ? `<li class="${n.pre.every(p => CR().done[p]) ? 'ok' : ''}">${n.pre.every(p => CR().done[p]) ? '✓' : '○'} ${L2('بعد', 'After')}: ${n.pre.map(p => nm(CN(p).t)).join(' + ')}</li>` : '');
+ const vehs = (rw.veh || []).map(v => VBY(v) ? `<span class="sjv" title="${nm(VBY(v).name)}"><img src="${ASSETS[VBY(v).spr]}"></span>` : '').join('');
+ const perks = [rw.sal ? `💰 ${money(rw.sal)}/${L2('وردية', 'shift')}` : '', rw.com ? `📈 ${Math.round(rw.com * 100)}%` : '', rw.bonus ? `🎁 +${money(rw.bonus)}` : '', rw.perk ? '⭐ ' + ({night:L2('حافز ليلي', 'Night allowance'), daily:L2('مكافأة يومية', 'Daily bonus'), partner:L2('١٥٪ شراكة', '15% partnership')}[rw.perk] || rw.perk) : ''].filter(Boolean).join(' · ');
+ return `<div class="sjn ${s} ${compact ? 'cmp' : ''}"><div class="sjnh"><img src="${ASSETS[V.spr]}"><div><em>${s === 'done' ? L2('✓ ترقية حصلت عليها', '✓ Promotion earned') : s === 'ready' ? L2('★ جاهزة للترقية', '★ Ready to promote') : L2('🎖 الترقية', '🎖 Promotion')}</em><b>${nm(n.t)}</b><small>${perks}</small></div>${s === 'ready' ? `<button class="btn pri sm" data-prom="${n.id}">🎖 ${L2('ترقّى', 'Promote')}</button>` : ''}</div>${s !== 'done' ? `<ul class="sjr">${reqs}</ul>` : ''}${vehs ? `<div class="sjvs">${vehs}</div>` : ''}</div>`; }
+function renderStoryPage(){ const el = $('#s-career'), c = CR(); c.story = c.story || {}; const pay = careerPay(), rank = careerRank(), perf = perfScore(), doneN = STORY.filter(s => c.story[s.id]).length;
+ const hero = `<div class="sjhero"><div class="sjbg"></div><div class="sjhl"><span class="sjk">${L2('شركة أجرة للنقل', 'OGRAAA TRANSPORT CO.')}</span><h2>${L2('أسطى', 'The Driver')}</h2><p>${L2('من أول يوم على هايس قديمة… لحد ما تبقى شريك.', 'From day one in an old HiAce… to partner of the company.')}</p>
+  <div class="sjbar"><i style="width:${doneN / STORY.length * 100}%"></i></div><small>${fmt(doneN)}/${fmt(STORY.length)} ${L2('فصول', 'chapters')}</small></div>
+  <div class="sjstats">${c.joined ? `<div><b>${rank ? nm(rank.t) : '—'}</b><span>${L2('رتبتك', 'Rank')}</span></div><div><b>${money(pay.sal)}</b><span>${L2('مرتب الوردية', 'Shift pay')}</span></div><div><b>${Math.round(pay.com * 100)}%</b><span>${L2('عمولة', 'Commission')}</span></div><div><b>${perf}%</b><span>${L2('الأداء', 'Performance')}</span></div><div><b>${fmt(c.shifts || 0)}</b><span>${L2('ورديات', 'Shifts')}</span></div>` : `<div class="sjjoin"><b>${L2('لسه مش متعين', 'Not hired yet')}</b><button class="btn pri" id="sjJoin">${L2('🤝 اتعين في الشركة', '🤝 Join the company')}</button></div>`}</div>
+  ${c.joined ? `<div class="sjact"><button class="btn pri" id="sjShift">🚐 ${L2('ابدأ وردية عادية', 'Start a regular shift')}</button></div>` : ''}</div>`;
+ const tabs = `<div class="ctabs sjtabs">${[['story', '🎬', ['القصة والترقيات', 'Story & promotions']], ['board', '📋', ['لوحة الورديات', 'Shift board']], ['team', '🏆', ['الفريق', 'Team']], ['journey', '📜', ['رحلتك', 'Journey']]].map(([k, ic, n]) => `<button class="${CTAB === k ? 'on' : ''}" data-ct2="${k}"><i>${ic}</i>${nm(n)}</button>`).join('')}</div>`;
+ const chap = (ch, i) => { const done = !!c.story[ch.id], open = ch.unlock() || (i === 0), cur = open && !done, prev = i ? STORY[i - 1] : null, node = CH_NODE[ch.id] ? CN(CH_NODE[ch.id]) : null, cast = [...new Set(ch.intro.map(l => l.who))].filter(w => w !== 'you').map(w => `<span title="${nm(CAST[w].n)}" style="--c:${CAST[w].c}">${CAST[w].ic}</span>`).join('');
+  return `<div class="sjc ${done ? 'done' : cur ? 'cur' : 'lock'}"><div class="sjdot">${done ? '✓' : i + 1}</div><div class="sjcard"><div class="sjtop"><div class="sjt"><span class="sjno">${L2('الفصل', 'CHAPTER')} ${fmt(i + 1)}</span><h3>${nm(ch.title).replace(/^.*?·\s*/, '')}</h3><p>${nm(ch.sub)}</p><div class="sjcast">${cast}</div></div>
+   <div class="sjgo">${open ? `<button class="btn ${done ? '' : 'pri'} sjplay" data-ch="${ch.id}">${done ? '↺ ' + L2('إعادة', 'Replay') : '▶ ' + L2('العب الفصل', 'Play chapter')}</button><small>${done ? L2('خلصته', 'Completed') : '💰 ' + money(ch.reward)}</small>` : `<span class="sjlk">🔒</span><small>${prev && !c.story[prev.id] ? L2('خلّص ', 'Finish ') + nm(prev.title).replace(/^.*?·\s*/, '') : L2('محتاج: ', 'Needs: ') + nm(CN(ch.node).t)}</small>`}</div></div>
+   ${node ? nodeCard(node) : ''}</div></div>`; };
+ const side = SIDE_NODES.map(id => CN(id)).filter(Boolean);
+ el.innerHTML = `<div class="sjpage">${hero}${tabs}<div class="sjpath">${STORY.map(chap).join('')}</div>
+  <div class="sjside"><h4>🛣 ${L2('أدوار جانبية', 'Side roles')}</h4><div class="sjsg">${side.map(n => nodeCard(n, true)).join('')}</div></div></div>`;
+ $$('[data-ct2]').forEach(b => b.onclick = () => { CTAB = b.dataset.ct2; AU.click(); renderCareer(); });
+ $$('#s-career [data-ch]').forEach(b => b.onclick = () => { const ch = STORY.find(s => s.id === b.dataset.ch); if (!c.joined){ c.joined = true; c.done.c0 = true; save(); } startChapter(ch); });
+ $$('#s-career [data-prom]').forEach(b => b.onclick = () => { const id = b.dataset.prom; c.done[id] = true; c.dates = c.dates || {}; c.dates[id] = Date.now(); AU.levelUp(); toastUI('🎖 ' + L2('ترقية: ', 'Promoted: ') + nm(CN(id).t), 'good', null, 4); save(true); renderCareer(); });
+ const j = $('#sjJoin'); if (j) j.onclick = () => { if (!hasLic('micro')){ toastUI('🪪 ' + L2('محتاج رخصة درجة تالتة الأول', 'You need a Grade 3 licence first'), 'bad'); DMVTAB = 'lic'; show('traffic'); return; } c.joined = true; c.done.c0 = true; AU.levelUp(); save(true); renderCareer(); };
+ const s = $('#sjShift'); if (s) s.onclick = () => startShift();
+ // scroll the current chapter into view
+ const cur = $('#s-career .sjc.cur'); if (cur) setTimeout(() => cur.scrollIntoView({block:'center', behavior:'smooth'}), 60); }
+const _rc41 = renderCareer;
+renderCareer = function(){ if (CTAB === 'story' || CTAB === 'tree') return renderStoryPage(); _rc41();
+ // keep the unified tab bar on the other pages too
+ const tb = $('#s-career .ctabs'); if (tb){ tb.querySelectorAll('[data-ct="story"],[data-ct="tree"]').forEach(b => b.remove()); if (!tb.querySelector('[data-ct="story2"]')){ tb.insertAdjacentHTML('afterbegin', `<button data-ct="story2"><i>🎬</i>${L2('القصة والترقيات', 'Story & promotions')}</button>`); tb.querySelector('[data-ct="story2"]').onclick = () => { CTAB = 'story'; AU.click(); renderCareer(); }; } } };
+{ const st = document.createElement('style'); st.textContent = `
+#bAC.noAC{opacity:.32;filter:grayscale(1)}
+.sjpage{display:flex;flex-direction:column;gap:1rem;padding-bottom:2rem}
+.sjhero{position:relative;overflow:hidden;border-radius:1.4rem;padding:1.4rem 1.6rem;display:grid;grid-template-columns:1.3fr 1fr;gap:1rem;align-items:center;border:1px solid rgba(245,178,27,.45);background:linear-gradient(120deg,#0c1630 0%,#121f3f 45%,#2a1b08 100%);box-shadow:0 1.2rem 3rem rgba(0,0,0,.45),0 0 3rem rgba(245,178,27,.08) inset}
+.sjbg{position:absolute;inset:0;background:radial-gradient(60% 120% at 90% 10%,rgba(245,178,27,.22),transparent 60%),radial-gradient(40% 80% at 10% 100%,rgba(80,140,255,.18),transparent 70%);pointer-events:none}
+.sjhl{position:relative}.sjk{font-size:.72rem;letter-spacing:.18em;color:var(--gold2);opacity:.85}.sjhl h2{font:900 2.6rem Lalezar,'Readex Pro',serif;margin:.1rem 0;background:linear-gradient(180deg,#fff2c9,#f5b21b);-webkit-background-clip:text;background-clip:text;color:transparent}
+.sjhl p{color:#c9d4e5;margin:.2rem 0 .8rem}.sjbar{height:.5rem;border-radius:1rem;background:rgba(255,255,255,.1);overflow:hidden}.sjbar i{display:block;height:100%;background:linear-gradient(90deg,#f5b21b,#ffd36b);box-shadow:0 0 1rem #f5b21b}.sjhl small{color:var(--mut)}
+.sjstats{position:relative;display:grid;grid-template-columns:repeat(auto-fit,minmax(6.5rem,1fr));gap:.5rem}.sjstats>div{background:rgba(5,10,22,.55);border:1px solid var(--line);border-radius:.9rem;padding:.55rem .6rem;display:flex;flex-direction:column;gap:.1rem}.sjstats b{font-size:1rem;color:#fff}.sjstats span{font-size:.72rem;color:var(--mut)}
+.sjjoin{grid-column:1/-1;align-items:flex-start;gap:.5rem!important}.sjact{grid-column:1/-1;position:relative;display:flex;justify-content:flex-end}
+.sjtabs{margin:0}
+.sjpath{position:relative;display:flex;flex-direction:column;gap:1.1rem;padding-inline-start:2.6rem}
+.sjpath:before{content:'';position:absolute;inset-inline-start:1.05rem;top:.8rem;bottom:.8rem;width:3px;border-radius:3px;background:linear-gradient(180deg,rgba(245,178,27,.85),rgba(245,178,27,.15))}
+.sjc{position:relative}.sjdot{position:absolute;inset-inline-start:-2.6rem;top:1rem;width:2.2rem;height:2.2rem;border-radius:50%;display:grid;place-items:center;font:800 1rem 'Readex Pro';background:#0b1428;border:2px solid rgba(245,178,27,.5);color:var(--gold2);z-index:1}
+.sjc.done .sjdot{background:#1f7a46;border-color:#7CFC9A;color:#fff}.sjc.cur .sjdot{background:#f5b21b;color:#1a1200;box-shadow:0 0 1.2rem #f5b21b;animation:sjp 1.6s ease-in-out infinite}@keyframes sjp{50%{box-shadow:0 0 2.2rem #f5b21b}}
+.sjcard{border-radius:1.2rem;padding:1rem 1.1rem;background:linear-gradient(135deg,rgba(18,30,58,.95),rgba(8,12,26,.95));border:1px solid var(--line);display:flex;flex-direction:column;gap:.8rem}
+.sjc.cur .sjcard{border-color:rgba(245,178,27,.8);box-shadow:0 0 2rem rgba(245,178,27,.15)}.sjc.done .sjcard{border-color:rgba(124,252,154,.35)}.sjc.lock .sjcard{opacity:.6;filter:saturate(.6)}
+.sjtop{display:flex;gap:1rem;align-items:flex-start;justify-content:space-between}.sjno{font-size:.7rem;letter-spacing:.16em;color:var(--gold2)}.sjt h3{font:900 1.45rem Lalezar,'Readex Pro',serif;margin:.05rem 0}.sjt p{color:#c3cede;margin:0;font-size:.88rem}
+.sjcast{display:flex;gap:.3rem;margin-top:.5rem}.sjcast span{width:2rem;height:2rem;border-radius:50%;display:grid;place-items:center;font-size:1.1rem;border:1.5px solid var(--c);background:rgba(255,255,255,.04)}
+.sjgo{display:flex;flex-direction:column;align-items:flex-end;gap:.35rem;min-width:9rem}.sjgo small{color:var(--mut);font-size:.75rem;text-align:end}.sjlk{font-size:1.6rem}
+.sjn{border-radius:.9rem;padding:.7rem .8rem;background:rgba(5,10,22,.6);border:1px dashed rgba(245,178,27,.35)}.sjn.done{border-style:solid;border-color:rgba(124,252,154,.35)}.sjn.ready{border-style:solid;border-color:#f5b21b;box-shadow:0 0 1rem rgba(245,178,27,.2)}
+.sjnh{display:flex;align-items:center;gap:.7rem}.sjnh img{height:2.3rem;max-width:5.5rem;object-fit:contain}.sjnh>div{flex:1;display:flex;flex-direction:column}.sjnh em{font-style:normal;font-size:.7rem;color:var(--gold2)}.sjnh b{font-size:.95rem}.sjnh small{font-size:.72rem;color:var(--mut)}
+.sjr{list-style:none;margin:.5rem 0 0;padding:0;display:flex;flex-wrap:wrap;gap:.3rem .9rem;font-size:.78rem;color:#aeb8c8}.sjr li.ok{color:#7CFC9A}
+.sjvs{display:flex;gap:.35rem;flex-wrap:wrap;margin-top:.5rem}.sjv{background:rgba(255,255,255,.05);border-radius:.5rem;padding:.15rem .3rem}.sjv img{height:1.5rem;display:block}
+.sjside h4{margin:.4rem 0 .6rem;color:var(--gold2)}.sjsg{display:grid;grid-template-columns:repeat(auto-fill,minmax(17rem,1fr));gap:.6rem}
+@media (max-width:760px){.sjhero{grid-template-columns:1fr}.sjtop{flex-direction:column}.sjgo{align-items:stretch;min-width:0}}`; document.head.appendChild(st); }
+
 /* ======================= atlas-loader.js ======================= */
 /* =====================================================================
    Ograaa — atlas loader: loads a handful of texture atlases and one audio
