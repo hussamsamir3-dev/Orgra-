@@ -4447,10 +4447,10 @@ for (const k in LAMPS){ const m = META[k]; if (!m) continue; const [[hx, hy], [t
 const _upd30 = update;
 update = function(dt){ _upd30(dt); if (G.mode !== 'play' || !G.car || dt <= 0) return; const all = [G.car, ...G.ai.filter(a => Math.abs(a.x - G.car.x) < 80)];
  for (const c of all){ if (!c.wh || c.wh.length < 2) continue; const xs = c.wh.map(w => w.x), x0 = Math.min(...xs), x1 = Math.max(...xs); if (x1 - x0 < .5) continue;
-  const slope = Math.atan2(terrH(x1) - terrH(x0), x1 - x0), diff = c.a - slope, big = c.L > 5.8, lim = big ? .028 : .045;
+  const slope = Math.atan2(terrH(x1) - terrH(x0), x1 - x0), diff = c.a - slope, big = c.L > 5.8, lim = big ? .045 : .07;
   // progressive pitch stiffness beyond a small free range (air-suspension levelling / anti-dive geometry), plus pitch damping
-  if (Math.abs(diff) > lim) c.w -= (diff - Math.sign(diff) * lim) * (big ? 70 : 45) * dt;
-  c.w *= 1 - Math.min(.5, dt * (big ? 5 : 3)); }
+  if (Math.abs(diff) > lim) c.w -= (diff - Math.sign(diff) * lim) * (big ? 40 : 28) * dt;
+  c.w *= 1 - Math.min(.5, dt * (big ? 1.6 : 1.1)); }
  tickDamageFX(dt); };
 /* ---------------- heavy-crash damage keeps smoking / sparking from the broken spot ---------------- */
 const _ad30 = addDent;
@@ -5525,13 +5525,13 @@ function gameWash(vid, done, target){ const body = mgOpen('🧽 ' + L2('غسيل
  const base = dx.getImageData(0, 0, dirt.width, dirt.height).data; let total = 0; for (let i = 3; i < base.length; i += 64) if (base[i] > 30) total++;
  const foam = []; let down = false, fin = false, lastS = 0;
  const prog = () => { const d = dx.getImageData(0, 0, dirt.width, dirt.height).data; let left = 0; for (let i = 3; i < d.length; i += 64) if (d[i] > 30) left++; return 1 - left / Math.max(1, total); };
- const scrub = e => { if (!down || fin) return; const [px, py] = toCanvas(c, e), u = (px - F.x) / F.s, v = (py - F.y) / F.s; dx.globalCompositeOperation = 'destination-out'; const R = clean.width * .045; const gr = dx.createRadialGradient(u, v, 0, u, v, R); gr.addColorStop(0, 'rgba(0,0,0,.9)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); dx.fillStyle = gr; dx.beginPath(); dx.arc(u, v, R, 0, 7); dx.fill(); dx.globalCompositeOperation = 'source-over'; for (let i = 0; i < 3; i++) foam.push({x:px + rnd(-20, 20), y:py + rnd(-14, 14), r:4 + Math.random() * 10, t:1}); if (performance.now() - lastS > 120){ lastS = performance.now(); sfx('water'); } };
+ const scrub = e => { if (!down || fin) return; const [px, py] = toCanvas(c, e), u = (px - F.x) / F.s, v = (py - F.y) / F.s; dx.globalCompositeOperation = 'destination-out'; const R = clean.width * .06; const gr = dx.createRadialGradient(u, v, 0, u, v, R); gr.addColorStop(0, 'rgba(0,0,0,.9)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); dx.fillStyle = gr; dx.beginPath(); dx.arc(u, v, R, 0, 7); dx.fill(); dx.globalCompositeOperation = 'source-over'; for (let i = 0; i < 3; i++) foam.push({x:px + rnd(-20, 20), y:py + rnd(-14, 14), r:4 + Math.random() * 10, t:1}); if (performance.now() - lastS > 120){ lastS = performance.now(); sfx('water'); } };
  c.onpointerdown = e => { down = true; c.setPointerCapture(e.pointerId); scrub(e); }; c.onpointermove = scrub; c.onpointerup = () => { down = false; };
  let tick = 0, sweep = -1; const loop = () => { if (!MG.on || !c.isConnected) return; x.clearRect(0, 0, c.width, c.height); const bg = x.createLinearGradient(0, 0, 0, c.height); bg.addColorStop(0, '#20262f'); bg.addColorStop(1, '#0d1015'); x.fillStyle = bg; x.fillRect(0, 0, c.width, c.height); x.fillStyle = 'rgba(80,140,200,.12)'; x.fillRect(0, F.y + clean.height * F.s - 6, c.width, 40);
   x.drawImage(clean, F.x, F.y, clean.width * F.s, clean.height * F.s); x.drawImage(dirt, F.x, F.y, dirt.width * F.s, dirt.height * F.s);
   for (let i = foam.length - 1; i >= 0; i--){ const f = foam[i]; f.t -= .02; f.y += .4; if (f.t <= 0){ foam.splice(i, 1); continue; } x.fillStyle = `rgba(255,255,255,${f.t * .8})`; x.beginPath(); x.arc(f.x, f.y, f.r, 0, 7); x.fill(); }
   if (sweep >= 0){ sweep += .025; const gx = F.x + (sweep * 1.6 - .3) * clean.width * F.s; const sg = x.createLinearGradient(gx - 80, 0, gx + 80, 0); sg.addColorStop(0, 'rgba(255,255,255,0)'); sg.addColorStop(.5, 'rgba(255,255,255,.55)'); sg.addColorStop(1, 'rgba(255,255,255,0)'); x.save(); x.globalCompositeOperation = 'lighter'; x.fillStyle = sg; x.fillRect(F.x, F.y, clean.width * F.s, clean.height * F.s); x.restore(); if (sweep > 1){ mgClose(); done(); return; } }
-  if (++tick % 12 === 0 && !fin){ const p = prog(); mgBar(p / (target || .85)); if (p >= (target || .85)){ fin = true; sfx('ok'); sweep = 0; mgHint('✨ ' + L2('بتلمع!', 'Sparkling!')); } } requestAnimationFrame(loop); }; loop(); }
+  if (++tick % 12 === 0 && !fin){ const p = prog(); mgBar(p / (target || .78)); if (p >= (target || .78)){ fin = true; sfx('ok'); sweep = 0; mgHint('✨ ' + L2('بتلمع!', 'Sparkling!')); } } requestAnimationFrame(loop); }; loop(); }
 /* ---------- dents: hammer them out ---------- */
 function gameDents(vid, done){ const body = mgOpen('🔨 ' + L2('سمكرة', 'Bodywork'), mgSteps, mgIdx); const g = GV(vid); let dents = (g.dents || []).filter(d => d[3] !== 2 && d[3] !== 4).slice(0, 8); if (!dents.length) dents = [[.3, .55, .04, 0], [.62, .6, .04, 0], [.82, .5, .04, 1]];
  mgHint(L2('اضرب كل خبطة ٣ مرات بالشاكوش', 'Tap each dent three times with the hammer')); const c = mgCanvas(body), x = c.getContext('2d'); const hits = dents.map(() => 0); let im = vanArt(vid, Object.assign({}, g.cond, {clean:100}), dents), F = vanFit(c, im), sparks = [], hammer = null, total = dents.length;
@@ -5770,5 +5770,66 @@ dailyCheck = function(){ if (S.daily && S.daily.claimed && !S.daily.day){ S.dstr
 .tape{font-style:italic;color:#e8c27a!important;background:rgba(232,194,122,.08)!important}.tease{color:#c9d4e5!important}
 #s-routes.rlock .card,#s-routes.rlock .tabs,#s-routes.rlock .rgrid,#s-routes.rlock [data-r]{filter:grayscale(.85) brightness(.5);pointer-events:none}
 .rlockNote{margin:0 0 .8rem;padding:.7rem 1rem;border-radius:.9rem;background:rgba(10,14,24,.85);border:1px dashed rgba(245,178,27,.6);color:#ffe08a;font-weight:700;text-align:center}`; document.head.appendChild(st); }
+</script>
+<script>
+"use strict";
+/* =====================================================================
+   OGRAAA v50 — Zouba carries Om Karim · living suspension · calm engine
+   · grounded dialogue for every chapter
+   ===================================================================== */
+/* ---------------- Chapter 3 is driven in Zouba ---------------- */
+{ const ch = STORY.find(s => s.id === 's3'); if (ch){ ch.vid = OLD; ch.own = true; } }
+/* ---------------- suspension that feels alive ----------------
+   lighter damping on everything, plus real road texture: small, speed-dependent
+   vertical kicks at each wheel (seams, patches, cat's eyes) so the body breathes */
+const _ss50 = softSusp;
+softSusp = function(c, len){ _ss50(c, len); if (!c) return; c.zeta = c.zeta * .82; const n = c.wh.length; c.cd = 2 * c.zeta * Math.sqrt(c.k * c.base / n); };
+const _upd50 = update;
+update = function(dt){ _upd50(dt); if (G.mode !== 'play' || !G.car || G.paused || dt <= 0) return; const car = G.car, sp = speedOf(car), urban = W.biome && W.biome.urban > .3 ? 1 : .6;
+ for (const w of car.wh){ if (!w.ground) continue; w.rt = (w.rt || 0) - dt * sp; if (w.rt <= 0){ w.rt = 1.2 + Math.random() * 4.5; const kick = (.25 + Math.random() * .55) * clamp(sp / 14, .15, 1.4) * urban; w.vy += kick; } } };
+/* ---------------- engine: smooth, warm, quiet ---------------- */
+const _eng50 = AU.engine.bind(AU);
+AU.engine = function(on, rpm, load, speed, big){ _eng50(on, rpm, load, speed, big); const e = this.eng, c = this.ctx; if (!e || !c) return;
+ if (!e._calm){ e._calm = 1; try{ e.o1.type = 'triangle'; e.o2.type = 'sine'; e.o3.type = 'sine'; }catch(x){} }
+ const t = c.currentTime + .02, P = (typeof ENGP !== 'undefined' && G.V && ENGP[G.V.id]) || {lp:660, g:1}; e.lp.frequency.setTargetAtTime(P.lp * .5 + load * 380 + rpm * 160, t, .35); e.out.gain.setTargetAtTime(on ? (.07 + load * .06) * (P.g || 1) : 0, t, .4); e.ng.gain.setTargetAtTime(on ? .012 + load * .012 : 0, t, .4); if (e.tbg) e.tbg.gain.setTargetAtTime(0, t, .3); };
+/* ---------------- dialogue: grounded, consistent with Zouba ---------------- */
+const SET = (id, k, lines) => { const ch = STORY.find(s => s.id === id); if (ch) ch[k] = lines; };
+SET('s3', 'intro', [L('mona','(تليفون الساعة ٢ بالليل) الحاج على الخط… صوته بيترعش.','(phone, 2 a.m.) Hagg is on the line… his voice is shaking.'), L('hagg','أم كريم تعبت فجأة. الإسعاف قالوا نص ساعة. إنت أقرب واحد ليا.','Om Karim went into labour. The ambulance says half an hour. You\'re the closest.'), L('you','جاي بزوبه حالاً.','Coming with Zouba right now.'), L('omk','بالراحة يا ابني… كل مطب بحس بيه.','Gently, son… I feel every bump.'), L('abdo','(لاسلكي) سوق ناعم. فرامل خفيفة. المستشفى على الطريق الرئيسي.','(radio) Drive smooth. Light brakes. The hospital is on the main road.')]);
+SET('s3', 'beats', [[.3, [L('omk','الطلق بقى كل خمس دقايق…','Every five minutes now…')]], [.6, [L('hagg','(تليفون) أنا ورا الإسعاف. متقلقش عليا، خليك معاها.','(phone) I\'m behind the ambulance. Don\'t worry about me, stay with her.')]], [.85, [L('omk','شايفة النور بتاع المستشفى… الحمد لله.','I can see the hospital lights… thank God.')]]]);
+SET('s3', 'win', [L('hagg','ولد يا ابني… ولد! هنسميه صلاح، على اسم أبوك.','A boy, son… a boy! We\'re naming him Salah, after your father.'), L('omk','زوبه وصّلتنا زي ما كانت بتوصّل الناس زمان.','Zouba got us here, just like she used to carry people years ago.')]);
+SET('s4', 'intro', [L('karim','سيد بقاله أسبوع واقف قدامنا في كل محطة.','Sayed has been parking ahead of us at every stop for a week.'), L('sayed','يا ابني الخط مش بالوراثة. اللي يوصل المحطة الأول ياخد الناس.','Kid, a line isn\'t inherited. Whoever reaches the stop first gets the people.'), L('you','الناس بتختار اللي بيحترمها، مش اللي بيجري.','People choose whoever respects them, not whoever rushes.'), L('karim','اسبقه للمحطات… بس من غير ما تكسر إشارة. الكمين مش بيرحم.','Beat him to the stops… without running a light. The police don\'t forgive.')]);
+SET('s4', 'win', [L('sayed','…ماشي يا ابن صلاح. الخط ليك. بس أنا مش بنسى.','…Fine, son of Salah. The line is yours. But I don\'t forget.'), L('hagg','الناس رجعت تقول "عربية صلاح". سمعتها بودني.','People are saying "Salah\'s van" again. I heard it myself.')]);
+SET('s4', 'lose', [L('sayed','قلتلك يا شاطر.','Told you, champ.'), L('karim','بكرة نصحى بدري ونكون أول واحد.','Tomorrow we get up early and we\'re first.')]);
+SET('s5', 'intro', [L('mona','آخر وردية. المطر قافل الطريق والعمال لسه في المصنع.','Last shift. Rain has closed the road and the workers are still at the factory.'), L('abdo','التانك قرب يخلص. في بنزينة على الخط — اقف وموّن بنفسك.','The tank is nearly dry. There\'s a station on the line — stop and fill her yourself.'), L('you','ماحدش هيبات في الشارع الليلة.','Nobody sleeps on the street tonight.')]);
+SET('s5', 'win', [L('mona','كله وصل بيته. تصبح على خير يا أسطى.','Everyone is home. Good night, usta.'), L('pax','(واحد من العمال) أبوك كان بيستنانا كده برضه في المطر.','(one of the workers) Your father used to wait for us in the rain too.')]);
+SET('s6', 'intro', [L('mona','وردية عادية. ركاب كتير، وزحمة على الكوبري.','A normal shift. Lots of passengers, traffic on the bridge.'), L('abdo','قطع غيار زوبه هتكلف. شوف هتعمل إيه.','Zouba\'s parts are going to cost. Think about it.')]);
+SET('s6', 'win', [L('adel','الشنطة كان فيها مرتبات مصنع كامل. إنت أنقذت ٤٠ أسرة.','That bag held a whole factory\'s wages. You saved forty families.'), L('adel','صاحب المصنع عايز يكافئك… وعايز يتعاقد مع الخط بتاعك.','The owner wants to reward you… and contract your line.')]);
+SET('s7', 'intro', [L('hagg','الهيئة باعتة مفتش. لو العقد جه، يبقى عندنا أتوبيسات تحت اسم أبوك.','The authority sent an inspector. If we win, we\'ll have buses under your father\'s name.'), L('pax','(المفتش) كل المحطات. ولا مخالفة. والركاب مرتاحين. أنا بكتب كل حاجة.','(inspector) Every stop. No fines. Comfortable passengers. I note everything.')]);
+SET('s8', 'intro', [L('mona','أتوبيس إسكندرية كامل. الأرصاد بتقول عاصفة بعد الضهر.','A full coach to Alexandria. The forecast says a storm this afternoon.'), L('abdo','الاحتياطي وشنطة العدة في الشنطة. لو حصل حاجة، اركن بأمان الأول.','Spare and tool kit are in the trunk. If anything happens, pull over safely first.')]);
+SET('s9', 'intro', [L('karim','الفرح يوم الخميس… وعايزك إنت تسوق. أبويا مش هيأمّن غيرك.','The wedding\'s on Thursday… and I want you driving. Dad won\'t trust anyone else.'), {cond:() => CR().storyKept, ...L('hagg','…وموضوع الشنطة وصلني. هنتكلم بعد الفرح.','…and I heard about the bag. We\'ll talk after the wedding.')}]);
+SET('s10', 'intro', [L('abdo','بص على زوبه… كأنها لسه نازلة من المصنع.','Look at Zouba… like she just rolled out of the factory.'), L('hagg','أنا كبرت يا ابني. عايز آخر مشوار أعمله، يكون معاك فيها، على خط أبوك.','I\'ve grown old, son. My last ride should be with you, in her, on your father\'s line.'), L('omk','(شايلة صلاح الصغير) سلّم على عمو… هو اللي وصّلنا يوم ما اتولدت.','(holding little Salah) Say hi to uncle… he drove us the night you were born.'), L('hagg','ورقة الشراكة في جيبي. وصّلنا بأحسن سواقة… وهي بتاعتك.','The partnership papers are in my pocket. Drive us perfectly… and they\'re yours.')]);
+</script>
+<script>
+"use strict";
+/* =====================================================================
+   OGRAAA v51 — the story explains every vehicle change.
+   Chapters 1–6 and 10: Zouba. Ch.7 bus, Ch.8–9 coach — each opens with
+   the reason (capacity, contract, licence, distance) and where Zouba is.
+   No passenger talk when nobody is on board.
+   ===================================================================== */
+['s4', 's5', 's6'].forEach(id => { const ch = STORY.find(s => s.id === id); if (ch){ ch.vid = OLD; ch.own = true; ch.cls = 'micro'; } });
+const PRE = (id, lines) => { const ch = STORY.find(s => s.id === id); if (ch) ch.intro = lines.concat(ch.intro.filter(l => !lines.includes(l))); };
+PRE('s7', [L('hagg','المفتش هيقيّم خط أتوبيس فيه ٦٠ راكب. زوبه ١٤ كرسي — مايسمحوش بيها في المناقصة.','The inspector is assessing a 60-passenger bus line. Zouba has 14 seats — the tender won\'t allow her.'), L('hagg','أجّرت أتوبيس الشركة باسم أبوك. ده المفتاح… الرخصة اللي طلعتها من المرور تخليك تسوقه.','I leased the company bus under your father\'s name. Here are the keys… the bus licence you earned lets you drive it.'), L('abdo','وزوبه؟ سيبهالي. كريم هيطلع بالعربية التانية على الخط النهارده.','And Zouba? Leave her with me. Karim takes the second van on the line today.')]);
+PRE('s8', [L('mona','العقد جه! والشركة اشترت أتوبيس سفر للإسكندرية.','We won the contract! The company bought an intercity coach for Alexandria.'), L('you','٢٢٠ كيلو و٥٠ راكب… دي مش شغلانة زوبه.','220 kilometres and 50 passengers… that\'s not Zouba\'s job.'), L('abdo','هي في الورشة بتاخد غيار زيت. ارجع لها بالسلامة.','She\'s in the workshop for an oil change. Come back to her safely.')]);
+PRE('s9', [L('karim','٤٠ معزوم للجونة. زوبه مش هتشيلهم… هتسوق أتوبيس السفر.','Forty guests to El Gouna. Zouba can\'t carry them… you\'ll drive the coach.'), L('hagg','وزوبه هتستنانا هناك — عبده هيطلع بيها بدري، عشان صورة العريس جنبها.','And Zouba will be waiting there — Abdo is driving her down early, for a photo of the groom beside her.')]);
+PRE('s10', [L('abdo','الشركة بقى عندها أتوبيسات وعربيات سفر… بس النهارده، زوبه وبس.','The company has buses and coaches now… but today, it\'s only Zouba.')]);
+/* ---------------- no passengers → no passenger talk ---------------- */
+const _say51 = say;
+say = function(pair, x, y, col, life){ if (G.mode === 'play' && G.car && !G.onboard.length){ const boarding = (G.walkers || []).some(w => !w.fade && Math.abs(w.x - G.car.x) < 12); if (!boarding) return; } return _say51(pair, x, y, col, life); };
+const PAXMSG = ['change', 'loud', 'hot', 'likeRadio', 'sideStop'];
+const _toast51 = toast;
+toast = function(msg, cls, acts, life){ if (G.mode === 'play' && !G.onboard.length && typeof msg === 'string' && PAXMSG.some(k => msg.includes(t(k)))) return; return _toast51(msg, cls, acts, life); };
+const _react51 = react;
+react = function(kind){ const S2 = STORYRUN; if (S2 && !G.onboard.length){ const cast = chapterCast(S2.ch).filter(w => w !== 'pax'); const pool = REACT[kind] || {}; if (!cast.some(w => pool[w]) && kind !== 'crash' && kind !== 'hot') return; } _react51(kind); };
 </script>
 </body></html>
