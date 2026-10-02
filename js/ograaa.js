@@ -466,7 +466,7 @@ function resize(){
  const s = Math.min(VW / 1280, VH / 720); document.documentElement.style.fontSize = (16 * clamp(Math.pow(s, .55), .6, 1.9)) + 'px';
  document.body.classList.toggle('portrait', VH > VW * 1.05); calcPPM();
 }
-function calcPPM(){ const L = G.car ? G.car.L : 5.4; const vw = L * 1.55 + 19, vh = 12.5 + L * .2; PPM = Math.min(VW / vw, VH / vh) * cam.zoom; if (VH > VW) PPM = VW / (L * 1.9 + 7) * cam.zoom; }
+function calcPPM(){ const L = G.car ? G.car.L : 5.4; const vw = L * 1.85 + 25, vh = 15 + L * .25; PPM = Math.min(VW / vw, VH / vh) * cam.zoom; if (VH > VW) PPM = VW / (L * 1.9 + 7) * cam.zoom; }
 window.addEventListener('resize', resize);
 const SX0 = () => VW * (G.mode === 'attract' ? .5 : .33), SY0 = () => VH * (VH > VW ? .56 : VH < 560 ? .55 : .66);
 const sx = x => (x - cam.x) * PPM + SX0(), sy = y => SY0() - (y - cam.y) * PPM;
@@ -4509,9 +4509,26 @@ cleanImages = function(){ _ci37();
 drawVehicle = (function(prev){ return function(car, opt){ const M = META[car.spr]; if (!M || !M.wf) return prev(car, opt); _dv26(car, opt);
  opt = opt || {}; const lift = opt.lift || 0, sc = opt.scale || 1, src = car.cv || IMG[car.spr], k = PPM * car.g.s * sc, mk = car.mirror ? -k : k, wr = car.whRim ?? car.rim, im = rimImg(wr, car.player ? car.rimc : null), q = WQ(wr), ca = Math.cos(car.a), sa = Math.sin(car.a), s = car.g.s;
  ctx.save(); ctx.translate(sx(car.x), sy(car.y + lift)); ctx.rotate(-car.a); ctx.scale(mk, k); ctx.translate(-src.width / 2, -src.height / 2); if (opt.dim && S.set.gfx !== 'low') ctx.filter = 'brightness(.86) saturate(.85)';
- M.wheels.forEach(([cx, cy, r], i) => { const w = car.wh[i]; if (!w) return; const dx = w.x - car.x, dy = w.y - car.y, ly = -dx * sa + dy * ca, py = clamp(src.height / 2 - ly / s, cy - r * .35, cy + r * .25), R = r * q;
+ M.wheels.forEach(([cx, cy, r], i) => { const w = car.wh[i]; if (!w) return; const dx = w.x - car.x, dy = w.y - car.y, ly = -dx * sa + dy * ca, py = clamp(src.height / 2 - ly / s, cy - r * .3, cy), R = r * q;
   ctx.save(); ctx.translate(cx, py); if (w.flat) ctx.scale(1, .86); ctx.rotate(car.mirror ? -w.rot : w.rot); ctx.drawImage(im, -R, -R, R * 2, R * 2); ctx.restore(); });
  ctx.restore(); }; })(drawVehicle);
+
+/* ======================= door-fuel.js ======================= */
+"use strict";
+/* =====================================================================
+   OGRAAA v38 — door watchdog (no more frozen vehicle in "N"),
+   live fuel readout in litres
+   ===================================================================== */
+/* the bus shows "N" and won't move while its doors are open; make sure doors never stay open with nothing happening */
+const _upd38 = update;
+update = function(dt){ _upd38(dt); if (G.mode !== 'play' || !G.car) return; const car = G.car;
+ if (G.doorOpen){ G._doorT = (G._doorT || 0) + dt; const busy = G.walkers.some(w => !w.fade && !w.stay) || (G.queueT > 0); if (!busy) G._idleDoor = (G._idleDoor || 0) + dt; else G._idleDoor = 0;
+  // driver presses the gas → close up and go (after a short moment), or close automatically when nobody is boarding
+  if (((key.gas || G.gasT) && G._doorT > 1.2) || G._idleDoor > 6 || G._doorT > 25){ setDoor(false); G._doorT = 0; G._idleDoor = 0; } }
+ else { G._doorT = 0; G._idleDoor = 0; }
+ const fc = $('#cFuelL'); if (fc){ const L = G.fuel, u = G.T.fuelL || 0; fc.textContent = `⛽ ${fmt(Math.round(L * 10) / 10)} L · −${fmt(Math.round(u * 10) / 10)}`; fc.style.color = L < G.fuelMax * .12 ? '#ff6b78' : ''; } };
+const _bc38 = buildControls;
+buildControls = function(){ _bc38(); const ch = $('.chips'); if (ch && !$('#cFuelL')) ch.insertAdjacentHTML('beforeend', '<div class="chip" id="cFuelL"></div>'); };
 
 /* ======================= atlas-loader.js ======================= */
 /* =====================================================================
