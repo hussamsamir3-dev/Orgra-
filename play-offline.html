@@ -698,7 +698,7 @@ function physStep(c, h, ctl){
   const ex = w.x - Px, ey = w.y - Py, s = ex * dx + ey * dy, lx = ex - dx * s, ly = ey - dy * s;
   const rx = Px - c.x, ry = Py - c.y, vcx = c.vx - c.w * ry, vcy = c.vy + c.w * rx;
   const rvx = w.vx - vcx, rvy = w.vy - vcy, rvd = rvx * dx + rvy * dy, rlx = rvx - dx * rvd, rly = rvy - dy * rvd;
-  let fs = -(c.k * (s - (c.pre || 0)) + c.cd * rvd);
+  let fs = -(c.k * (s - (w.pre != null ? w.pre : (c.pre || 0))) + c.cd * rvd);
   if (s < -c.travel){ fs += c.kb * (-c.travel - s); if (rvd < -3.2) c.impacts.push({kind:'bottom', v:-rvd}); }
   if (s > c.travel * .9) fs -= c.kb * (s - c.travel * .9);
   const fx = dx * fs - c.kl * lx - c.cl * rlx, fy = dy * fs - c.kl * ly - c.cl * rly;
@@ -5969,5 +5969,47 @@ drawGlass = function(car, opt){ const cells = winCells2(G.V); if (!cells.length)
 /* window switch names follow the real panes: driver first, then passenger windows front→back */
 const _wp54 = winPanel;
 winPanel = function(){ const p = _wp54(); const cells = G.V ? winCells2(G.V) : []; p.querySelectorAll('.wsr').forEach(r => { const i = +r.dataset.w, c2 = cells[i]; if (!c2) return; const pax = cells.filter(q => q.kind === 'pax'), n = pax.length - pax.indexOf(c2); r.querySelector('span').textContent = c2.kind === 'drv' ? L2('السواق', 'Driver') : n === pax.length ? L2('ورا', 'Rear') : L2('شباك', 'Window') + ' ' + n; }); return p; };
+</script>
+<script>
+"use strict";
+/* =====================================================================
+   OGRAAA v55 — real-size tyres & level stance
+   · every player vehicle's tyres resized to its real tyre diameter
+     (HiAce 0.67 m … coach 1.05 m); the oversized painted arches are
+     rebuilt around the new tyre: body panel filled back in, a dark
+     arch lip with a small realistic gap, nothing floating
+   · self-levelling: each axle's spring preload trims itself so the
+     vehicle stands level at rest (air-suspension style on buses);
+     braking dive and acceleration squat are untouched
+   ===================================================================== */
+const TYRE_D = {hiace:.67, hiace2:.67, hiaceB:.66, coaster:.79, kinglong:.75, rosa:.79, redbus:.95, mcv:.95, redbus2:.97, coachB:1.05, coachO:1.05, coachN:1.05,
+ suzuki:.58, fotonC2:.62, joyA4:.65, joyA5:.67, hiaceW:.67, kingWB:.70, gdx6532:.75, coasterW:.79, joyA6:.75, xmq6600:.76, higer6720:.82, zk6770:.86, xmq6127:1.05, gdx6125:1.05, zk6128:1.05, tourismo:1.05};
+function resizeTyres(V){ const M = META[V.spr], im = IMG[V.spr]; if (!M || !im || !im.width || V.baked || M._ty) return; const D = TYRE_D[V.id]; if (!D) return; const s = V.len / M.w;
+ const c = document.createElement('canvas'); c.width = im.width; c.height = im.height; const x = c.getContext('2d'); x.drawImage(im, 0, 0); const d = x.getImageData(0, 0, c.width, c.height), p = d.data, W = c.width, H = c.height;
+ const nw = M.wheels.map(([cx, cy, R]) => { const r = Math.min(R, D / 2 / s); if (r >= R * .97) return [cx, cy, R];
+  const ncy = cy + (R - r), lip = r * 1.1;
+  // body colour just above the old arch, left and right of it
+  let sr = 0, sg = 0, sb = 0, n = 0; for (const ox of [-1.25, 1.25]) for (let dy = -6; dy <= 6; dy++) for (let dx = -4; dx <= 4; dx++){ const px = Math.round(cx + ox * R + dx), py = Math.round(cy - R * .35 + dy); if (px < 0 || py < 0 || px >= W || py >= H) continue; const q = (py * W + px) * 4; if (p[q + 3] > 200){ sr += p[q]; sg += p[q + 1]; sb += p[q + 2]; n++; } }
+  if (!n) return [cx, ncy, r]; sr /= n; sg /= n; sb /= n; const sill = ncy + r * .15;
+  for (let py = Math.max(0, Math.floor(cy - R * 1.15)); py < Math.min(H, Math.ceil(cy + R * 1.1)); py++) for (let px = Math.max(0, Math.floor(cx - R * 1.15)); px < Math.min(W, Math.ceil(cx + R * 1.15)); px++){
+   const dOld = Math.hypot(px - cx, py - cy), dNew = Math.hypot(px - cx, py - ncy); if (dOld > R * 1.06 || dNew <= lip) continue; const q = (py * W + px) * 4;
+   if (py > sill){ p[q + 3] = 0; continue; }                                   // under the sill: open air
+   const shade = .9 + .1 * (py - (cy - R)) / (2 * R); p[q] = sr * shade; p[q + 1] = sg * shade; p[q + 2] = sb * shade; p[q + 3] = 255; }
+  // fill the new well behind the tyre so the gap reads as a dark arch, not a hole
+  for (let py = Math.max(0, Math.floor(ncy - lip)); py < Math.min(H, Math.ceil(sill)); py++) for (let px = Math.max(0, Math.floor(cx - lip)); px < Math.min(W, Math.ceil(cx + lip)); px++){ const dNew = Math.hypot(px - cx, py - ncy); if (dNew > lip) continue; const q = (py * W + px) * 4; p[q] = 14; p[q + 1] = 15; p[q + 2] = 17; p[q + 3] = 255; }
+  return [cx, ncy, r]; });
+ x.putImageData(d, 0, 0);
+ // arch lip: a thin dark rubber edge and a soft highlight on the panel
+ nw.forEach(([cx, cy, r], i) => { const [, , R0] = M.wheels[i]; if (r >= R0 * .97) return; const lip = r * 1.1, sill = cy + r * .15, a0 = Math.PI + Math.asin(clamp((sill - cy) / lip, -1, 1)) * -1; x.lineWidth = Math.max(2, r * .07); x.strokeStyle = 'rgba(10,10,12,.95)'; x.beginPath(); x.arc(cx, cy, lip, Math.PI - Math.asin(clamp((sill - cy) / lip, -1, 1)), Math.asin(clamp((sill - cy) / lip, -1, 1))); x.stroke(); x.lineWidth = Math.max(1, r * .03); x.strokeStyle = 'rgba(255,255,255,.18)'; x.beginPath(); x.arc(cx, cy, lip + r * .06, Math.PI * 1.1, Math.PI * 1.9); x.stroke(); });
+ IMG[V.spr] = c; M.wheels = nw; M.wf = 1; M._ty = 1; }
+const _ci55 = cleanImages;
+cleanImages = function(){ _ci55(); for (const v of VEHS) try{ resizeTyres(v); }catch(e){ reportErr('tyres', e); } for (const k in MASKS) delete MASKS[k]; for (const k in PREV) delete PREV[k]; for (const k in GEO) delete GEO[k]; for (const k in WC2) delete WC2[k]; for (const k in GM2) delete GM2[k]; if (typeof CABM !== 'undefined') for (const k in CABM) delete CABM[k]; if (typeof CABB !== 'undefined') for (const k in CABB) delete CABB[k]; };
+/* ---------------- self-levelling stance ---------------- */
+const _upd55 = update;
+update = function(dt){ _upd55(dt); if (G.mode !== 'play' || !G.car || dt <= 0) return; const car = G.car; levelCar(car, dt); for (const a of G.ai) if (Math.abs(a.x - car.x) < 60) levelCar(a, dt); };
+function levelCar(c, dt){ if (!c.wh || c.wh.length < 2) return; const xs = c.wh.map(w => w.x), x0 = Math.min(...xs), x1 = Math.max(...xs); if (x1 - x0 < .5) return;
+ const slope = Math.atan2(terrH(x1) - terrH(x0), x1 - x0), err = c.a - slope, accel = Math.abs((c.vx - (c.lvx ?? c.vx)) / dt); c.lvx = c.vx; if (accel > 1.2) return;   // don't fight dive/squat
+ c.lvT = (c.lvT || 0) + dt; const front = c.wh.reduce((a, w) => (w.x > a.x ? w : a)), rear = c.wh.reduce((a, w) => (w.x < a.x ? w : a)), dir = c.mirror ? -1 : 1, g = clamp(err * dir, -.05, .05) * dt * (c.lvT < 3 ? 6 : 2);
+ for (const w of c.wh){ if (w.pre == null) w.pre = c.pre || 0; } front.pre = clamp(front.pre - g, -.3, .6); rear.pre = clamp(rear.pre + g, -.3, .6); }
 </script>
 </body></html>
