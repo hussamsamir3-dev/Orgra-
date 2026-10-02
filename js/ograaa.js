@@ -46,12 +46,12 @@ const TX = {
  doorDrive:['الباب مفتوح وإنت ماشي!','Driving with the door open!'], belt:['اربط الحزام','Fasten your seatbelt'], beltOn:['الحزام اتربط','Seatbelt fastened'],
  cpAhead:['كمين قدام — هدّي','Police checkpoint ahead — slow down'], cpStop:['قف عند الظابط','Stop by the officer'], cpOk:['اتفضل يا أسطى — كله تمام','Carry on, driver — all good'], cpRan:['هربت من الكمين!','You ran the checkpoint!'],
  fBelt:['عدم ربط الحزام','No seatbelt'], fLights:['السواقة بالليل من غير نور','Driving at night without lights'], fDoor:['السير والباب مفتوح','Driving with door open'], fOver:['حمولة زيادة','Overloading'], fInsp:['الفحص الفني منتهي','Inspection expired'], fLic:['الرخصة مسحوبة','Licence suspended'], fRed:['كسر إشارة حمرا','Running a red light'], fRadar:['تجاوز السرعة','Speeding'], fRun:['الهروب من الكمين','Evading a checkpoint'], fAmb:['عدم إفساح الطريق للإسعاف','Failing to yield to an ambulance'], fCrash:['حادثة تصادم','Collision'], fPed:['عدم الوقوف للمشاة','Not stopping for pedestrians'],
- redAhead:['إشارة قدامك','Traffic light ahead'], radar:['رادار','Speed camera'], limit:['الحد','Limit'], amb:['إسعاف ورا منك— خلي بالك!','Ambulance behind you — Careful!'], ambOk:[! الاسعاف عدت ', ambulance passed'],
+ redAhead:['إشارة قدامك','Traffic light ahead'], radar:['رادار','Speed camera'], limit:['الحد','Limit'], amb:['إسعاف ورا منك — اركن على جنب وقف!','Ambulance behind you — pull over and stop!'], ambOk:['برافو! فسحت للإسعاف','Well done! You made way for the ambulance'],
  honkMove:['اضرب كلاكس عشان يوسّع','Honk so they move over'], jam:['العربية اللي قدامك واقفة','The car ahead has stopped'], crashAI:['خبطت عربية! إنت أعمى يا أسطى؟','You hit a car! Are you blind, driver?'],
  ped:['في حد بيعدي — قف!','Someone is crossing — stop!'], pedOk:['شكراً يا أسطى','Thanks, driver'], flat:['الكاوتش نام!','Flat tyre!'], overheat:['الموتور سخن! هدّي','Engine overheating! Ease off'],
  fuelLow:['البنزين قرب يخلص','Fuel is low'], refuel:['فوّل من البنزينة','Refuel here'], refueled:['التانك اتملى','Tank filled'], wipers:['شغل المساحات','Turn on the wipers'],
  restAhead:['استراحة قدام','Rest house ahead'], restTitle:['استراحة','Rest house'], rest1:['الركاب نزلوا يستريحوا — دقيقة وراجعين','Passengers are taking a break — back in a minute'], callBack:['نادي على الركاب','Call passengers back'], leave:['اتحرك','Depart'],
- sideStop:['راكب: "المحطة الجايه يا أسطى!"','Passenger: "Drop next stop please, driver!"'], sideOk:['نزل الراكب — شكراً','Passenger dropped — thanks'], change:['راكب معاه ٢٠٠ جنيه ومحتاج باقي','Passenger has a 200-pound note and needs change'], giveChange:['ادّيله الباقي','Give change'], askPax:['اسأل الركاب','Ask other riders'],
+ sideStop:['راكب: "على جنب يا أسطى!"','Passenger: "Drop me here, driver!"'], sideOk:['نزل الراكب — شكراً','Passenger dropped — thanks'], change:['راكب معاه ٢٠٠ جنيه ومحتاج باقي','Passenger has a 200-pound note and needs change'], giveChange:['ادّيله الباقي','Give change'], askPax:['اسأل الركاب','Ask other riders'],
  loud:['"وطّي الراديو شوية يا أسطى"','"Turn the radio down a bit, driver"'], hot:['"الجو حر! شغل التكييف"','"It\'s hot! Turn on the A/C"'], likeRadio:['"الله! علّي الأغنية دي"','"Oh, turn this song up!"'],
  parcelOk:['تم تسليم الطرد','Parcel delivered'], parcelBroken:['الطرد اتكسر من المطبات!','A parcel broke over the bumps!'], cruiseSet:['مثبت السرعة','Cruise control'], cruiseOff:['مثبت السرعة اتلغى','Cruise cancelled'],
  pause:['إيقاف مؤقت','Paused'], resume:['كمّل','Resume'], quit:['اخرج للقائمة','Quit to menu'], restart:['ابدأ من جديد','Restart'],
@@ -5132,6 +5132,17 @@ renderStoryPage = function(){ _rsp45(); const path = $('#s-career .sjpath'); if 
 .olImg img{height:5.5rem;max-width:12rem;object-fit:contain;transition:filter 1s}.olTxt{flex:1}.olTxt small{letter-spacing:.2em;color:#e8c27a;font-size:.7rem}.olTxt h3{margin:.1rem 0;font:900 1.6rem Lalezar,serif}.olTxt p{margin:.1rem 0 .6rem;color:#cfd6e2;font-size:.88rem}
 .rsg{display:grid;grid-template-columns:repeat(auto-fill,minmax(10rem,1fr));gap:.35rem .8rem;margin-bottom:.6rem}.rs{display:flex;align-items:center;gap:.4rem;font-size:.78rem}.rs span{min-width:5.5rem}.rs>i{flex:1;height:.4rem;border-radius:1rem;background:rgba(255,255,255,.1);overflow:hidden}.rs>i>i{display:block;height:100%;background:#e8604c}.rs.ok>i>i{background:#3ddc84}.rs b{min-width:2.4rem;text-align:end}
 @media (max-width:700px){.oldLady{flex-direction:column}}`; document.head.appendChild(st); }
+
+/* ======================= texts.js ======================= */
+"use strict";
+/* =====================================================================
+   OGRAAA v46 — text updates from the designer (Hossam):
+   amb, ambOk, sideStop
+   ===================================================================== */
+Object.assign(TX, {
+ amb:['إسعاف ورا منك— خلي بالك!', 'Ambulance behind you — Careful!'],
+ ambOk:['الإسعاف عدّت!', 'Ambulance passed!'],
+ sideStop:['راكب: "المحطة الجايه يا أسطى!"', 'Passenger: "Drop next stop please, driver!"']});
 
 /* ======================= atlas-loader.js ======================= */
 /* =====================================================================
