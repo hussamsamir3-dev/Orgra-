@@ -3641,8 +3641,7 @@ addFine = function(k, cam){ if (k === 'run'){ const c = W.cps.find(q => q.state 
 const _upd21 = update;
 update = function(dt){ _upd21(dt); if (G.mode !== 'play') return; const car = G.car, st = W.stops[G.nextIdx]; if (!st || st.trimmed || !st.waiting || st.x - car.x > 70 || st.i === W.stops.length - 1) return; st.trimmed = true;
  const room = Math.max(0, seatsOf(G.V) - G.onboard.length + G.onboard.filter(p => p.dest <= st.i).length);
- if (st.waiting.length > room){ const extra = st.waiting.splice(room); extra.forEach((p, i) => G.walkers.push({t:p.t, h:p.h, x:st.x - 3 + (i % 5) * .75, y:1.8, ty:1.8, tx:st.x - 3 + (i % 5) * .75 + (Math.random() < .5 ? -1 : 1) * (10 + Math.random() * 8), spd:1 + Math.random() * .4, d:0, fade:true}));
-  if (!room) toast('🚐 ' + L2('العربية مليانة — الناس هتستنى اللي بعدك', 'Vehicle full — people will wait for the next one'), 'gold'); } };
+ if (st.waiting.length > room && !room) toast('🚐 ' + L2('العربية مليانة — الناس هتستنى اللي بعدك', 'Vehicle full — people will wait for the next one'), 'gold'); };
 
 
 "use strict";
@@ -4529,6 +4528,180 @@ update = function(dt){ _upd38(dt); if (G.mode !== 'play' || !G.car) return; cons
  const fc = $('#cFuelL'); if (fc){ const L = G.fuel, u = G.T.fuelL || 0; fc.textContent = `⛽ ${fmt(Math.round(L * 10) / 10)} L · −${fmt(Math.round(u * 10) / 10)}`; fc.style.color = L < G.fuelMax * .12 ? '#ff6b78' : ''; } };
 const _bc38 = buildControls;
 buildControls = function(){ _bc38(); const ch = $('.chips'); if (ch && !$('#cFuelL')) ch.insertAdjacentHTML('beforeend', '<div class="chip" id="cFuelL"></div>'); };
+
+/* ======================= story-glass.js ======================= */
+"use strict";
+/* =====================================================================
+   OGRAAA v39 — real tinted glass · no drop-off outline · "next stop
+   please" · fuel +40% & A/C +20% · A/C only where fitted · traffic
+   lights clear of lamp posts · richer passenger talk ·
+   STORY MODE: a dramatic career told through connected scenarios
+   ===================================================================== */
+/* ---------------- tinted glass: a smoked, reflective pane — not a dimmer ---------------- */
+function glassFilm(o, w, h, TA, wins){ if (TA <= 0) return; o.save();
+ const g = o.createLinearGradient(0, 0, 0, h); g.addColorStop(0, `rgba(8,16,22,${.35 + TA * .55})`); g.addColorStop(.55, `rgba(12,24,30,${.22 + TA * .5})`); g.addColorStop(1, `rgba(20,32,38,${.18 + TA * .42})`); o.fillStyle = g; o.fillRect(0, 0, w, h);
+ o.globalCompositeOperation = 'screen'; const sky = o.createLinearGradient(0, 0, 0, h * .5); sky.addColorStop(0, `rgba(170,200,225,${.16 + TA * .12})`); sky.addColorStop(1, 'rgba(170,200,225,0)'); o.fillStyle = sky; o.fillRect(0, 0, w, h * .5);
+ const r = mulberry(w + h); for (let i = 0; i < 4; i++){ const x0 = w * (.08 + i * .24 + r() * .06), sw = w * (.035 + r() * .04); const sg = o.createLinearGradient(x0, 0, x0 + sw + h * .4, h); sg.addColorStop(0, 'rgba(255,255,255,0)'); sg.addColorStop(.45, `rgba(255,255,255,${.1 + TA * .08})`); sg.addColorStop(.55, 'rgba(255,255,255,0)'); o.fillStyle = sg; o.beginPath(); o.moveTo(x0, 0); o.lineTo(x0 + sw, 0); o.lineTo(x0 + sw + h * .45, h); o.lineTo(x0 + h * .45, h); o.closePath(); o.fill(); }
+ o.restore(); }
+/* replace the old "darken" pass: after the cabin layer is composed, add the glass film over the window cells only */
+const _cc39 = cabinCanvas;
+cabinCanvas = function(V, cos, pax, forPreview){ const c = _cc39(V, cos, pax, forPreview); const TA = (COS.tint.find(q => q.id === cos.tint) || {a:0}).a; if (!c || !c.width || TA <= 0) return c; const key = '_g' + TA; if (c[key]) return c;
+ const out = document.createElement('canvas'); out.width = c.width; out.height = c.height; const o = out.getContext('2d'); o.drawImage(c, 0, 0); const film = document.createElement('canvas'); film.width = c.width; film.height = c.height; const f = film.getContext('2d'); glassFilm(f, c.width, c.height, TA); f.globalCompositeOperation = 'destination-in'; f.drawImage(c, 0, 0); o.drawImage(film, 0, 0); c[key] = out; return out; };
+{ const lc = typeof CABB !== 'undefined' ? CABB : null; if (lc) for (const k in lc) delete lc[k]; }
+/* ---------------- no flashing outline around passengers ---------------- */
+goldOutline = function(){};
+/* ---------------- "next station please" instead of "drop me here" ---------------- */
+const _re39 = randomEvent;
+randomEvent = function(){ const had = G.side; _re39(); if (G.side && G.side !== had){ const p = G.side.p, ns = W.stops[G.nextIdx]; G.side = null; $$('#toasts .toast').forEach(d => { if (d.textContent.includes(t('sideStop'))) d.remove(); }); if (p && ns){ p.dest = Math.min(p.dest, ns.i); const line = pick(DLG.nextStop); say(line, G.car.x - G.car.L * .1, G.car.y + G.car.yt + .4); toast('🙋 ' + nm(line), 'gold', null, 4); } } };
+/* ---------------- fuel +40%, A/C +20% ---------------- */
+{ const _f = fuelFactor; fuelFactor = function(){ return _f() * 1.4 * (G.ac && G.engOn ? 1.2 : 1); }; }
+/* ---------------- A/C only where the vehicle really has it (or the garage fitted it) ---------------- */
+const NO_AC = new Set(['fiat128','hiaceB','hiace','coaster','redbus','suzuki','fotonC2','joyA4']);
+function hasAC(){ if (!G.V) return true; return !NO_AC.has(G.V.id) || (!G.test && upl(G.vid, 'ac') >= 1); }
+let acWarned = 0;
+const _upd39 = update;
+update = function(dt){ _upd39(dt); if (G.mode !== 'play' || !G.car) return;
+ if (G.ac && !hasAC()){ G.ac = false; if (performance.now() - acWarned > 8000){ acWarned = performance.now(); toastUI('❄️ ' + L2('العربية دي مفيهاش تكييف — ركّبه من الجراج', 'No A/C in this vehicle — fit one in the garage'), 'gold'); } }
+ storyTick(dt); };
+/* ---------------- traffic lights never share a spot with a lamp post ---------------- */
+const _sr39 = startRoute;
+startRoute = function(r, o){ _sr39(r, o); if (W.lights && W.props) W.props = W.props.filter(p => !(/^lamp|pole|wire/.test(p.k) && W.lights.some(l => Math.abs(p.x - l.x) < 4))); };
+/* ---------------- stop crowds: no one "spawns and walks away" — those who don't fit simply wait ---------------- */
+// (the boarding loop already takes only as many as fit; nothing else to do here)
+/* ---------------- passengers: many more natural lines ---------------- */
+DLG.nextStop = [['نازل المحطة الجاية يا أسطى','Next station for me, driver'],['المحطة الجاية لو سمحت','Next station, please'],['أول ما توصل المحطة الجاية نزلني','Drop me at the next station'],['عندك المحطة الجاية يا باشا','Next station, boss'],['أنا نازل الجاية إن شاء الله','I\'m getting off at the next one']];
+DLG.board.push(['صباح الفل يا أسطى','Morning, driver'],['الجو حر النهارده أوي','So hot today'],['معلش الفكة مش معايا','Sorry, no small change'],['هو ده رايح الموقف؟','Does this go to the terminal?'],['اقعد هنا يا حاج، اتفضل','Take this seat, sir'],['لحقتك بالعافية الحمد لله','Barely caught you, thank God']);
+DLG.alightGood.push(['متشكر يا كبير، وصلتنا بالسلامة','Thanks boss, got us there safe'],['ربنا يحفظك يا أسطى','God keep you, driver'],['أحسن سواق ركبت معاه النهارده','Best driver I rode with today'],['هركب معاك تاني أكيد','I\'ll ride with you again']);
+DLG.alightBad.push(['إيه يا عم، إحنا مش في سباق!','Hey, this isn\'t a race!'],['الفرامل دي هتموتنا','Those brakes will kill us'],['حرام عليك يا أسطى','Have some mercy, driver']);
+DLG.chat = [['تفتكر الأسعار هتنزل؟','Think prices will come down?'],['الزحمة دي كل يوم كده','This traffic, every single day'],['ابني نجح في الثانوية الحمد لله','My son passed his exams, thank God'],['شغّل حاجة حلوة يا أسطى','Put something nice on, driver'],['الكوبري ده كان فاضي زمان','This bridge used to be empty'],['هو التكييف شغال؟','Is the A/C on?'],['الواد ده جاي ورانا من بدري','That guy\'s been tailing us'],['ربنا يسهّلها','May God make it easy']];
+setInterval(() => { if (G.mode === 'play' && !G.paused && G.onboard.length > 1 && Math.random() < .28 && typeof say === 'function') say(pick(DLG.chat), G.car.x - G.car.L * (.1 + Math.random() * .3), G.car.y + G.car.yt + .4); }, 9000);
+
+/* =====================================================================
+   STORY MODE — "أسطى | The Driver" : nine connected chapters
+   ===================================================================== */
+const CAST = {
+ hagg:{n:['الحاج محمود','Hagg Mahmoud'], ic:'👴🏽', c:'#d6a740', r:['صاحب شركة أجرة','Owner, Ograaa Transport']},
+ omk:{n:['أم كريم','Om Karim'], ic:'🤰🏽', c:'#ff7aa8', r:['مرات الحاج','Hagg\'s wife']},
+ karim:{n:['كريم','Karim'], ic:'👨🏻', c:'#5bc0ff', r:['ابن الحاج','Hagg\'s son']},
+ sayed:{n:['سيد السبّاق','Sayed "The Racer"'], ic:'😎', c:'#ff5a4e', r:['سواق شركة منافسة','Rival company driver']},
+ mona:{n:['منى','Mona'], ic:'🎧', c:'#9b8cff', r:['الحركة واللاسلكي','Dispatcher']},
+ abdo:{n:['الأسطى عبده','Usta Abdo'], ic:'🧰', c:'#8fd16a', r:['ميكانيكي وأستاذك','Mechanic & mentor']},
+ adel:{n:['النقيب عادل','Captain Adel'], ic:'👮🏽‍♂️', c:'#7ab8ff', r:['مرور','Traffic police']},
+ you:{n:['إنت','You'], ic:'🧑🏽‍✈️', c:'#f5b21b', r:['السواق','The driver']},
+ pax:{n:['راكب','Passenger'], ic:'🧔🏽', c:'#cfd6de', r:['',''] }};
+const L = (who, ar, en) => ({who, ar, en});
+const STORY = [
+ {id:'ch1', node:'c0', unlock:() => CR().joined, title:['الفصل ١ · أول يوم','Chapter 1 · Day One'], sub:['الهايس القديمة ومفتاح على سلسلة','An old HiAce and a key on a chain'], cls:'micro', vid:'hiaceB', route:'m1', tod:'day',
+  goal:{deliver:6, nofine:true}, reward:600,
+  intro:[L('hagg','أهلاً يا ابني. الهايس دي شغالة من قبل ما تتولد — حافظ عليها زي عينيك.','Welcome, son. This HiAce has run since before you were born — guard her like your own eyes.'), L('abdo','الفرامل بتشد شمال شوية… وماتدوسش بنزين وإنت داخل على المطب.','The brakes pull a bit left… and never floor it into a speed bump.'), L('hagg','عايز ٦ ركاب يوصلوا، ومن غير ولا مخالفة. الناس هنا بتتكلم.','Six passengers delivered, not one fine. People talk around here.'), L('you','حاضر يا حاج. مش هتندم.','Yes, Hagg. You won\'t regret it.')],
+  beats:[[.3, [L('mona','لاسلكي: الكمين اللي قدام شغال النهارده — خليك على اليمين.','Radio: the checkpoint ahead is active today — keep right.')]], [.7, [L('abdo','شايف؟ السواقة الهادية بتجيب بقشيش.','See? Calm driving brings tips.')]]],
+  win:[L('hagg','تمام يا أسطى. الشغل الحلو بيبان من أول يوم.','Good work, usta. Real talent shows on day one.'), L('hagg','بكرة تيجي بدري… عندي شغلانة مهمة.','Come early tomorrow… I have something important.')],
+  lose:[L('hagg','مش مشكلة. الكل بيبدأ كده. جرّب تاني.','No shame in it. Everyone starts like this. Try again.')]},
+ {id:'ch2', node:'n1', unlock:() => CR().done.n1 && CR().story.ch1, title:['الفصل ٢ · الولادة','Chapter 2 · The Delivery'], sub:['أم كريم في الطلق — والمستشفى بعيدة','Om Karim is in labour — the hospital is far'], cls:'micro', vid:'hiace', route:'m3', tod:'day',
+  goal:{timer:true, vip:'omk', comfort:45}, reward:2500,
+  intro:[L('mona','الحق! الحاج بيتصل… صوته مش طبيعي.','Quick! Hagg is calling… he doesn\'t sound right.'), L('hagg','أم كريم بتولد! عربيتي واقفة والإسعاف متأخرة. إنت أقرب واحد.','Om Karim is in labour! My car is dead and the ambulance is late. You\'re the closest.'), L('omk','آآه… بالراحة يا ابني… بس بسرعة!','Aah… gently, son… but hurry!'), L('hagg','المستشفى في آخر الخط. عندك وقت محدود — وأي مطب هتحس بيه.','The hospital is at the end of the line. Time is short — and she\'ll feel every bump.')],
+  beats:[[.25, [L('omk','الطلق بيقرّب… حاسب المطبات!','The contractions are closer… watch the bumps!')]], [.5, [L('hagg','(في التليفون) فين؟ فين؟! قولّي إنك قربت!','(on the phone) Where are you?! Tell me you\'re close!')]], [.8, [L('omk','شايفة المستشفى… ربنا يكرمك.','I can see the hospital… God bless you.')]]],
+  win:[L('hagg','ولد! ولد يا أسطى! سمّيناه على اسمك.','A boy! A boy, usta! We named him after you.'), L('hagg','من النهارده إنت مش موظف عندي. إنت من العيلة.','From today you\'re not my employee. You\'re family.')],
+  lose:[L('omk','الحمد لله الإسعاف لحقتنا…','Thank God the ambulance caught up…'), L('hagg','مش ذنبك… بس كان نفسي تكون إنت.','Not your fault… I just wished it had been you.')]},
+ {id:'ch3', node:'n1', unlock:() => CR().story.ch2, title:['الفصل ٣ · السبّاق','Chapter 3 · The Racer'], sub:['سيد عايز الخط — والخط مش بتاعه','Sayed wants the line — it isn\'t his'], cls:'micro', route:'m10', tod:'day',
+  goal:{race:true, deliver:8}, reward:1800,
+  intro:[L('karim','في واحد اسمه سيد بقاله أسبوع بيلم ركابنا من قدامنا.','There\'s a guy, Sayed — been stealing our passengers for a week.'), L('sayed','الخط ده بتاعي يا شاطر. اللي يوصل الأول ياخده.','This line is mine, kid. First one to the end takes it.'), L('you','نشوف.','We\'ll see.'), L('karim','اوصل قبله… ومن غير ما تعمل حادثة. الحاج مش ناقص.','Beat him… without crashing. Dad doesn\'t need that.')],
+  beats:[[.4, [L('sayed','(بيكلكس) يلا يا عم الحاج الصغير!','(honking) Come on, little Hagg!')]], [.75, [L('karim','قرّبت! ماتسيبهوش!','You\'re close! Don\'t let him!')]]],
+  win:[L('sayed','…ماشي. الخط بتاعكم. المرة دي.','…Fine. The line\'s yours. This time.'), L('hagg','سمعت. ده اللي بيتعمل بالراجل.','I heard. That\'s how a man does it.')],
+  lose:[L('sayed','قلتلك الخط بتاعي!','Told you, the line is mine!'), L('karim','مافيش مشكلة… الجولة الجاية.','No worries… next round.')]},
+ {id:'ch4', node:'n5', unlock:() => CR().story.ch3, title:['الفصل ٤ · الليلة الطويلة','Chapter 4 · The Long Night'], sub:['مطر، بنزين على الآخر، وناس عايزة تروّح','Rain, an empty tank, and people who need to get home'], cls:'micro', route:'m5', tod:'night', weather:'rain',
+  goal:{lowfuel:true}, reward:1500,
+  intro:[L('mona','آخر وردية الليلة. المطر قافل الدنيا والعمال مستنيين في الموقف.','Last shift tonight. Rain everywhere and the workers are waiting.'), L('abdo','خلي بالك… العربية دي مافيهاش غير شوية بنزين.','Careful… there\'s barely any fuel in her.'), L('you','هموّن في السكة.','I\'ll fill up on the way.')],
+  beats:[[.35, [L('pax','إنت متأكد إن البنزين هيكفي؟','Sure the fuel will last?')]], [.7, [L('mona','لاسلكي: الطريق قدامك غرقان — بالراحة.','Radio: the road ahead is flooded — go easy.')]]],
+  win:[L('mona','كله وصل. تصبح على خير يا بطل.','Everyone made it home. Good night, hero.')], lose:[L('abdo','الليالي دي بتعلّم. نجرب تاني.','Nights like this teach you. Again.')]},
+ {id:'ch5', node:'n5', unlock:() => CR().story.ch4 && CR().done.n5, title:['الفصل ٥ · الشنطة','Chapter 5 · The Bag'], sub:['راكب نسي حاجة… غالية جداً','A passenger left something… very valuable'], cls:'micro', route:'m3', tod:'sunset',
+  goal:{choice:'bag'}, reward:800,
+  intro:[L('mona','وردية عادية. ركاب كتير النهارده.','A normal shift. Lots of passengers today.'), L('you','عادي يعني… إن شاء الله.','Normal… God willing.')],
+  beats:[[.45, [L('pax','(واحد نازل بسرعة وناسي شنطة جلد على الكرسي)','(a man hurries off, leaving a leather bag on the seat)'), L('you','…دي مليانة فلوس. كتير أوي.','…It\'s full of cash. A lot of it.')], 'bag']],
+  win:[L('adel','أمانتك نادرة يا أسطى. صاحب الشنطة تاجر وعايز يكافئك.','Honesty like yours is rare, usta. The owner is a merchant — he wants to reward you.')], lose:[L('you','(الشنطة في الدرج… وضميري مش مرتاح)','(the bag sits in the glovebox… and my conscience won\'t rest)')]},
+ {id:'ch6', node:'n6', unlock:() => CR().story.ch5 && CR().done.n6, title:['الفصل ٦ · المفتش','Chapter 6 · The Inspector'], sub:['أول أتوبيس… ومفتش راكب وراك','Your first bus… and an inspector right behind you'], cls:'bus', route:'b1', tod:'day',
+  goal:{allstops:true, nofine:true, comfort:60}, reward:3000,
+  intro:[L('hagg','الهيئة باعتة مفتش يركب معاك. لو عجبه، الشركة تاخد خط الأتوبيس.','The authority sent an inspector to ride with you. If he\'s impressed, we win the bus contract.'), L('pax','كل المحطات. ولا مخالفة. والركاب مرتاحين. أنا بكتب كل حاجة.','Every stop. No fines. Comfortable passengers. I\'m writing everything down.')],
+  beats:[[.5, [L('pax','(بيكتب في الدفتر)… كمّل.','(writing in his notebook)… carry on.')]]],
+  win:[L('pax','تقرير ممتاز. مبروك للشركة.','An excellent report. Congratulations to the company.'), L('hagg','عقد الأتوبيسات بقى بتاعنا! بسببك.','The bus contract is ours! Because of you.')], lose:[L('pax','مش كفاية للأسف.','Not enough, I\'m afraid.')]},
+ {id:'ch7', node:'n8', unlock:() => CR().story.ch6 && CR().done.n8, title:['الفصل ٧ · العاصفة','Chapter 7 · The Storm'], sub:['الطريق الصحراوي والرملة طالعة','The desert road and a rising sandstorm'], cls:'coach', route:'c1', tod:'day', weather:'sand',
+  goal:{puncture:.4}, reward:4500,
+  intro:[L('mona','أتوبيس إسكندرية كامل. الأرصاد بتقول عاصفة رملية.','Full coach to Alexandria. Forecast says sandstorm.'), L('abdo','الكاوتش الاحتياطي في الشنطة… وصندوق العدة. خليهم قريبين.','Spare tyre in the trunk… and the toolbox. Keep them handy.')],
+  beats:[[.4, [L('you','الكاوتش ضرب!','Tyre blew!'), L('abdo','(لاسلكي) اركن على جنب وغيّر بالاحتياطي، أو صندوق العدة.','(radio) Pull over, change to the spare — or use the toolbox.')]], [.75, [L('pax','ربنا معاك يا أسطى، إحنا مش شايفين حاجة!','God be with you, driver, we can\'t see a thing!')]]],
+  win:[L('mona','وصلتوا إسكندرية بالسلامة. الركاب بيصقفوا!','Safe in Alexandria. The passengers are applauding!')], lose:[L('abdo','الصحرا مابتسامحش. نجهز ونرجع.','The desert doesn\'t forgive. We prepare and go again.')]},
+ {id:'ch8', node:'n9', unlock:() => CR().story.ch7 && CR().done.n9, title:['الفصل ٨ · الفرح','Chapter 8 · The Wedding'], sub:['ضيوف فرح كريم للجونة','Karim\'s wedding guests to El Gouna'], cls:'coach', route:'c8', tod:'sunset',
+  goal:{comfort:65}, reward:6000,
+  intro:[L('karim','بفرح يوم الخميس… وعايزك إنت اللي توصّل المعازيم.','I\'m getting married Thursday… and I want YOU driving the guests.'), L('hagg','خليهم يوصلوا مبسوطين. ده فرح ابني.','Get them there happy. It\'s my son\'s wedding.'), {cond:() => CR().storyKept, ...L('hagg','…وعلى فكرة. عرفت موضوع الشنطة. هنتكلم بعدين.','…and by the way. I heard about the bag. We\'ll talk later.')}],
+  beats:[[.5, [L('pax','(المعازيم بيغنوا ويطبلوا ورا)','(the guests are singing and drumming in the back)')]]],
+  win:[L('karim','أحلى فرح! كله بيتكلم عن السواق.','Best wedding ever! Everyone\'s talking about the driver.')], lose:[L('karim','المعازيم وصلوا تعبانين… بس الفرح كمّل.','The guests arrived worn out… but the party went on.')]},
+ {id:'ch9', node:'n11', unlock:() => CR().story.ch8 && CR().done.n11, title:['الفصل ٩ · الشريك','Chapter 9 · The Partner'], sub:['آخر رحلة للحاج… وأول رحلة ليك','Hagg\'s last ride… and your first'], cls:'coach', route:'c8', tod:'day',
+  goal:{stars:3}, reward:15000,
+  intro:[L('hagg','أنا كبرت يا ابني. عايز آخر رحلة أركبها تكون معاك، للجونة.','I\'ve grown old, son. I want my last ride to be with you — to El Gouna.'), L('omk','(شايلة البيبي) قول لعمو يسوق بالراحة.','(holding the baby) Tell uncle to drive gently.'), L('hagg','ورقة الشراكة في جيبي. وصّلنا بأحسن طريقة… وهي بتاعتك.','The partnership papers are in my pocket. Get us there perfectly… and they\'re yours.')],
+  beats:[[.5, [L('hagg','فاكر أول يوم؟ الهايس القديمة؟','Remember day one? The old HiAce?'), L('you','عمري ما هنسى.','I\'ll never forget.')]]],
+  win:[L('hagg','مبروك يا شريكي.','Congratulations, partner.'), L('mona','(في اللاسلكي، بتبكي) كل الشركة بتصقف لك!','(on the radio, crying) The whole company is applauding you!')], lose:[L('hagg','قريب أوي… نعيدها. الورقة مش هتطير.','So close… we\'ll go again. The papers aren\'t going anywhere.')]}];
+const STORY_NODE_REQ = {n1:'ch1', v1:'ch2', n5:'ch3', n3:'ch4', n6:'ch5', n7:'ch6', n9:'ch7', n11:'ch8', n12:'ch9'};
+for (const n of CAREER_N){ const ch = STORY_NODE_REQ[n.id]; if (ch && !n.req.some(r => r[0] === 'story')) n.req.push(['story', ch]); }
+const _rm39 = reqMet; reqMet = function(r){ if (r[0] === 'story') return !!(CR().story || {})[r[1]]; return _rm39(r); };
+const _rt39 = reqText; reqText = function(r){ if (r[0] === 'story'){ const ch = STORY.find(s => s.id === r[1]); return '🎬 ' + (ch ? nm(ch.title) : r[1]); } return _rt39(r); };
+/* ---------------- cinematic dialogue ---------------- */
+let DQ = null;
+function dialogue(lines, done, choice){ lines = lines.filter(l => !l.cond || l.cond()); let i = 0; const wasPaused = G.paused; if (G.mode === 'play') G.paused = true;
+ let m = $('#storyM'); if (!m){ m = document.createElement('div'); m.id = 'storyM'; document.body.appendChild(m); }
+ const show = () => { const l = lines[i], who = CAST[l.who] || CAST.pax, last = i === lines.length - 1;
+  m.innerHTML = `<div class="sbox" style="--c:${who.c}"><div class="sava">${who.ic}</div><div class="stxt"><div class="swho">${nm(who.n)} <em>${nm(who.r)}</em></div><div class="sline"></div>${last && choice ? `<div class="schoice">${choice.map((c, k) => `<button class="btn ${k ? '' : 'pri'}" data-sc="${k}">${nm(c.t)}</button>`).join('')}</div>` : `<div class="snext">${last ? L2('▶ يلا', '▶ Go') : L2('التالي ▸', 'Next ▸')}</div>`}</div></div>`;
+  m.classList.add('on'); const el = m.querySelector('.sline'), txt = L2(l.ar, l.en); let k = 0; clearInterval(DQ); DQ = setInterval(() => { k += 2; el.textContent = txt.slice(0, k); if (k >= txt.length) clearInterval(DQ); }, 22); AU.click && AU.click();
+  if (last && choice) $$('#storyM [data-sc]').forEach(b => b.onclick = e => { e.stopPropagation(); close(); choice[+b.dataset.sc].fx(); });
+  else m.onclick = () => { if (k < txt.length){ k = txt.length; el.textContent = txt; return; } i++; if (i < lines.length) show(); else { close(); done && done(); } }; };
+ const close = () => { clearInterval(DQ); m.classList.remove('on'); m.onclick = null; if (G.mode === 'play') G.paused = wasPaused && false; };
+ show(); }
+/* ---------------- running a chapter ---------------- */
+let STORYRUN = null;
+function startChapter(ch){ const c = CR(); c.story = c.story || {}; const fl = fleet(); const vid = ch.vid && VBY(ch.vid) ? ch.vid : (fl.find(v => VBY(v).cls === ch.cls) || fl.find(v => CLS_OK[ch.cls].includes(v)) || VEHS.find(v => CLS_OK[ch.cls].includes(v.id)).id);
+ const V = VBY(vid); if (!hasLic(V.cls)){ toastUI('🪪 ' + L2('محتاج رخصة ', 'Licence needed: ') + t('lic_' + V.cls), 'bad'); DMVTAB = 'lic'; show('traffic'); return; }
+ const route = ROUTES.find(r => r.id === ch.route) || ROUTES.find(r => r.type === ch.cls);
+ dialogue(ch.intro, () => { STORYRUN = {ch, t:0, beat:0, choice:null, fail:false}; play(route, {vid, test:true, tod:ch.tod, weather:ch.weather || 'clear', career:{job:null, objs:[], mult:1, story:ch.id}}); setupChapter(ch); }); }
+function setupChapter(ch){ const S2 = STORYRUN, g = ch.goal; if (!S2 || !G.car) return; $('#helpM') && $('#helpM').classList.remove('on');
+ if (g.timer){ S2.limit = Math.round(W.len / (G.V.vmax * .55)); }
+ if (g.vip){ const p = {t:'p3', h:1.62, dest:W.stops.length - 1, vip:true}; G.onboard.unshift(p); }
+ if (g.lowfuel){ G.fuel = G.fuelMax * .07; }
+ if (g.race){ const spec = AIV.findIndex(a => a.spr === 'nw4' || a.spr === 'ai17'); const rv = spawnAI(spec >= 0 ? spec : 0, 0, G.car.x + 28, 1); if (rv){ rv.rival = true; rv.pers.speedK = 1.15; rv.tgt = G.V.vmax * .92; S2.rival = rv; } }
+ storyHUD(); }
+function storyHUD(){ let h = $('#storyHud'); if (!h){ h = document.createElement('div'); h.id = 'storyHud'; document.body.appendChild(h); } h.classList.add('on'); }
+function storyTick(dt){ const S2 = STORYRUN; if (!S2 || G.mode !== 'play' || G.paused) return; const ch = S2.ch, g = ch.goal, prog = clamp((G.car.x - W.stops[0].x) / (W.stops[W.stops.length - 1].x - W.stops[0].x), 0, 1); S2.t += dt;
+ const b = ch.beats[S2.beat]; if (b && prog >= b[0]){ S2.beat++; if (b[2] === 'bag') dialogue(b[1], null, [{t:['أرجّعها للبوليس','Hand it to the police'], fx:() => { S2.choice = 'return'; CR().storyKept = false; toastUI('🤝 ' + L2('هتسلّمها في آخر الخط', 'You\'ll hand it in at the end of the line'), 'good'); }}, {t:['أحتفظ بيها','Keep it'], fx:() => { S2.choice = 'keep'; CR().storyKept = true; G.T.tips += 2000; toastUI('💰 +2000', 'gold'); }}]); else dialogue(b[1]); }
+ if (g.timer && S2.limit){ const left = S2.limit - S2.t; if (left <= 0 && !S2.fail){ S2.fail = true; toastUI('⏱ ' + L2('الوقت خلص!', 'Time\'s up!'), 'bad'); } }
+ if (g.puncture && !S2.punct && prog > g.puncture){ S2.punct = true; const w = G.car.wh[G.car.wh.length - 1]; if (w) w.flat = true; }
+ if (S2.rival && S2.rival.x > W.stops[W.stops.length - 1].x && !S2.rivalWon){ S2.rivalWon = true; toastUI('😎 ' + L2('سيد وصل الأول!', 'Sayed reached the end first!'), 'bad'); }
+ const h = $('#storyHud'); if (h){ const parts = [`🎬 ${nm(ch.title)}`]; if (g.timer && S2.limit) parts.push(`⏱ ${Math.max(0, Math.ceil(S2.limit - S2.t))}s`); if (g.vip) parts.push(`🤰🏽 ${Math.round(G.comfort)}%`); if (g.deliver) parts.push(`🧍 ${G.T.delivered}/${g.deliver}`); if (S2.rival) parts.push(`😎 ${Math.round(Math.max(0, (W.stops[W.stops.length - 1].x - S2.rival.x)))} m`); if (g.lowfuel) parts.push(`⛽ ${Math.round(G.fuel * 10) / 10} L`); h.textContent = parts.join('   ·   '); } }
+function chapterResult(R){ const S2 = STORYRUN, g = S2.ch.goal, T = G.T; let ok = R.reason === 'ok' && !S2.fail;
+ if (g.deliver && T.delivered < g.deliver) ok = false; if (g.nofine && T.fines > 0) ok = false; if (g.comfort && (T.comfortN ? T.comfortSum / T.comfortN : G.comfort) < g.comfort) ok = false; if (g.allstops && T.missed > 0) ok = false; if (g.race && S2.rivalWon) ok = false; if (g.stars && (R.stars || 0) < g.stars) ok = false; if (g.choice && !S2.choice) ok = false; if (g.choice === 'bag' && S2.choice === 'keep') ok = true;
+ return ok; }
+const _end39 = endRun;
+endRun = function(reason){ const S2 = STORYRUN; _end39(reason); if (!S2) return; STORYRUN = null; $('#storyHud') && $('#storyHud').classList.remove('on');
+ const R = {reason, stars:G.T ? (reason === 'ok' ? 1 + ((G.T.comfortN ? G.T.comfortSum / G.T.comfortN : G.comfort) > 70 ? 1 : 0) + (G.T.missed === 0 && G.T.fines === 0 && G.T.hits === 0 ? 1 : 0) : 0) : 0}, ok = chapterResult(R), ch = S2.ch, c = CR();
+ setTimeout(() => { const lines = ok ? ch.win.slice() : ch.lose.slice(); if (ch.id === 'ch5' && S2.choice === 'keep') lines.splice(0, lines.length, ...ch.lose);
+  dialogue(lines, () => { if (ok){ const first = !c.story[ch.id]; c.story[ch.id] = true; if (first){ S.money += ch.reward; if (typeof addXP === 'function') addXP(Math.round(ch.reward / 10)); else S.xp += Math.round(ch.reward / 10); toastUI('🎬 ' + nm(ch.title) + ' ✓  +' + money(ch.reward), 'good', null, 5); } save(true); } }); }, 900); };
+/* ---------------- Story tab in Career ---------------- */
+const _rc39 = renderCareer;
+renderCareer = function(){ const want = CTAB; if (want === 'story') CTAB = 'journey'; _rc39(); CTAB = want; const car = $('#s-career .career'), tabs = car && car.querySelector('.ctabs'); if (!tabs) return;
+ if (!tabs.querySelector('[data-ct="story"]')){ tabs.insertAdjacentHTML('afterbegin', `<button class="${CTAB === 'story' ? 'on' : ''}" data-ct="story"><i>🎬</i>${L2('القصة', 'Story')}</button>`); tabs.querySelector('[data-ct="story"]').onclick = () => { CTAB = 'story'; AU.click(); renderCareer(); }; }
+ if (CTAB !== 'story') return; tabs.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.ct === 'story'));
+ let el = tabs.nextElementSibling; while (el){ const n = el.nextElementSibling; if (!el.classList.contains('cfoot')) el.style.display = 'none'; el = n; }
+ const c = CR(); c.story = c.story || {};
+ tabs.insertAdjacentHTML('afterend', `<div class="storyGrid">${STORY.map((ch, i) => { const done = !!c.story[ch.id], open = ch.unlock(), prev = i ? STORY[i - 1] : null; return `<div class="schap ${done ? 'done' : open ? 'open' : 'lock'}"><div class="snum">${i + 1}</div><div class="sbody"><b>${nm(ch.title)}</b><span>${nm(ch.sub)}</span><small>${done ? '✅ ' + L2('خلصت', 'Completed') : open ? '💰 ' + money(ch.reward) : '🔒 ' + (prev && !c.story[prev.id] ? L2('بعد ', 'After ') + nm(prev.title) : L2('محتاج ترقية: ', 'Needs promotion: ') + nm(CN(ch.node).t))}</small></div>${open ? `<button class="btn ${done ? '' : 'pri'}" data-ch="${ch.id}">${done ? L2('إعادة', 'Replay') : L2('▶ ابدأ', '▶ Play')}</button>` : ''}</div>`; }).join('')}</div>`);
+ $$('[data-ch]').forEach(b => b.onclick = () => startChapter(STORY.find(s => s.id === b.dataset.ch))); };
+{ const st = document.createElement('style'); st.textContent = `
+#storyM{position:fixed;inset:0;z-index:90;display:none;align-items:flex-end;justify-content:center;padding:0 2vw 4vh;background:linear-gradient(0deg,rgba(0,0,0,.82),rgba(0,0,0,.25) 55%,rgba(0,0,0,0));cursor:pointer}#storyM.on{display:flex;animation:sfade .35s ease}
+@keyframes sfade{from{opacity:0}to{opacity:1}}
+.sbox{width:min(980px,96vw);display:flex;gap:1rem;align-items:flex-start;background:linear-gradient(180deg,rgba(14,22,40,.96),rgba(8,12,24,.96));border:1px solid var(--c);border-radius:1.1rem;padding:1rem 1.2rem;box-shadow:0 0 0 1px rgba(255,255,255,.04) inset,0 1.2rem 3rem rgba(0,0,0,.6),0 0 2rem color-mix(in srgb,var(--c) 30%,transparent)}
+.sava{font-size:3.2rem;line-height:1;width:4.6rem;height:4.6rem;display:grid;place-items:center;border-radius:50%;background:radial-gradient(circle at 35% 30%,rgba(255,255,255,.18),rgba(255,255,255,.02));border:2px solid var(--c);flex:none}
+.stxt{flex:1;min-width:0}.swho{font:800 1.05rem Lalezar,'Readex Pro',sans-serif;color:var(--c);letter-spacing:.02em}.swho em{font:600 .75rem 'Readex Pro',sans-serif;color:var(--mut);font-style:normal;margin-inline-start:.4rem}
+.sline{font-size:1.12rem;line-height:1.7;margin:.35rem 0 .5rem;min-height:3.4em;color:#f3f5f8}.snext{font-size:.8rem;color:var(--gold2);text-align:end;opacity:.85}.schoice{display:flex;gap:.6rem;flex-wrap:wrap;justify-content:flex-end}
+#storyHud{position:fixed;top:5.6rem;left:50%;transform:translateX(-50%);z-index:30;display:none;padding:.4rem .9rem;border-radius:.8rem;background:rgba(8,12,24,.82);border:1px solid rgba(245,178,27,.6);font-weight:700;font-size:.85rem;color:#ffe08a;white-space:nowrap}#storyHud.on{display:block}
+.storyGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(19rem,1fr));gap:.7rem;margin:.8rem 0}
+.schap{display:flex;align-items:center;gap:.8rem;padding:.8rem;border-radius:1rem;background:linear-gradient(135deg,rgba(18,30,58,.9),rgba(8,12,26,.9));border:1px solid var(--line);position:relative;overflow:hidden}
+.schap.open{border-color:rgba(245,178,27,.7);box-shadow:0 0 1.4rem rgba(245,178,27,.15)}.schap.done{border-color:rgba(124,252,154,.5)}.schap.lock{opacity:.55;filter:grayscale(.4)}
+.snum{font:900 2rem Lalezar,serif;color:var(--gold);width:2.4rem;text-align:center}.sbody{flex:1;display:flex;flex-direction:column;gap:.15rem}.sbody b{font-size:.98rem}.sbody span{font-size:.8rem;color:var(--mut)}.sbody small{font-size:.75rem;color:var(--gold2)}`; document.head.appendChild(st); }
 
 /* ======================= atlas-loader.js ======================= */
 /* =====================================================================
