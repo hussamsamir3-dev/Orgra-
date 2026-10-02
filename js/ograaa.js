@@ -5686,7 +5686,30 @@ update = function(dt){ _upd55(dt); if (G.mode !== 'play' || !G.car || dt <= 0) r
 function levelCar(c, dt){ if (!c.wh || c.wh.length < 2) return; const xs = c.wh.map(w => w.x), x0 = Math.min(...xs), x1 = Math.max(...xs); if (x1 - x0 < .5) return;
  const slope = Math.atan2(terrH(x1) - terrH(x0), x1 - x0), err = c.a - slope, accel = Math.abs((c.vx - (c.lvx ?? c.vx)) / dt); c.lvx = c.vx; if (accel > 1.2) return;   // don't fight dive/squat
  c.lvT = (c.lvT || 0) + dt; const front = c.wh.reduce((a, w) => (w.x > a.x ? w : a)), rear = c.wh.reduce((a, w) => (w.x < a.x ? w : a)), dir = c.mirror ? -1 : 1, g = clamp(err * dir, -.05, .05) * dt * (c.lvT < 3 ? 6 : 2);
- for (const w of c.wh){ if (w.pre == null) w.pre = c.pre || 0; } front.pre = clamp(front.pre - g, -.3, .6); rear.pre = clamp(rear.pre + g, -.3, .6); }
+ for (const w of c.wh){ if (w.pre == null) w.pre = c.pre || 0; } const b0 = c.pre || 0; front.pre = clamp(front.pre - g, b0 - .07, b0 + .07); rear.pre = clamp(rear.pre + g, b0 - .07, b0 + .07); }
+
+/* ======================= ride-tuning.js ======================= */
+"use strict";
+/* =====================================================================
+   OGRAAA v56 — realistic ride height & damping (one clean definition)
+   Earlier passes stacked extra preload and kept softening the dampers,
+   so buses rode high and wallowed. Final, real-world-based tuning:
+     body freq · damping ratio · travel · ride height vs design
+     coach      0.85 Hz · 0.32 · 18 cm · +1.5 cm
+     city bus   0.90 Hz · 0.33 · 17 cm · +1.5 cm
+     minibus    1.05 Hz · 0.34 · 16 cm · +2 cm
+     van/car    1.30–1.45 Hz · 0.36 · 15 cm · +2 cm
+   Suspension upgrades firm it up; wear softens it a little.
+   ===================================================================== */
+softSusp = function(c, len){ if (!c) return; if (c.f0 == null) c.f0 = c.f; const isP = c === G.car && !G.test, up = isP ? upl(G.vid, 'susp') : 0, wear = isP ? (GV(G.vid).cond.susp ?? 100) / 100 : 1, n = c.wh.length, m = c.base;
+ const T = len > 11 ? [.85, .32, .18, .015] : len > 9 ? [.9, .33, .17, .015] : len > 6.2 ? [1.05, .34, .16, .02] : len > 4.6 ? [1.3, .36, .15, .02] : [1.45, .36, .14, .02];
+ c.f = T[0] * (1 + .04 * up); c.zeta = (T[1] + .03 * up) * (.85 + .15 * wear); c.travel = T[2] + .01 * up;
+ c.k = (m / n) * Math.pow(2 * Math.PI * c.f, 2); c.cd = 2 * c.zeta * Math.sqrt(c.k * m / n); c.kb = c.k * 9;
+ const sagNew = 9.8 / Math.pow(2 * Math.PI * c.f, 2), sagDef = 9.8 / Math.pow(2 * Math.PI * (c.f0 || 1.6), 2); c.pre = sagNew - sagDef + T[3]; for (const w of c.wh) w.pre = c.pre; };
+/* re-apply to vehicles already on the road */
+const _sr56 = startRoute; startRoute = function(r, o){ _sr56(r, o); if (G.car && G.V) softSusp(G.car, G.V.len); };
+/* road texture: wheels only (no body heave), speed bumps: modest body nod */
+bodyKick = function(c, w, v){ wheelKick(w, v * 2); if (Math.abs(v) > .7){ const lever = clamp((w.ax || 0) / (c.L / 2), -1, 1); c.vy += v * .35; c.w += v * .18 * lever * (c.mirror ? -1 : 1); } };
 
 /* ======================= atlas-loader.js ======================= */
 /* =====================================================================
