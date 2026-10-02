@@ -4447,10 +4447,10 @@ for (const k in LAMPS){ const m = META[k]; if (!m) continue; const [[hx, hy], [t
 const _upd30 = update;
 update = function(dt){ _upd30(dt); if (G.mode !== 'play' || !G.car || dt <= 0) return; const all = [G.car, ...G.ai.filter(a => Math.abs(a.x - G.car.x) < 80)];
  for (const c of all){ if (!c.wh || c.wh.length < 2) continue; const xs = c.wh.map(w => w.x), x0 = Math.min(...xs), x1 = Math.max(...xs); if (x1 - x0 < .5) continue;
-  const slope = Math.atan2(terrH(x1) - terrH(x0), x1 - x0), diff = c.a - slope, big = c.L > 5.8, lim = big ? .045 : .07;
+  const slope = Math.atan2(terrH(x1) - terrH(x0), x1 - x0), diff = c.a - slope, big = c.L > 5.8, lim = big ? .06 : .09;
   // progressive pitch stiffness beyond a small free range (air-suspension levelling / anti-dive geometry), plus pitch damping
-  if (Math.abs(diff) > lim) c.w -= (diff - Math.sign(diff) * lim) * (big ? 40 : 28) * dt;
-  c.w *= 1 - Math.min(.5, dt * (big ? 1.6 : 1.1)); }
+  if (Math.abs(diff) > lim) c.w -= (diff - Math.sign(diff) * lim) * (big ? 28 : 20) * dt;
+  c.w *= 1 - Math.min(.5, dt * (big ? 1.0 : .7)); }
  tickDamageFX(dt); };
 /* ---------------- heavy-crash damage keeps smoking / sparking from the broken spot ---------------- */
 const _ad30 = addDent;
@@ -5614,7 +5614,7 @@ document.addEventListener('pointerdown', e => { if (G.mode !== 'play' || G.pause
  const dx = px - sx(car.x), dy = py - sy(car.y), ca = Math.cos(car.a), sa = Math.sin(car.a), ux = (dx * ca - dy * sa) / (car.mirror ? -k : k) + src.width / 2, uy = (dx * sa + dy * ca) / k + src.height / 2;
  winCells(G.V).forEach((c2, i) => { if (ux > c2.x0 && ux < c2.x1 && uy > c2.t - 4 && uy < c2.b + 4){ WIN.tgt[i] = (WIN.tgt[i] || 0) > .1 ? 0 : .5; AU.tone && AU.tone(180, .25, 'sine', .03); } }); }, true);
 const _dv48 = drawVehicle;
-drawVehicle = function(car, opt){ _dv48(car, opt); if (!car.player || !G.V) return; const cells = winCells(G.V); if (!cells.length || !WIN.open.some(v => v > .01)) return; const src = car.cv || IMG[car.spr], k = PPM * car.g.s, cos = G.test ? {} : GV(G.vid).cos;
+drawVehicle = function(car, opt){ _dv48(car, opt); if (!car.player || !G.V || WIN.v52) return; const cells = winCells(G.V); if (!cells.length || !WIN.open.some(v => v > .01)) return; const src = car.cv || IMG[car.spr], k = PPM * car.g.s, cos = G.test ? {} : GV(G.vid).cos;
  let raw = null; try{ const cc = cabinCanvas(G.V, cos, paxView()); raw = cc._raw || cc; }catch(e){}
  ctx.save(); ctx.translate(sx(car.x), sy(car.y + (opt && opt.lift || 0))); ctx.rotate(-car.a); ctx.scale(car.mirror ? -k : k, k); ctx.translate(-src.width / 2, -src.height / 2);
  cells.forEach((c2, i) => { const o = WIN.open[i] || 0; if (o < .01) return; const H = c2.b - c2.t, edge = c2.t + H * o; ctx.save(); ctx.beginPath(); ctx.rect(c2.x0, c2.t, c2.x1 - c2.x0, edge - c2.t); ctx.clip(); ctx.fillStyle = 'rgba(10,14,20,.55)'; ctx.fillRect(c2.x0, c2.t, c2.x1 - c2.x0, edge - c2.t); if (raw) ctx.drawImage(raw, 0, 0); ctx.restore();
@@ -5623,12 +5623,12 @@ drawVehicle = function(car, opt){ _dv48(car, opt); if (!car.player || !G.V) retu
 let winSnd = null;
 const _upd48 = update;
 update = function(dt){ _upd48(dt); if (G.mode !== 'play' || !G.car) return; if (WIN.vid !== G.vid) winReset(); const cells = G.V ? winCells(G.V) : []; let avg = 0;
- cells.forEach((_, i) => { const t = WIN.tgt[i] || 0, o = WIN.open[i] || 0; WIN.open[i] = o + clamp(t - o, -dt * .45, dt * .45); avg += WIN.open[i]; }); avg = cells.length ? avg / cells.length : 0;
+ cells.forEach((_, i) => { const t = WIN.tgt[i] || 0, o = WIN.open[i] || 0; WIN.open[i] = o + clamp(t - o, -dt * (WIN.v52 ? .22 : .45), dt * (WIN.v52 ? .22 : .45)); avg += WIN.open[i]; }); avg = cells.length ? avg / cells.length : 0;
  const sp = speedOf(G.car); if (avg > .02){ const pax = G.onboard.length; if (!G.ac && G.cabin > 27 && sp > 2){ G.cabin -= dt * avg * .35 * clamp(sp / 12, .3, 1); if (pax) G.comfort = Math.min(100, G.comfort + dt * avg * 1.6); } if (G.weather === 'rain' && pax) G.comfort -= dt * avg * 2.2; if (G.weather === 'sand' && pax) G.comfort -= dt * avg * 2; if (G.ac) G.cabin += dt * avg * .2; }
  else if (!G.ac && !hasAC() && G.cabin > 31 && G.onboard.length > 1 && Math.random() < dt * .03 && typeof say === 'function') say(pick([['افتح الشباك يا أسطى، إحنا هنموت من الحر','Open a window, driver, we\'re melting'], ['شبّاك بس يا أسطى الله يخليك','Just a window, driver, please']]), G.car.x - G.car.L * .2, G.car.y + G.car.yt + .4);
  // wind through the open window: soft, rising with speed and opening
  const c = AU.ctx; if (!c) return; if (!winSnd){ const len = c.sampleRate * 2, b = c.createBuffer(1, len, c.sampleRate), d = b.getChannelData(0); let last = 0; for (let i = 0; i < len; i++){ last = last * .97 + (Math.random() * 2 - 1) * .03; d[i] = last * 6; } const s = c.createBufferSource(); s.buffer = b; s.loop = true; const bp = c.createBiquadFilter(); bp.type = 'lowpass'; bp.frequency.value = 700; const g2 = c.createGain(); g2.gain.value = 0; s.connect(bp).connect(g2).connect(AU.sfxG); s.start(); winSnd = {bp, g:g2}; }
- const t = c.currentTime, v = G.paused ? 0 : avg * (.012 + .07 * clamp(sp / 25, 0, 1)); winSnd.g.gain.setTargetAtTime(v, t, .25); winSnd.bp.frequency.setTargetAtTime(500 + sp * 30 + avg * 400, t, .3); };
+ const t = c.currentTime, v = G.paused || WIN.v52 ? 0 : avg * (.012 + .07 * clamp(sp / 25, 0, 1)); winSnd.g.gain.setTargetAtTime(v, t, .25); winSnd.bp.frequency.setTargetAtTime(500 + sp * 30 + avg * 400, t, .3); };
 { const st = document.createElement('style'); st.textContent = `
 #mg{position:fixed;inset:0;z-index:97;display:none;place-items:center;background:radial-gradient(ellipse at center,rgba(20,28,44,.92),rgba(0,0,0,.94))}#mg.on{display:grid}
 .mgbox{width:min(1100px,96vw);height:min(720px,92vh);display:flex;flex-direction:column;border-radius:1.2rem;overflow:hidden;border:1px solid rgba(245,178,27,.5);background:#0d121b;box-shadow:0 2rem 4rem rgba(0,0,0,.6)}.mgbox.shake{animation:mgsh .3s}@keyframes mgsh{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
@@ -5786,7 +5786,9 @@ const _ss50 = softSusp;
 softSusp = function(c, len){ _ss50(c, len); if (!c) return; c.zeta = c.zeta * .82; const n = c.wh.length; c.cd = 2 * c.zeta * Math.sqrt(c.k * c.base / n); };
 const _upd50 = update;
 update = function(dt){ _upd50(dt); if (G.mode !== 'play' || !G.car || G.paused || dt <= 0) return; const car = G.car, sp = speedOf(car), urban = W.biome && W.biome.urban > .3 ? 1 : .6;
- for (const w of car.wh){ if (!w.ground) continue; w.rt = (w.rt || 0) - dt * sp; if (w.rt <= 0){ w.rt = 1.2 + Math.random() * 4.5; const kick = (.25 + Math.random() * .55) * clamp(sp / 14, .15, 1.4) * urban; w.vy += kick; } } };
+ for (const w of car.wh){ if (!w.ground) continue; w.rt = (w.rt || 0) - dt * sp; if (w.rt <= 0){ w.rt = 1.2 + Math.random() * 4.5; const kick = (.25 + Math.random() * .55) * clamp(sp / 14, .15, 1.4) * urban; bodyKick(car, w, kick * .55); } } };
+/* a road input at one wheel moves the body through that corner: heave + pitch */
+function bodyKick(c, w, v){ const lever = clamp((w.ax || 0) / (c.L / 2), -1, 1); c.vy += v * 1.3; c.w += v * .55 * lever * (c.mirror ? -1 : 1); }
 /* ---------------- engine: smooth, warm, quiet ---------------- */
 const _eng50 = AU.engine.bind(AU);
 AU.engine = function(on, rpm, load, speed, big){ _eng50(on, rpm, load, speed, big); const e = this.eng, c = this.ctx; if (!e || !c) return;
@@ -5831,5 +5833,95 @@ const _toast51 = toast;
 toast = function(msg, cls, acts, life){ if (G.mode === 'play' && !G.onboard.length && typeof msg === 'string' && PAXMSG.some(k => msg.includes(t(k)))) return; return _toast51(msg, cls, acts, life); };
 const _react51 = react;
 react = function(kind){ const S2 = STORYRUN; if (S2 && !G.onboard.length){ const cast = chapterCast(S2.ch).filter(w => w !== 'pax'); const pool = REACT[kind] || {}; if (!cast.some(w => pool[w]) && kind !== 'crash' && kind !== 'hot') return; } _react51(kind); };
+</script>
+<script>
+"use strict";
+/* =====================================================================
+   OGRAAA v52 — power windows, done properly
+   · 🪟 control with one switch per window: hold to move, tap for
+     one-touch; or tap the window on the vehicle itself
+   · glass is a real pane: reflective, tinted, with a lit top edge and
+     a rubber seal; above it the cabin is open air (no tint/reflection)
+   · sound: motor whine while moving + end-stop clunk; wind that grows
+     with speed & opening, low buffeting when half open at speed, street
+     noise coming in
+   · physics: drag & fuel at speed, cooling, rain/dust, wind-noise
+     complaints when wide open on the highway
+   ===================================================================== */
+WIN.v52 = true;
+const WMAX = .5;
+/* ---------------- control panel ---------------- */
+function winPanel(){ let p = $('#winP'); if (!p){ p = document.createElement('div'); p.id = 'winP'; p.className = 'pan'; document.body.appendChild(p); } const cells = G.V ? winCells(G.V) : [];
+ const names = i => i === cells.length - 1 ? L2('السواق', 'Driver') : i === 0 ? L2('ورا', 'Rear') : L2('شباك', 'Window') + ' ' + (cells.length - i);
+ p.innerHTML = `<div class="wph"><b>🪟 ${L2('الشبابيك', 'Windows')}</b><button class="wall" data-all="dn">⬇ ${L2('الكل', 'All')}</button><button class="wall" data-all="up">⬆ ${L2('الكل', 'All')}</button></div><div class="wsw">${cells.map((c, i) => `<div class="wsr" data-w="${i}"><span>${names(i)}</span><button class="wsb" data-d="up">▲</button><i class="wlv"><i></i></i><button class="wsb" data-d="dn">▼</button></div>`).slice().reverse().join('')}</div>`;
+ p.querySelectorAll('.wsr').forEach(r => { const i = +r.dataset.w; r.querySelectorAll('.wsb').forEach(b => { let t0 = 0; b.onpointerdown = e => { e.preventDefault(); e.stopPropagation(); t0 = performance.now(); WIN.tgt[i] = b.dataset.d === 'dn' ? WMAX : 0; }; const rel = () => { if (!t0) return; const held = performance.now() - t0; t0 = 0; if (held > 320) WIN.tgt[i] = WIN.open[i] || 0; }; b.onpointerup = rel; b.onpointerleave = rel; }); });
+ p.querySelectorAll('[data-all]').forEach(b => b.onpointerdown = e => { e.preventDefault(); e.stopPropagation(); cells.forEach((_, i) => WIN.tgt[i] = b.dataset.all === 'dn' ? WMAX : 0); }); return p; }
+ACT.win = () => { const p = winPanel(); p.classList.toggle('on'); $('#acP').classList.remove('on'); $('#radioP').classList.remove('on'); $('#cruiseP').classList.remove('on'); AU.click && AU.click(); };
+const _bc52 = buildControls;
+buildControls = function(){ _bc52(); const ac = $('#bAC'); if (ac && !$('#bWin')){ ac.insertAdjacentHTML('afterend', `<button class="cb" id="bWin" data-act="win"><img src="${ASSETS.i_weather || ''}" style="display:none"><b class="wico">🪟</b><span class="k">W</span><em>${L2('شبابيك', 'Windows')}</em></button>`); const b = $('#bWin'); b.addEventListener('pointerdown', ev => { ev.preventDefault(); AU.init(); if (G.mode === 'play') ACT.win(); }); } };
+addEventListener('keydown', e => { if (G.mode === 'play' && (e.code === 'KeyW') && !e.repeat){ const cells = G.V ? winCells(G.V) : [], anyOpen = cells.some((_, i) => (WIN.tgt[i] || 0) > .05); cells.forEach((_, i) => WIN.tgt[i] = anyOpen ? 0 : WMAX); } });
+/* ---------------- glass panes on the vehicle ---------------- */
+function drawGlass(car, opt){ const cells = winCells(G.V); if (!cells.length) return; const src = car.cv || IMG[car.spr], k = PPM * car.g.s, cos = G.test ? {} : GV(G.vid).cos, TA = (COS.tint.find(q => q.id === cos.tint) || {a:0}).a;
+ let raw = null; try{ const cc = cabinCanvas(G.V, cos, paxView()); raw = cc._raw || null; }catch(e){}
+ ctx.save(); ctx.translate(sx(car.x), sy(car.y + (opt && opt.lift || 0))); ctx.rotate(-car.a); ctx.scale(car.mirror ? -k : k, k); ctx.translate(-src.width / 2, -src.height / 2); const t = performance.now() / 1000;
+ cells.forEach((c2, i) => { const o = WIN.open[i] || 0, H = c2.b - c2.t, W2 = c2.x1 - c2.x0, edge = c2.t + H * o;
+  if (o > .01){ // open part: real air — untinted cabin, a soft shadow under the door frame
+   ctx.save(); ctx.beginPath(); ctx.rect(c2.x0, c2.t, W2, edge - c2.t); ctx.clip(); if (raw) ctx.drawImage(raw, 0, 0); const sh = ctx.createLinearGradient(0, c2.t, 0, c2.t + H * .18); sh.addColorStop(0, 'rgba(0,0,0,.45)'); sh.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = sh; ctx.fillRect(c2.x0, c2.t, W2, H * .18); ctx.restore(); }
+  // the glass pane from its top edge down
+  ctx.save(); ctx.beginPath(); ctx.rect(c2.x0, edge, W2, c2.b - edge); ctx.clip(); const tint = ctx.createLinearGradient(0, edge, 0, c2.b); tint.addColorStop(0, `rgba(150,185,215,${.2 + TA * .05})`); tint.addColorStop(1, `rgba(25,40,58,${.18 + TA * .05})`); ctx.fillStyle = tint; ctx.fillRect(c2.x0, edge, W2, c2.b - edge);
+  const sx0 = c2.x0 + W2 * ((.15 + i * .23 + t * .015) % 1), rg = ctx.createLinearGradient(sx0, edge, sx0 + H * .5, c2.b); rg.addColorStop(0, 'rgba(255,255,255,0)'); rg.addColorStop(.5, 'rgba(255,255,255,.26)'); rg.addColorStop(1, 'rgba(255,255,255,0)'); ctx.fillStyle = rg; ctx.fillRect(c2.x0, edge, W2, c2.b - edge); ctx.restore();
+  if (o > .01){ // lit glass edge + rubber seal
+   const eg = ctx.createLinearGradient(0, edge - 1, 0, edge + 2.5); eg.addColorStop(0, 'rgba(255,255,255,.95)'); eg.addColorStop(.5, 'rgba(200,220,235,.6)'); eg.addColorStop(1, 'rgba(60,70,80,.3)'); ctx.fillStyle = eg; ctx.fillRect(c2.x0 + 1.5, edge - 1, W2 - 3, 3.2); ctx.fillStyle = 'rgba(15,15,18,.85)'; ctx.fillRect(c2.x0, c2.b - 1.5, W2, 2); } });
+ ctx.restore(); }
+const _dv52 = drawVehicle;
+drawVehicle = function(car, opt){ _dv52(car, opt); if (car.player && G.V && G.mode === 'play') try{ drawGlass(car, opt); }catch(e){} };
+/* ---------------- sound & physics ---------------- */
+const WS = {n:null, moving:false};
+function winAudio(){ const c = AU.ctx; if (!c || WS.n) return; const mk = (type, f) => { const o = c.createOscillator(); o.type = type; o.frequency.value = f; o.start(); return o; };
+ const len = c.sampleRate * 2, b = c.createBuffer(1, len, c.sampleRate), d = b.getChannelData(0); let l = 0; for (let i = 0; i < len; i++){ l = l * .985 + (Math.random() * 2 - 1) * .015; d[i] = l * 7; }
+ const wind = c.createBufferSource(); wind.buffer = b; wind.loop = true; const wlp = c.createBiquadFilter(); wlp.type = 'lowpass'; wlp.frequency.value = 500; const wg = c.createGain(); wg.gain.value = 0; const buf = c.createGain(); buf.gain.value = 1; const bl = mk('sine', 11), blg = c.createGain(); blg.gain.value = 0; bl.connect(blg).connect(buf.gain); wind.connect(wlp).connect(buf).connect(wg).connect(AU.sfxG); wind.start();
+ const mot = mk('sawtooth', 118), mlp = c.createBiquadFilter(); mlp.type = 'lowpass'; mlp.frequency.value = 520; const mg = c.createGain(); mg.gain.value = 0; mot.connect(mlp).connect(mg).connect(AU.sfxG);
+ let street = null; if (SND.buf && SND.buf.snd_street){ const s = c.createBufferSource(); s.buffer = SND.buf.snd_street; s.loop = true; const sg = c.createGain(); sg.gain.value = 0; s.connect(sg).connect(AU.sfxG); s.start(); street = sg; }
+ WS.n = {wlp, wg, blg, bl, mot, mg, street}; }
+const _upd52 = update;
+update = function(dt){ _upd52(dt); if (G.mode !== 'play' || !G.car || !G.V) return; const cells = winCells(G.V), car = G.car, sp = speedOf(car), kmh = sp * 3.6; let avg = 0, moving = false;
+ cells.forEach((_, i) => { avg += WIN.open[i] || 0; if (Math.abs((WIN.tgt[i] || 0) - (WIN.open[i] || 0)) > .004) moving = true; }); avg = cells.length ? avg / cells.length : 0;
+ // panel level bars
+ const p = $('#winP.on'); if (p) p.querySelectorAll('.wsr').forEach(r => { const i = +r.dataset.w, v = (WIN.open[i] || 0) / WMAX; r.querySelector('.wlv i').style.height = Math.round(v * 100) + '%'; });
+ // physics: aero drag & fuel at speed, wind-noise complaints on the highway
+ if (avg > .02 && sp > 8){ car.vx -= Math.sign(car.vx) * dt * avg * .0009 * sp * sp; G.fuel = Math.max(0, G.fuel - dt * avg * .00012 * sp * (G.V.lp100 / 12)); if (kmh > 80 && avg > .3 && G.onboard.length > 1 && Math.random() < dt * .04) say(pick([['اقفل الشباك شوية يا أسطى، الهوا جامد','Close the window a bit, driver, the wind is strong'], ['مش سامعين بعض من الهوا!','We can\'t hear each other with this wind!']]), car.x - car.L * .2, car.y + car.yt + .4); }
+ // sound
+ const c = AU.ctx; if (!c) return; winAudio(); const n = WS.n; if (!n) return; const t = c.currentTime, pz = G.paused ? 0 : 1;
+ n.mg.gain.setTargetAtTime(moving ? .035 * pz : 0, t, .04); n.mot.frequency.setTargetAtTime(moving ? 110 + Math.random() * 6 : 90, t, .1); if (WS.moving && !moving && pz){ AU.noiseHit(.06, 260, .09, 0, 'lowpass', 1); } WS.moving = moving;
+ const wv = avg * (.01 + .085 * clamp(kmh / 90, 0, 1.2)); n.wg.gain.setTargetAtTime(wv * pz, t, .3); n.wlp.frequency.setTargetAtTime(380 + kmh * 9 + avg * 500, t, .4);
+ // buffeting: half-open windows at speed thump at a low frequency
+ const buffet = clamp((kmh - 45) / 40, 0, 1) * clamp(1 - Math.abs(avg / WMAX - .55) * 2.2, 0, 1); n.blg.gain.setTargetAtTime(buffet * .7 * pz, t, .4); n.bl.frequency.setTargetAtTime(9 + kmh * .05, t, .5);
+ if (n.street) n.street.gain.setTargetAtTime(avg * (W.biome && W.biome.urban > .4 ? .22 : .08) * pz, t, .4); };
+const _sr52 = startRoute; startRoute = function(r, o){ _sr52(r, o); const p = $('#winP'); if (p) p.classList.remove('on'); };
+{ const st = document.createElement('style'); st.textContent = `
+#bWin .wico{font-size:1.6rem;line-height:1.2;filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))}#bWin em{font-style:normal}
+#winP{position:fixed;right:50%;transform:translateX(50%);bottom:calc(var(--hudH,9rem) + .6rem);z-index:31;display:none;min-width:17rem;padding:.7rem .8rem;border-radius:1rem;background:linear-gradient(180deg,#1a2130,#0c1018);border:1px solid #3a4558;box-shadow:0 1rem 2rem rgba(0,0,0,.55)}#winP.on{display:block}
+.wph{display:flex;align-items:center;gap:.4rem;margin-bottom:.5rem}.wph b{flex:1}.wall{padding:.25rem .5rem;border-radius:.5rem;background:#263044;border:1px solid #435069;color:#dfe6ef;font-size:.78rem}
+.wsw{display:flex;gap:.6rem;justify-content:center}.wsr{display:flex;flex-direction:column;align-items:center;gap:.25rem;padding:.4rem;border-radius:.7rem;background:rgba(255,255,255,.04)}.wsr span{font-size:.7rem;color:#9fb0c6}
+.wsb{width:2.4rem;height:2rem;border-radius:.5rem;background:linear-gradient(180deg,#3a4458,#222a38);border:1px solid #56627a;color:#fff;font-size:.9rem;touch-action:none;user-select:none}.wsb:active{background:#f5b21b;color:#111}
+.wlv{position:relative;width:.9rem;height:2.6rem;border-radius:.3rem;background:#0b0f15;border:1px solid #3b465a;overflow:hidden}.wlv i{position:absolute;left:0;right:0;top:0;height:0;background:linear-gradient(180deg,#9fd0ff,#3d7ccf)}`; document.head.appendChild(st); }
+</script>
+<script>
+"use strict";
+/* =====================================================================
+   OGRAAA v53 — taller, livelier suspension that feels every bump
+   · all vehicles ride ~6 cm higher with ~5 cm more travel
+   · lighter damping → the body breathes and rebounds naturally
+   · speed bumps and potholes hit each wheel in turn (front then rear),
+     harder the faster you take them
+   ===================================================================== */
+const _ss53 = softSusp;
+softSusp = function(c, len){ _ss53(c, len); if (!c) return; const n = c.wh.length; c.zeta *= .78; c.cd = 2 * c.zeta * Math.sqrt(c.k * c.base / n); c.travel += .05; c.pre = (c.pre || 0) + .06; };
+const _upd53 = update;
+update = function(dt){ _upd53(dt); if (G.mode !== 'play' || !G.car || G.paused || dt <= 0) return; const car = G.car, sp = speedOf(car);
+ for (const w of car.wh){ const px = w.px53 ?? w.x; w.px53 = w.x; if (!w.ground) continue;
+  for (const b of W.bumps){ if ((px - b) * (w.x - b) <= 0 && px !== w.x){ bodyKick(car, w, clamp(.35 + sp * .07, .35, 1.6)); if (car === G.car){ cam.shake = Math.max(cam.shake || 0, clamp(sp * .012, .04, .22)); AU.noiseHit && AU.noiseHit(.09, 140, .14 * clamp(sp / 10, .3, 1), 0, 'lowpass', 1); } } }
+  for (const h of W.holes){ if ((px - h) * (w.x - h) <= 0 && px !== w.x){ bodyKick(car, w, -clamp(.25 + sp * .05, .25, 1.1)); w.hole53 = .12; if (car === G.car) cam.shake = Math.max(cam.shake || 0, clamp(sp * .01, .03, .18)); } }
+  if (w.hole53 > 0){ w.hole53 -= dt; if (w.hole53 <= 0) bodyKick(car, w, clamp(.3 + sp * .06, .3, 1.3)); } } };
 </script>
 </body></html>
