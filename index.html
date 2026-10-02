@@ -7,7 +7,7 @@
 <title>Ograaa | أجرة</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Lalezar&family=Readex+Pro:wght@300;400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/ograaa.css">
+<link rel="stylesheet" href="css/ograaa.css?v=202610021001">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="assets/img/logo.webp">
 <link rel="preload" href="js/assets.js" as="script">
@@ -53,7 +53,14 @@
 <div class="modal" id="helpM"><div class="mbox" style="text-align:start"><h2 data-t="help" style="text-align:center"></h2><p data-t="help1"></p><p data-t="help2"></p><p data-t="help3"></p><p class="muted" style="direction:ltr;text-align:left">⌨ →/W gas · ←/S brake · D door · H horn · Q/E indicators · Z hazard · L lights · B belt · G gear · C cruise · X cancel · R radio · A A/C · V wipers · Space handbrake · P pause</p><div class="mbtns"><button class="btn" id="helpOk" data-t="gotIt"></button></div></div></div>
 <div class="modal" id="confirmM"><div class="mbox"><h2 id="cfT"></h2><div class="mbtns"><button class="btn red" id="cfYes">OK</button><button class="btn sec" id="cfNo">✕</button></div></div></div>
 <div id="rotate"><div style="font-size:3rem">📱↻</div><div class="disp" style="font-size:1.4rem">لف الموبايل بالعرض · Rotate to landscape</div><button class="btn sm sec" onclick="this.parentNode.classList.remove('req')">OK</button></div>
-<script src="js/assets.js"></script>
-<script src="js/ograaa.js"></script>
+<script>
+/* load guard: if a game file is missing or loading fails, say so instead of hanging */
+window.__ogErr=[];addEventListener('error',function(e){var t=e.target;if(t&&(t.src||t.href)){__ogErr.push('missing: '+(t.src||t.href).split('/').slice(-2).join('/'));}else{__ogErr.push(String(e.message||e));}},true);
+setTimeout(function(){if(window.G&&G.mode)return;var b=document.createElement('div');b.style.cssText='position:fixed;left:50%;top:62%;transform:translateX(-50%);max-width:90vw;padding:14px 18px;border-radius:12px;background:#2a0e14;border:1px solid #ff5a6e;color:#ffd7dc;font:600 14px system-ui;text-align:center;z-index:999';
+var t=document.createElement('div');t.textContent='The game did not finish loading';b.appendChild(t);var d=document.createElement('small');d.style.opacity='.8';d.textContent=__ogErr.slice(0,4).join(' | ')||'timeout';b.appendChild(d);
+var r=document.createElement('button');r.textContent='Reload';r.style.cssText='display:block;margin:8px auto 0;padding:6px 14px;border-radius:8px;border:0;background:#f5b21b;font-weight:800;cursor:pointer';r.onclick=function(){location.reload();};b.appendChild(r);document.body.appendChild(b);},20000);
+</script>
+<script src="js/assets.js?v=202610021001"></script>
+<script src="js/ograaa.js?v=202610021001"></script>
 </body>
 </html>
