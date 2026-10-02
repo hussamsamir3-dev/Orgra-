@@ -4680,7 +4680,7 @@ const _end39 = endRun;
 endRun = function(reason){ const S2 = STORYRUN; _end39(reason); if (!S2) return; STORYRUN = null; $('#storyHud') && $('#storyHud').classList.remove('on');
  const R = {reason, stars:G.T ? (reason === 'ok' ? 1 + ((G.T.comfortN ? G.T.comfortSum / G.T.comfortN : G.comfort) > 70 ? 1 : 0) + (G.T.missed === 0 && G.T.fines === 0 && G.T.hits === 0 ? 1 : 0) : 0) : 0}, ok = chapterResult(R), ch = S2.ch, c = CR();
  setTimeout(() => { const lines = ok ? ch.win.slice() : ch.lose.slice(); if (ch.id === 'ch5' && S2.choice === 'keep') lines.splice(0, lines.length, ...ch.lose);
-  dialogue(lines, () => { if (ok){ const first = !c.story[ch.id]; c.story[ch.id] = true; if (first){ S.money += ch.reward; if (typeof addXP === 'function') addXP(Math.round(ch.reward / 10)); else S.xp += Math.round(ch.reward / 10); toastUI('🎬 ' + nm(ch.title) + ' ✓  +' + money(ch.reward), 'good', null, 5); } save(true); } }); }, 900); };
+  dialogue(lines, () => { if (ok){ const first = !c.story[ch.id]; c.story[ch.id] = true; if (first){ ledger(ch.reward, '🎬 ' + nm(ch.title), 'cash'); if (typeof addXP === 'function') addXP(Math.round(ch.reward / 10)); else S.xp += Math.round(ch.reward / 10); toastUI('🎬 ' + nm(ch.title) + ' ✓  +' + money(ch.reward), 'good', null, 5); } save(true); if (typeof guardRebase === 'function') guardRebase(); } }); }, 900); };
 /* ---------------- Story tab in Career ---------------- */
 const _rc39 = renderCareer;
 renderCareer = function(){ const want = CTAB; if (want === 'story') CTAB = 'journey'; _rc39(); CTAB = want; const car = $('#s-career .career'), tabs = car && car.querySelector('.ctabs'); if (!tabs) return;
@@ -4845,6 +4845,131 @@ renderCareer = function(){ if (CTAB === 'story' || CTAB === 'tree') return rende
 .sjvs{display:flex;gap:.35rem;flex-wrap:wrap;margin-top:.5rem}.sjv{background:rgba(255,255,255,.05);border-radius:.5rem;padding:.15rem .3rem}.sjv img{height:1.5rem;display:block}
 .sjside h4{margin:.4rem 0 .6rem;color:var(--gold2)}.sjsg{display:grid;grid-template-columns:repeat(auto-fill,minmax(17rem,1fr));gap:.6rem}
 @media (max-width:760px){.sjhero{grid-template-columns:1fr}.sjtop{flex-direction:column}.sjgo{align-items:stretch;min-width:0}}`; document.head.appendChild(st); }
+
+/* ======================= story2.js ======================= */
+"use strict";
+/* =====================================================================
+   OGRAAA v42 — Story 2.0
+   · no pausing pop-ups while driving: live "radio comms" subtitles
+   · characters react to how you actually drive (speed, bumps, crashes,
+     hard braking, overheating, being late…)
+   · ★★★ per chapter, replay for stars, rewards per new star
+   · chapters unlock one after another; finishing one promotes you
+   · daily streak reward + "today's twist" on a chapter (+50% pay)
+   · "Continue story" front and centre · bigger, cleaner dashboard
+     screen · new A/C button with a real LED
+   ===================================================================== */
+/* ---------------- A/C button ---------------- */
+function acIcon(){ const b = $('#bAC'), im = b && b.querySelector('img'); if (!im) return; const want = G.ac ? ASSETS.acOn : ASSETS.acOff; if (im.dataset.k !== (G.ac ? 'on' : 'off')){ im.src = want; im.dataset.k = G.ac ? 'on' : 'off'; } }
+const _bc42 = buildControls; buildControls = function(){ _bc42(); const im = $('#bAC img'); if (im){ im.classList.add('acimg'); im.dataset.k = ''; } acIcon(); };
+/* ---------------- progression: chapters drive promotions ---------------- */
+const CH_PROMO = {ch1:['n1'], ch2:['v1'], ch3:['n5'], ch4:['n3'], ch5:['n6'], ch6:['n7'], ch7:['n8'], ch8:['n9','n11'], ch9:['n12']};
+for (const n of CAREER_N){ const ch = Object.keys(CH_PROMO).find(k => CH_PROMO[k].includes(n.id)); if (ch) n.req = [['story', ch], ...n.req.filter(r => r[0] === 'lic')]; }
+STORY.forEach((ch, i) => { ch.unlock = () => i === 0 || !!(CR().story || {})[STORY[i - 1].id]; });
+function promoteFor(chId){ const c = CR(), got = []; const go = id => { const n = CN(id); if (!n || c.done[id]) return; n.pre.forEach(go); if (n.req.every(r => r[0] === 'story' ? c.story[r[1]] : reqMet(r))){ c.done[id] = true; c.dates = c.dates || {}; c.dates[id] = Date.now(); got.push(n); } }; (CH_PROMO[chId] || []).forEach(go); return got; }
+/* ---------------- daily: streak reward & today's twist ---------------- */
+const today = () => new Date().toISOString().slice(0, 10);
+function dailyTwist(){ const d = today(), h = [...d].reduce((a, ch) => a * 31 + ch.charCodeAt(0) | 0, 7) >>> 0, open = STORY.filter(s => s.unlock()); if (!open.length) return null; const ch = open[h % open.length], kinds = [['rain', ['مطر وزحمة', 'Rain & chaos']], ['night', ['بالليل', 'At night']], ['rush', ['وقت أقل ١٥٪', '15% less time']], ['sand', ['عاصفة رملية', 'Sandstorm']]]; const k = kinds[(h >> 3) % kinds.length]; return {ch:ch.id, kind:k[0], name:k[1]}; }
+function dailyCheck(){ S.daily = S.daily || {last:'', streak:0, claimed:''}; const d = today(); if (S.daily.claimed === d) return; const y = new Date(Date.now() - 864e5).toISOString().slice(0, 10); S.daily.streak = S.daily.last === y ? S.daily.streak + 1 : 1; S.daily.last = d; S.daily.claimed = d; const day = ((S.daily.streak - 1) % 7) + 1, prize = [150, 200, 300, 400, 500, 700, 1500][day - 1]; ledger(prize, L2('جايزة يومية', 'Daily reward'), 'cash'); save(true);
+ const m = document.createElement('div'); m.className = 'dlyM on'; m.innerHTML = `<div class="dly"><div class="dlyt">🔥 ${L2('سلسلة الأيام', 'Daily streak')} · ${fmt(S.daily.streak)}</div><div class="dlyd">${[1,2,3,4,5,6,7].map(i => `<div class="${i < day ? 'got' : i === day ? 'now' : ''}"><b>${i === 7 ? '🎁' : '💰'}</b><span>${L2('يوم', 'Day')} ${fmt(i)}</span><em>${money([150,200,300,400,500,700,1500][i - 1])}</em></div>`).join('')}</div><p>${L2('ارجع بكرة عشان السلسلة ماتتقطعش — اليوم السابع جايزة كبيرة!', 'Come back tomorrow to keep the streak — day 7 is the big one!')}</p><button class="btn pri">${L2('استلم', 'Claim')} +${money(prize)}</button></div>`; document.body.appendChild(m); m.querySelector('button').onclick = () => { AU.coin && AU.coin(); m.remove(); }; }
+setTimeout(() => { try{ dailyCheck(); }catch(e){} }, 2600);
+/* ---------------- live comms (never pauses) ---------------- */
+const COMMS = {q:[], el:null, t:0, cur:null};
+function comms(lines, opts){ for (const l of lines) if (!l.cond || l.cond()) COMMS.q.push(Object.assign({}, l, opts || {})); }
+function commsTick(dt){ let el = COMMS.el; if (!el){ el = COMMS.el = document.createElement('div'); el.id = 'comms'; document.body.appendChild(el); }
+ if (COMMS.cur){ COMMS.t -= dt; if (COMMS.t <= 0 && !COMMS.cur.choice){ COMMS.cur = null; el.classList.remove('on'); } }
+ if (!COMMS.cur && COMMS.q.length && G.mode === 'play'){ const l = COMMS.cur = COMMS.q.shift(), who = CAST[l.who] || CAST.pax, txt = L2(l.ar, l.en); COMMS.t = 2.2 + txt.length * .05;
+  el.style.setProperty('--c', who.c); el.innerHTML = `<div class="cav">${who.ic}</div><div class="ctx"><b>${nm(who.n)}</b><span>${txt}</span>${l.choice ? `<div class="cch">${l.choice.map((c, i) => `<button class="btn sm ${i ? '' : 'pri'}" data-cc="${i}">${nm(c.t)}</button>`).join('')}</div>` : ''}</div>`; el.classList.add('on'); AU.tone && AU.tone(880, .05, 'sine', .03);
+  if (l.choice) el.querySelectorAll('[data-cc]').forEach(b => b.onpointerdown = e => { e.preventDefault(); e.stopPropagation(); l.choice[+b.dataset.cc].fx(); COMMS.cur = null; el.classList.remove('on'); }); }
+ if (G.mode !== 'play'){ COMMS.q.length = 0; COMMS.cur = null; el.classList.remove('on'); } }
+/* ---------------- reactive story lines: the people in the vehicle respond to YOUR driving ---------------- */
+const REACT = {
+ speed:{omk:['يا ابني بالراحة! أنا حامل!','Slow down, son! I\'m pregnant!'], hagg:['هدّي يا ابني، الطريق مش طاير.','Easy, son. The road isn\'t going anywhere.'], karim:['كده هتلفت نظر المرور!','You\'ll get the cops on us!'], mona:['لاسلكي: الرادار بيقول إنك سريع.','Radio: the radar says you\'re fast.']},
+ bump:{omk:['آآه! المطب!','Aah! That bump!'], hagg:['الكراسي اتنطّت!','The seats jumped!'], pax:['يا عم المطبات!','Man, the bumps!'], karim:['المعازيم وقعوا على بعض!','The guests fell over each other!']},
+ crash:{omk:['يا نهار أبيض!','Oh my God!'], hagg:['العربية يا ابني!! العربية!','The vehicle, son!! The vehicle!'], sayed:['هههه بالسلامة يا شاطر!','Haha, nice one, champ!'], abdo:['كده هتجيلي الورشة النهارده.','You\'ll be in my workshop today.']},
+ brake:{omk:['بالراحة على الفرامل…','Gentle on the brakes…'], pax:['يا ساتر!','Whoa!'], hagg:['فرامل زي دي بتاكل الكاوتش.','Braking like that eats tyres.']},
+ hot:{abdo:['المؤشر بيعلى! خفّف شوية.','Temperature\'s climbing! Ease off.']},
+ late:{omk:['الطلق بيقرب أوي…','The contractions are so close…'], hagg:['الوقت يا ابني… الوقت!','Time, son… time!']},
+ good:{omk:['كده تمام… ربنا يكرمك.','That\'s perfect… bless you.'], hagg:['سواقة رجالة.','Real driving.'], karim:['المعازيم مبسوطين!','The guests are loving it!'], pax:['سواق محترم والله.','A proper driver, honestly.']}};
+function chapterCast(ch){ return [...new Set(ch.intro.map(l => l.who))].filter(w => w !== 'you'); }
+function react(kind){ const S2 = STORYRUN; if (!S2) return; S2.rc = S2.rc || {}; const now = S2.t; if ((S2.rc.any || -9) > now - 5 || (S2.rc[kind] || -99) > now - 14) return; const pool = REACT[kind], who = chapterCast(S2.ch).find(w => pool[w]) || Object.keys(pool)[0]; if (!pool[who]) return; S2.rc.any = now; S2.rc[kind] = now; comms([L(who, pool[who][0], pool[who][1])]); }
+/* ---------------- chapter loop (replaces the pausing version) ---------------- */
+function storyTick(dt){ commsTick(dt); const S2 = STORYRUN; if (!S2 || G.mode !== 'play' || G.paused) return; const ch = S2.ch, g = ch.goal, car = G.car, prog = clamp((car.x - W.stops[0].x) / (W.stops[W.stops.length - 1].x - W.stops[0].x), 0, 1); S2.t += dt;
+ const b = ch.beats[S2.beat]; if (b && prog >= b[0]){ S2.beat++; if (b[2] === 'bag'){ const ls = b[1].slice(); const last = ls.pop(); comms(ls); comms([Object.assign({}, last, {choice:[{t:['أرجّعها للبوليس','Hand it in'], fx:() => { S2.choice = 'return'; CR().storyKept = false; react('good'); }}, {t:['أحتفظ بيها','Keep it'], fx:() => { S2.choice = 'keep'; CR().storyKept = true; G.T.tips += 2000; toastUI('💰 +2000', 'gold'); }}]})]); } else comms(b[1]); }
+ // reactions to real driving
+ const sp = speedOf(car) * 3.6, lim = curLimit(car.x) || 60; if (sp > lim + 18) react('speed'); if (LOCK && LOCK.on) react('brake'); if (G.T.hits > (S2.hits || 0)){ S2.hits = G.T.hits; react('crash'); } if (G.temp > 104) react('hot');
+ if (car.impacts && car.impacts.some(i => i.kind === 'bottom' || i.v > 2.5)) react('bump'); if (G.comfort > 85 && S2.t > 25 && Math.random() < dt * .02) react('good');
+ if (g.timer && S2.limit){ const left = S2.limit - S2.t; if (left < S2.limit * .3 && left > 0) react('late'); if (left <= 0 && !S2.fail){ S2.fail = true; toastUI('⏱ ' + L2('الوقت خلص!', 'Time\'s up!'), 'bad'); } }
+ if (g.puncture && !S2.punct && prog > g.puncture){ S2.punct = true; const w = car.wh[car.wh.length - 1]; if (w) w.flat = true; }
+ if (S2.rival){ if (S2.rival.x > W.stops[W.stops.length - 1].x && !S2.rivalWon){ S2.rivalWon = true; comms([L('sayed','الخط بتاعي!!','The line is MINE!!')]); } if (!S2.rivalT || S2.t - S2.rivalT > 18){ S2.rivalT = S2.t; const d = S2.rival.x - car.x; comms([d > 40 ? L('karim','سيد سابقك بكتير! دوس!','Sayed is way ahead! Push!') : d > 0 ? L('karim','قرّبت منه… شوية كمان!','You\'re close… a bit more!') : L('sayed','(بيكلكس ورا) استنى عليا!','(honking behind) Wait up!')]); } }
+ // objective strip
+ const h = $('#storyHud'); if (h){ const st = []; if (g.timer && S2.limit){ const left = Math.max(0, Math.ceil(S2.limit - S2.t)); st.push(`<span class="${left < S2.limit * .25 ? 'warn' : ''}">⏱ ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}</span>`); }
+  if (g.vip) st.push(`<span class="${G.comfort < g.comfort ? 'warn' : ''}">🤰🏽 ${Math.round(G.comfort)}%</span>`); if (g.deliver) st.push(`<span class="${G.T.delivered >= g.deliver ? 'ok' : ''}">🧍 ${G.T.delivered}/${g.deliver}</span>`); if (g.nofine) st.push(`<span class="${G.T.fines ? 'warn' : 'ok'}">🚫 ${L2('مخالفات', 'Fines')} ${G.T.fines}</span>`);
+  if (S2.rival){ const d = Math.round(S2.rival.x - car.x); st.push(`<span class="${d > 0 ? 'warn' : 'ok'}">😎 ${d > 0 ? '+' + d : d} m</span>`); } if (g.lowfuel) st.push(`<span class="${G.fuel < 3 ? 'warn' : ''}">⛽ ${(G.fuel).toFixed(1)} L</span>`); if (g.comfort && !g.vip) st.push(`<span class="${G.comfort < g.comfort ? 'warn' : 'ok'}">😊 ${Math.round(G.comfort)}%</span>`); if (g.allstops) st.push(`<span class="${G.T.missed ? 'warn' : 'ok'}">🚏 ${L2('فايتة', 'Missed')} ${G.T.missed}</span>`);
+  h.innerHTML = `<b>${nm(ch.title)}</b>${st.join('')}`; } }
+/* daily twist & chapter setup */
+const _sc42 = setupChapter;
+setupChapter = function(ch){ _sc42(ch); const tw = dailyTwist(), S2 = STORYRUN; if (!S2) return; S2.twist = tw && tw.ch === ch.id ? tw : null; if (S2.twist){ if (S2.twist.kind === 'rush' && S2.limit) S2.limit = Math.round(S2.limit * .85); comms([L('mona', '🔥 تويست النهارده: ' + nm(S2.twist.name) + ' — المكافأة +٥٠٪', '🔥 Today\'s twist: ' + nm(S2.twist.name) + ' — reward +50%')]); } };
+const _stc42 = startChapter;
+startChapter = function(ch){ const tw = dailyTwist(); if (tw && tw.ch === ch.id){ if (tw.kind === 'rain') ch = Object.assign({}, ch, {weather:'rain'}); if (tw.kind === 'night') ch = Object.assign({}, ch, {tod:'night'}); if (tw.kind === 'sand') ch = Object.assign({}, ch, {weather:'sand'}); } _stc42(ch); };
+/* stars, rewards, promotions, back to the story page */
+endRun = (function(prev){ return function(reason){ const S2 = STORYRUN; if (!S2) return prev(reason); STORYRUN = null; // run base end (without v39's handler), then our own result
+  _end39(reason); $('#storyHud') && $('#storyHud').classList.remove('on'); COMMS.q.length = 0; COMMS.cur = null; COMMS.el && COMMS.el.classList.remove('on');
+  const T = G.T, cAvg = T.comfortN ? T.comfortSum / T.comfortN : G.comfort, R = {reason, stars:reason === 'ok' ? 1 + (cAvg > 70 ? 1 : 0) + (T.missed === 0 && T.fines === 0 && T.hits === 0 ? 1 : 0) : 0}; STORYRUN = S2; const ok = chapterResult(R); STORYRUN = null; const ch = S2.ch, c = CR(); c.storyStars = c.storyStars || {};
+  const stars = ok ? 1 + (cAvg >= 70 || (S2.limit && S2.t < S2.limit * .8) ? 1 : 0) + (T.hits === 0 && T.fines === 0 ? 1 : 0) : 0, best = c.storyStars[ch.id] || 0, first = ok && !c.story[ch.id], twistK = S2.twist ? 1.5 : 1;
+  let pay = 0; if (first) pay += ch.reward; if (stars > best) pay += Math.round(ch.reward * .25 * (stars - best)); pay = Math.round(pay * twistK);
+  setTimeout(() => { const lines = ok ? ch.win.slice() : ch.lose.slice(); if (ch.id === 'ch5' && S2.choice === 'keep') lines.splice(0, lines.length, ...ch.lose);
+   dialogue(lines, () => { let promos = []; if (ok){ c.story[ch.id] = true; c.storyStars[ch.id] = Math.max(best, stars); if (pay) ledger(pay, '🎬 ' + nm(ch.title), 'cash'); S.xp += Math.round(pay / 8); promos = promoteFor(ch.id); save(true); }
+    $$('.modal.on, .ov.on').forEach(m => { if (m.querySelector('#recBox')) m.classList.remove('on'); }); if (typeof toMenu === 'function') toMenu('career'); CTAB = 'story'; show('career');
+    storyResultCard(ch, ok, stars, best, pay, promos); }); }, 700); }; })(endRun);
+function storyResultCard(ch, ok, stars, best, pay, promos){ const i = STORY.findIndex(s => s.id === ch.id), next = STORY[i + 1]; const m = document.createElement('div'); m.className = 'dlyM on';
+ m.innerHTML = `<div class="dly sres ${ok ? 'win' : 'lose'}"><div class="dlyt">${ok ? '🎬 ' + L2('الفصل خلص!', 'Chapter complete!') : '💥 ' + L2('مانجحتش المرة دي', 'Not this time')}</div><h3>${nm(ch.title)}</h3><div class="sstars">${[1,2,3].map(k => `<i class="${k <= stars ? 'on' : ''} ${k <= stars && k > best ? 'new' : ''}">★</i>`).join('')}</div>
+  ${ok ? `<div class="srows">${pay ? `<div>💰 ${L2('مكافأة', 'Reward')} <b>+${money(pay)}</b></div>` : ''}${promos.map(n => `<div>🎖 ${L2('ترقية: ', 'Promoted: ')}<b>${nm(n.t)}</b></div>`).join('')}${next ? `<div>🔓 ${L2('اتفتح: ', 'Unlocked: ')}<b>${nm(next.title)}</b></div>` : `<div>👑 ${L2('خلّصت القصة كلها!', 'You finished the whole story!')}</div>`}</div>` : `<p>${L2('جرّب تاني — كل مرة بتتعلم حاجة.', 'Try again — every run teaches you something.')}</p>`}
+  <div class="sbtns">${ok && next ? `<button class="btn pri" data-nx>▶ ${L2('الفصل الجاي', 'Next chapter')}</button>` : ''}${!ok || stars < 3 ? `<button class="btn" data-rp>↺ ${L2('العب تاني', 'Replay')} ${stars < 3 && ok ? '★' : ''}</button>` : ''}<button class="btn" data-cl>${L2('القصة', 'Story')}</button></div></div>`;
+ document.body.appendChild(m); AU.levelUp && ok && AU.levelUp();
+ m.querySelector('[data-cl]').onclick = () => { m.remove(); renderCareer(); }; const nx = m.querySelector('[data-nx]'); if (nx) nx.onclick = () => { m.remove(); startChapter(next); }; const rp = m.querySelector('[data-rp]'); if (rp) rp.onclick = () => { m.remove(); startChapter(STORY[i]); }; }
+/* stars on the story page cards, twist badge */
+const _rsp42 = renderStoryPage;
+renderStoryPage = function(){ _rsp42(); const c = CR(), tw = dailyTwist(); c.storyStars = c.storyStars || {};
+ $$('#s-career .sjc').forEach((el, i) => { const ch = STORY[i]; if (!ch) return; const s = c.storyStars[ch.id] || (c.story[ch.id] ? 1 : 0), t = el.querySelector('.sjt'); if (t) t.insertAdjacentHTML('afterbegin', `<div class="sjst">${[1,2,3].map(k => `<i class="${k <= s ? 'on' : ''}">★</i>`).join('')}${tw && tw.ch === ch.id ? `<em class="twist">🔥 ${L2('تويست النهارده', 'Today\'s twist')}: ${nm(tw.name)} · +50%</em>` : ''}</div>`); }); };
+/* ---------------- "Continue story" — front and centre ---------------- */
+function nextChapter(){ const c = CR(); c.story = c.story || {}; return STORY.find(s => s.unlock() && !c.story[s.id]) || null; }
+const _rr42 = renderRoutes;
+renderRoutes = function(){ _rr42(); const host = $('#s-routes'); if (!host || host.querySelector('.ctaStory')) return; const nx = nextChapter(), c = CR(), st = S.daily || {streak:0};
+ const card = document.createElement('div'); card.className = 'ctaStory'; card.innerHTML = `<div class="ctaL"><span>🎬 ${L2('القصة', 'STORY')}</span><b>${nx ? nm(nx.title) : L2('خلّصت القصة 👑', 'Story complete 👑')}</b><small>${nx ? nm(nx.sub) : L2('العب الفصول تاني عشان ٣ نجوم', 'Replay chapters for 3 stars')}</small></div><div class="ctaR"><em>🔥 ${fmt(st.streak || 0)} ${L2('يوم', 'day streak')}</em><button class="btn pri">${nx ? '▶ ' + L2('كمّل القصة', 'Continue story') : L2('القصة', 'Story')}</button></div>`;
+ const first = host.querySelector('.scr-in, .wrap, .card') || host.firstElementChild; (first && first.parentNode === host ? host.insertBefore(card, first) : host.prepend(card));
+ card.querySelector('button').onclick = () => { if (nx && c.joined !== false){ if (!c.joined){ c.joined = true; c.done.c0 = true; save(); } startChapter(nx); } else { CTAB = 'story'; show('career'); } }; };
+/* ---------------- dashboard screen: fewer items, bigger type ---------------- */
+{ const _dc = drawCluster; drawCluster = function(){ _dc(); const el = $('#cluster'), car = G.car; if (!el || !car || !el.width) return; const x = el.getContext('2d'); const s = Math.min(el.width / META.dashC.w, el.height / META.dashC.h), ox = (el.width - META.dashC.w * s) / 2, oy = el.height - META.dashC.h * s; x.setTransform(s, 0, 0, s, ox, oy);
+  const L3 = DASH.lcd, X0 = L3.x, Y0 = L3.y, W = L3.w, H = L3.h, F = (wt, sz) => `${wt} ${sz}px "Readex Pro", system-ui, sans-serif`, sp = Math.round(NEED.spd), gs = gearState();
+  x.save(); x.beginPath(); x.rect(X0, Y0, W, H); x.clip(); const bg = x.createLinearGradient(0, Y0, 0, Y0 + H); bg.addColorStop(0, '#0b1426'); bg.addColorStop(1, '#050a14'); x.fillStyle = bg; x.fillRect(X0, Y0, W, H);
+  // top: up to 3 active warnings, large
+  const on = []; if (G.pbrake) on.push(['park', '#ff3b3b']); if (G.doorOpen) on.push(['door', '#ff3b3b']); if (G.temp > 104) on.push(['temp', '#ff3b3b']); if (G.fuel < G.fuelMax * .12) on.push(['fuel', '#ffb020']); if (car.absT > 0) on.push(['abs', '#ffb020']); if (!G.test && GV(G.vid).cond.engine < 40) on.push(['eng', '#ffb020']); if (car.headOn) on.push(['head', '#3ddc84']);
+  on.slice(0, 3).forEach(([k2, col], i, a) => lamp(x, X0 + W / 2 + (i - (a.length - 1) / 2) * W * .26, Y0 + H * .13, H * .17, col, LAMPS2[k2]));
+  // middle: huge speed, gear badge
+  x.textBaseline = 'middle'; x.textAlign = 'center'; x.fillStyle = '#fff'; x.font = F(800, H * .36); x.fillText(String(sp), X0 + W * .56, Y0 + H * .5); x.fillStyle = 'rgba(190,210,235,.75)'; x.font = F(600, H * .08); x.fillText('km/h', X0 + W * .56, Y0 + H * .7);
+  const gTxt = gs === 'D' ? 'D' + (car.gear || 1) : gs, gc = gs === 'R' ? '#ff6a5c' : gs === 'D' ? '#ffcf6b' : '#9fd0ff'; x.strokeStyle = gc; x.lineWidth = 3; x.beginPath(); x.roundRect ? x.roundRect(X0 + W * .05, Y0 + H * .36, W * .22, H * .28, 10) : x.rect(X0 + W * .05, Y0 + H * .36, W * .22, H * .28); x.stroke(); x.fillStyle = gc; x.font = F(800, H * .15); x.fillText(gTxt, X0 + W * .16, Y0 + H * .5);
+  // bottom: fuel litres (left) · speed limit (right)
+  const lim = curLimit(car.x); x.textAlign = 'left'; x.fillStyle = G.fuel < G.fuelMax * .12 ? '#ffb020' : 'rgba(225,235,250,.95)'; x.font = F(700, H * .1); x.fillText(`⛽ ${(G.fuel || 0).toFixed(0)} L`, X0 + W * .06, Y0 + H * .87);
+  if (lim){ const cx2 = X0 + W * .82, cy2 = Y0 + H * .84, r = H * .12; x.fillStyle = '#fff'; x.beginPath(); x.arc(cx2, cy2, r, 0, 7); x.fill(); x.strokeStyle = '#e3262e'; x.lineWidth = r * .24; x.beginPath(); x.arc(cx2, cy2, r * .88, 0, 7); x.stroke(); x.fillStyle = '#111'; x.font = F(800, r * .95); x.textAlign = 'center'; x.fillText(String(lim), cx2, cy2 + 1); }
+  x.restore(); x.setTransform(1, 0, 0, 1, 0, 0); acIcon(); }; }
+/* ---------------- styles ---------------- */
+{ const st = document.createElement('style'); st.textContent = `
+.acimg{border-radius:50%}
+#comms{position:fixed;left:50%;bottom:calc(var(--hudH,9rem) + 1rem);transform:translate(-50%,1rem);z-index:40;display:flex;gap:.7rem;align-items:center;max-width:min(720px,92vw);padding:.55rem .9rem .55rem .55rem;border-radius:1rem;background:rgba(6,10,22,.86);border:1px solid var(--c);box-shadow:0 .8rem 2rem rgba(0,0,0,.5),0 0 1.4rem color-mix(in srgb,var(--c) 25%,transparent);opacity:0;pointer-events:none;transition:.25s}
+#comms.on{opacity:1;transform:translate(-50%,0);pointer-events:auto}.cav{font-size:2rem;width:2.8rem;height:2.8rem;border-radius:50%;display:grid;place-items:center;border:2px solid var(--c);flex:none;background:rgba(255,255,255,.05)}
+.ctx{display:flex;flex-direction:column;gap:.15rem}.ctx b{color:var(--c);font-size:.85rem}.ctx span{font-size:1rem;color:#fff;line-height:1.5}.cch{display:flex;gap:.5rem;margin-top:.35rem}
+#storyHud{display:none;gap:.5rem;align-items:center;flex-wrap:wrap;justify-content:center;white-space:normal}#storyHud.on{display:flex}#storyHud b{color:#ffd36b;margin-inline-end:.3rem}#storyHud span{padding:.15rem .5rem;border-radius:.5rem;background:rgba(255,255,255,.07)}#storyHud span.warn{background:rgba(255,70,70,.25);color:#ffb3b3}#storyHud span.ok{background:rgba(60,220,130,.2);color:#9ff5c4}
+.dlyM{position:fixed;inset:0;z-index:95;display:grid;place-items:center;background:rgba(0,0,0,.6);backdrop-filter:blur(4px)}
+.dly{width:min(560px,92vw);padding:1.3rem;border-radius:1.3rem;text-align:center;background:linear-gradient(160deg,#13213f,#0a1020);border:1px solid rgba(245,178,27,.6);box-shadow:0 1.5rem 3rem rgba(0,0,0,.6)}
+.dlyt{font:900 1.5rem Lalezar,'Readex Pro';color:#ffd36b;margin-bottom:.8rem}.dlyd{display:grid;grid-template-columns:repeat(7,1fr);gap:.35rem;margin-bottom:.8rem}.dlyd div{border-radius:.7rem;padding:.4rem .1rem;background:rgba(255,255,255,.05);border:1px solid var(--line);display:flex;flex-direction:column;font-size:.68rem}
+.dlyd div.got{opacity:.5}.dlyd div.now{border-color:#f5b21b;box-shadow:0 0 1rem rgba(245,178,27,.4);background:rgba(245,178,27,.12)}.dlyd b{font-size:1.2rem}.dlyd em{font-style:normal;color:var(--gold2)}.dly p{color:#c8d2e2}
+.sres h3{margin:.2rem 0 .4rem}.sstars{font-size:2.6rem;letter-spacing:.3rem}.sstars i{font-style:normal;color:rgba(255,255,255,.15)}.sstars i.on{color:#ffcf3b;text-shadow:0 0 1rem #f5b21b}.sstars i.new{animation:snew .7s ease}@keyframes snew{0%{transform:scale(2.2);opacity:0}100%{transform:scale(1);opacity:1}}
+.srows{display:flex;flex-direction:column;gap:.35rem;margin:.6rem 0 1rem}.srows div{background:rgba(255,255,255,.05);border-radius:.6rem;padding:.4rem}.sbtns{display:flex;gap:.5rem;justify-content:center;flex-wrap:wrap}
+.sjst{display:flex;gap:.15rem;align-items:center;flex-wrap:wrap;font-size:1rem}.sjst i{font-style:normal;color:rgba(255,255,255,.15)}.sjst i.on{color:#ffcf3b}.sjst .twist{font-style:normal;font-size:.72rem;margin-inline-start:.5rem;padding:.1rem .45rem;border-radius:.5rem;background:rgba(255,90,40,.2);color:#ffb08a}
+.ctaStory{display:flex;justify-content:space-between;align-items:center;gap:1rem;margin:0 0 .9rem;padding:1rem 1.2rem;border-radius:1.2rem;background:linear-gradient(110deg,#2a1b06,#13213f 60%);border:1px solid rgba(245,178,27,.6);box-shadow:0 0 2rem rgba(245,178,27,.12)}
+.ctaL{display:flex;flex-direction:column}.ctaL span{font-size:.72rem;letter-spacing:.16em;color:var(--gold2)}.ctaL b{font:900 1.35rem Lalezar,'Readex Pro'}.ctaL small{color:#c3cede}.ctaR{display:flex;flex-direction:column;align-items:flex-end;gap:.4rem}.ctaR em{font-style:normal;color:#ffb08a;font-size:.85rem}
+@media (max-width:700px){.ctaStory{flex-direction:column;align-items:stretch}.ctaR{align-items:stretch}}`; document.head.appendChild(st); }
 
 /* ======================= atlas-loader.js ======================= */
 /* =====================================================================
