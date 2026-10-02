@@ -4082,12 +4082,14 @@ for (const k in PREV) delete PREV[k];
    fuel use +50%
    ===================================================================== */
 const _ss28 = softSusp;
-softSusp = function(c, len){ if (!c) return; if (c.f0 == null) c.f0 = c.f; const f0 = c.f0; _ss28(c, len); if (len <= 5.8) return;
+softSusp = function(c, len){ if (!c) return; if (c.f0 == null) c.f0 = c.f; const f0 = c.f0; _ss28(c, len);
+ // every vehicle: preload the softer spring so it rests at its designed ride height (no more sagging bodies)
+ if (len <= 5.8){ c.pre = 9.8 / Math.pow(2 * Math.PI * c.f, 2) - 9.8 / Math.pow(2 * Math.PI * (f0 || 1.6), 2); return; }
  // softer, more supple and more travel than before
  c.zeta *= .9; c.travel = (len > 11 ? .38 : len > 9 ? .36 : len > 6.5 ? .32 : .28) + (c === G.car && !G.test ? .012 * upl(G.vid, 'susp') : 0);
  const n = c.wh.length; c.cd = 2 * c.zeta * Math.sqrt(c.k * c.base / n);
  // preload: static sag of the soft spring is carried by the air bags, so the bus sits at its design height (+4 cm)
- const sagNew = 9.8 / Math.pow(2 * Math.PI * c.f, 2), sagDef = 9.8 / Math.pow(2 * Math.PI * (f0 || 1.6), 2); c.pre = sagNew - .105; };
+ const sagNew = 9.8 / Math.pow(2 * Math.PI * c.f, 2), sagDef = 9.8 / Math.pow(2 * Math.PI * (f0 || 1.6), 2); c.pre = sagNew - sagDef + .04; };
 /* fuel: another +50% */
 const _ff28 = fuelFactor;
 fuelFactor = function(){ return _ff28() * 1.5; };
@@ -4477,6 +4479,39 @@ setInterval(() => { if (PERF.low && DPR > 1.25) resize(); }, 3000);
 { const _ds = dirShadow; dirShadow = function(car, src, X, gy, sw, shh, mk, k){ if (PERF.low && !car.player) return; _ds(car, src, X, gy, sw, shh, mk, k); }; }
 { const _pf = puff; puff = function(...a){ if (PERF.low && Math.random() < .45) return; _pf(...a); }; }
 { const _cc = cabinCanvas; let skip = 0; const cache = new Map(); cabinCanvas = function(V, cos, pax, forPreview){ if (!PERF.low || forPreview) return _cc(V, cos, pax, forPreview); skip = (skip + 1) % 3; const k = V.id; if (skip && cache.has(k)) return cache.get(k); const r = _cc(V, cos, pax, forPreview); cache.set(k, r); return r; }; }
+
+/* ======================= proportions.js ======================= */
+"use strict";
+/* =====================================================================
+   OGRAAA v37 — true proportions & ride height
+   squeezed artwork stretched to the real vehicle height · every
+   separate-wheel vehicle gets dark wheel wells and wheels that sit in
+   their arches while following the suspension
+   ===================================================================== */
+const REALH = {hiace:2.28, hiace2:2.28, hiaceB:2.1, kinglong:2.5, rosa:2.7, redbus2:3.0, coachN:3.6};
+function stretchSprite(spr, s){ const im = IMG[spr], M = META[spr]; if (!im || !im.width || s <= 1.01) return; const w = im.width, h0 = im.height, h = Math.round(h0 * s), c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d'); x.imageSmoothingQuality = 'high';
+ // stretch the body above the wheel centres only, so wheel arches stay round at the bottom and the roof/windows gain the height
+ const cut = Math.round(Math.min(...M.wheels.map(q => q[1] - q[2] * .9))), top = cut, rest = h0 - cut, topH = h - rest;
+ x.drawImage(im, 0, 0, w, top, 0, 0, w, topH); x.drawImage(im, 0, top, w, rest, 0, topH, w, rest);
+ const dy = topH - top, sy = y => y < top ? y * topH / top : y + dy;
+ M.wheels = M.wheels.map(([cx, cy, r]) => [cx, cy + dy, r]); if (M.hl) M.hl = [M.hl[0], sy(M.hl[1])]; if (M.tl) M.tl = [M.tl[0], sy(M.tl[1])]; M.h = h; IMG[spr] = c; }
+function wellsFor(spr){ const im = IMG[spr], M = META[spr]; if (!im || !im.width || M.wf) return; const c = document.createElement('canvas'); c.width = im.width; c.height = im.height; const x = c.getContext('2d');
+ // dark wheel-well interiors: only the arch opening above the wheel centre line (no black below the body)
+ for (const [cx, cy, r] of M.wheels){ x.save(); x.beginPath(); x.rect(cx - r * 1.3, 0, r * 2.6, cy + r * .25); x.clip(); const g = x.createRadialGradient(cx, cy - r * .2, r * .2, cx, cy, r * 1.18); g.addColorStop(0, '#26282c'); g.addColorStop(1, '#0d0e10'); x.fillStyle = g; x.beginPath(); x.arc(cx, cy, r * 1.16, 0, 7); x.fill(); x.restore(); }
+ x.globalCompositeOperation = 'destination-over'; x.drawImage(im, 0, 0); x.globalCompositeOperation = 'source-over'; const top = document.createElement('canvas'); top.width = im.width; top.height = im.height; const t = top.getContext('2d'); t.drawImage(c, 0, 0);
+ // keep the original body on top so the arch edges stay crisp
+ t.drawImage(im, 0, 0); IMG[spr] = top; M.wf = 1; }
+const _ci37 = cleanImages;
+cleanImages = function(){ _ci37();
+ for (const v of VEHS){ if (v.baked || /^nw/.test(v.spr)) continue; const M = META[v.spr]; if (!M) continue; const want = REALH[v.id]; if (want){ const wb = Math.min(M.h, Math.min(...M.wheels.map(w => w[1] + w[2]))), implied = v.len * wb / M.w; stretchSprite(v.spr, clamp(want / implied, 1, 1.45)); } wellsFor(v.spr); }
+ for (const k in MASKS) delete MASKS[k]; for (const k in PREV) delete PREV[k]; if (typeof CABM !== 'undefined') for (const k in CABM) delete CABM[k]; if (typeof CABB !== 'undefined') for (const k in CABB) delete CABB[k]; if (typeof GEO !== 'undefined') for (const k in GEO) delete GEO[k]; };
+/* wheels: x locked to the arch, y follows the real suspension (clamped inside the well) */
+drawVehicle = (function(prev){ return function(car, opt){ const M = META[car.spr]; if (!M || !M.wf) return prev(car, opt); _dv26(car, opt);
+ opt = opt || {}; const lift = opt.lift || 0, sc = opt.scale || 1, src = car.cv || IMG[car.spr], k = PPM * car.g.s * sc, mk = car.mirror ? -k : k, wr = car.whRim ?? car.rim, im = rimImg(wr, car.player ? car.rimc : null), q = WQ(wr), ca = Math.cos(car.a), sa = Math.sin(car.a), s = car.g.s;
+ ctx.save(); ctx.translate(sx(car.x), sy(car.y + lift)); ctx.rotate(-car.a); ctx.scale(mk, k); ctx.translate(-src.width / 2, -src.height / 2); if (opt.dim && S.set.gfx !== 'low') ctx.filter = 'brightness(.86) saturate(.85)';
+ M.wheels.forEach(([cx, cy, r], i) => { const w = car.wh[i]; if (!w) return; const dx = w.x - car.x, dy = w.y - car.y, ly = -dx * sa + dy * ca, py = clamp(src.height / 2 - ly / s, cy - r * .35, cy + r * .25), R = r * q;
+  ctx.save(); ctx.translate(cx, py); if (w.flat) ctx.scale(1, .86); ctx.rotate(car.mirror ? -w.rot : w.rot); ctx.drawImage(im, -R, -R, R * 2, R * 2); ctx.restore(); });
+ ctx.restore(); }; })(drawVehicle);
 
 /* ======================= atlas-loader.js ======================= */
 /* =====================================================================
