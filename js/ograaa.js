@@ -5663,13 +5663,14 @@ function resizeTyres(V){ const M = META[V.spr], im = IMG[V.spr]; if (!M || !im |
  const c = document.createElement('canvas'); c.width = im.width; c.height = im.height; const x = c.getContext('2d'); x.drawImage(im, 0, 0); const d = x.getImageData(0, 0, c.width, c.height), p = d.data, W = c.width, H = c.height;
  const nw = M.wheels.map(([cx, cy, R]) => { const r = Math.min(R, D / 2 / s); if (r >= R * .97) return [cx, cy, R];
   const ncy = cy + (R - r), lip = r * 1.1;
-  // body colour just above the old arch, left and right of it
-  let sr = 0, sg = 0, sb = 0, n = 0; for (const ox of [-1.25, 1.25]) for (let dy = -6; dy <= 6; dy++) for (let dx = -4; dx <= 4; dx++){ const px = Math.round(cx + ox * R + dx), py = Math.round(cy - R * .35 + dy); if (px < 0 || py < 0 || px >= W || py >= H) continue; const q = (py * W + px) * 4; if (p[q + 3] > 200){ sr += p[q]; sg += p[q + 1]; sb += p[q + 2]; n++; } }
-  if (!n) return [cx, ncy, r]; sr /= n; sg /= n; sb /= n; const sill = ncy + r * .15;
-  for (let py = Math.max(0, Math.floor(cy - R * 1.15)); py < Math.min(H, Math.ceil(cy + R * 1.1)); py++) for (let px = Math.max(0, Math.floor(cx - R * 1.15)); px < Math.min(W, Math.ceil(cx + R * 1.15)); px++){
-   const dOld = Math.hypot(px - cx, py - cy), dNew = Math.hypot(px - cx, py - ncy); if (dOld > R * 1.06 || dNew <= lip) continue; const q = (py * W + px) * 4;
-   if (py > sill){ p[q + 3] = 0; continue; }                                   // under the sill: open air
-   const shade = .9 + .1 * (py - (cy - R)) / (2 * R); p[q] = sr * shade; p[q + 1] = sg * shade; p[q + 2] = sb * shade; p[q + 3] = 255; }
+  // inpaint row by row: blend the bodywork found just left and right of the old arch at the same height,
+  // so stripes, panel lines and colours carry straight through where the oversized arch used to be
+  const sill = ncy + r * .15, Ro = R * 1.07, orig = p.slice ? p.slice() : new Uint8ClampedArray(p);
+  for (let py = Math.max(0, Math.floor(cy - Ro)); py < Math.min(H, Math.ceil(cy + Ro)); py++){ const dy = py - cy; if (Math.abs(dy) >= Ro) continue; const half = Math.sqrt(Ro * Ro - dy * dy), xl = Math.floor(cx - half) - 2, xr = Math.ceil(cx + half) + 2;
+   const pick = (x0, step) => { for (let k = 0; k < 8; k++){ const px = x0 + step * k; if (px < 0 || px >= W) break; const q = (py * W + px) * 4; if (orig[q + 3] > 220) return [orig[q], orig[q + 1], orig[q + 2]]; } return null; };
+   const cl = pick(xl, -1), cr = pick(xr, 1);
+   for (let px = Math.max(0, xl + 1); px < Math.min(W, xr); px++){ const q = (py * W + px) * 4, dNew = Math.hypot(px - cx, py - ncy), dOld = Math.hypot(px - cx, py - cy); if (dOld > Ro || dNew <= lip) continue;
+    if (py > sill || (!cl && !cr)){ p[q + 3] = 0; continue; } const tt = (px - xl) / Math.max(1, xr - xl), a = cl || cr, b = cr || cl; for (let ch = 0; ch < 3; ch++) p[q + ch] = a[ch] * (1 - tt) + b[ch] * tt; p[q + 3] = 255; } }
   // fill the new well behind the tyre so the gap reads as a dark arch, not a hole
   for (let py = Math.max(0, Math.floor(ncy - lip)); py < Math.min(H, Math.ceil(sill)); py++) for (let px = Math.max(0, Math.floor(cx - lip)); px < Math.min(W, Math.ceil(cx + lip)); px++){ const dNew = Math.hypot(px - cx, py - ncy); if (dNew > lip) continue; const q = (py * W + px) * 4; p[q] = 14; p[q + 1] = 15; p[q + 2] = 17; p[q + 3] = 255; }
   return [cx, ncy, r]; });
