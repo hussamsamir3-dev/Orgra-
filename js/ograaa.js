@@ -4561,7 +4561,7 @@ function hasAC(){ if (!G.V) return true; return !NO_AC.has(G.V.id) || (!G.test &
 let acWarned = 0;
 const _upd39 = update;
 update = function(dt){ _upd39(dt); if (G.mode !== 'play' || !G.car) return;
- if (G.ac && !hasAC()){ G.ac = false; if (performance.now() - acWarned > 8000){ acWarned = performance.now(); toastUI('❄️ ' + L2('العربية دي مفيهاش تكييف — ركّبه من الجراج', 'No A/C in this vehicle — fit one in the garage'), 'gold'); } }
+ if (G.ac && !hasAC()) G.ac = false;
  storyTick(dt); };
 /* ---------------- traffic lights never share a spot with a lamp post ---------------- */
 const _sr39 = startRoute;
@@ -4970,6 +4970,39 @@ renderRoutes = function(){ _rr42(); const host = $('#s-routes'); if (!host || ho
 .ctaStory{display:flex;justify-content:space-between;align-items:center;gap:1rem;margin:0 0 .9rem;padding:1rem 1.2rem;border-radius:1.2rem;background:linear-gradient(110deg,#2a1b06,#13213f 60%);border:1px solid rgba(245,178,27,.6);box-shadow:0 0 2rem rgba(245,178,27,.12)}
 .ctaL{display:flex;flex-direction:column}.ctaL span{font-size:.72rem;letter-spacing:.16em;color:var(--gold2)}.ctaL b{font:900 1.35rem Lalezar,'Readex Pro'}.ctaL small{color:#c3cede}.ctaR{display:flex;flex-direction:column;align-items:flex-end;gap:.4rem}.ctaR em{font-style:normal;color:#ffb08a;font-size:.85rem}
 @media (max-width:700px){.ctaStory{flex-direction:column;align-items:stretch}.ctaR{align-items:stretch}}`; document.head.appendChild(st); }
+
+/* ======================= ac-window.js ======================= */
+"use strict";
+/* =====================================================================
+   OGRAAA v43 — A/C window always opens; on vehicles without A/C it
+   shows "fan only" in its own display (no pop-up messages)
+   ===================================================================== */
+ACT.ac = () => { $('#acP').classList.toggle('on'); $('#radioP').classList.remove('on'); $('#cruiseP').classList.remove('on'); AU.click && AU.click(); };
+const _upd43 = update;
+update = function(dt){ _upd43(dt); if (G.mode !== 'play') return; const lcd = $('#acLCD'), p = $('#acP'); if (!lcd || !p) return; const no = !hasAC(); p.classList.toggle('noAC', no);
+ if (no) lcd.innerHTML = `<b>${L2('مفيش تكييف', 'NO A/C FITTED')}</b><span>${L2('مروحة', 'FAN')} ${G.fan || 0} · ${L2('ركّبه من الجراج', 'fit one in the garage')}</span>`; };
+{ const st = document.createElement('style'); st.textContent = '#acP.noAC #acOn{opacity:.3;filter:grayscale(1)}#acP.noAC #acMinus,#acP.noAC #acPlus{opacity:.3}'; document.head.appendChild(st); }
+
+/* ======================= story-logic.js ======================= */
+"use strict";
+/* =====================================================================
+   OGRAAA v44 — story logic: private runs are private.
+   Ch.2 (labour) is a straight emergency run: only Om Karim on board,
+   no stops, destination = the maternity hospital. Ch.8 (wedding) and
+   Ch.9 (family) are charters: the group boards at the start and rides
+   straight to the venue — no strangers, no line stops.
+   ===================================================================== */
+const EXPRESS = {
+ ch2:{dest:['مستشفى الولادة', 'Maternity Hospital'], group:() => [{t:'p3', h:1.62, vip:true}], note:['طوارئ — على المستشفى على طول', 'Emergency — straight to the hospital']},
+ ch8:{dest:['قاعة فرح كريم · الجونة', 'Karim\'s wedding venue · El Gouna'], group:() => Array.from({length:Math.min(seatsOf(G.V), 40)}, (_, i) => ({t:pick(W.stops[0].waiting.length ? W.stops[0].waiting.map(p => p.t) : ['p1','p2','p3','p4']), h:1.6 + Math.random() * .2})), note:['رحلة خاصة — معازيم الفرح بس', 'Private charter — wedding guests only']},
+ ch9:{dest:['الجونة', 'El Gouna'], group:() => [{t:'p6', h:1.66, vip:true}, {t:'p3', h:1.62}, {t:'p5', h:1.7}, {t:'p2', h:1.6}], note:['رحلة العيلة — الحاج وأهله بس', 'Family trip — Hagg and his family only']}};
+const _sc44 = setupChapter;
+setupChapter = function(ch){ const X = EXPRESS[ch.id]; if (X && G.car){ const last = W.stops.length - 1;
+  W.stops.forEach((st, i) => { st.waiting = []; if (i < last){ st.served = true; st.express = true; } });
+  W.stops[last].name = X.dest; G.nextIdx = last; G.onboard = X.group().map(p => Object.assign({dest:last}, p)); if (typeof refreshTrack === 'function') refreshTrack(); }
+ // the chapter's own setup (VIP etc.) — skip adding a second Om Karim
+ const vip = ch.goal.vip; if (X) ch.goal.vip = null; _sc44(ch); if (X){ ch.goal.vip = vip; if (vip && STORYRUN) STORYRUN.vipOn = true; toastUI('🚨 ' + nm(X.note), 'gold', null, 4); } };
+{ const st = document.createElement("style"); st.textContent = "#storyHud{z-index:60!important;top:4.7rem!important;left:.8rem!important;transform:none!important;max-width:44vw}"; document.head.appendChild(st); }
 
 /* ======================= atlas-loader.js ======================= */
 /* =====================================================================
