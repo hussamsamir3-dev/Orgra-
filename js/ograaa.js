@@ -5121,7 +5121,7 @@ renderStoryPage = function(){ _rsp45(); const path = $('#s-career .sjpath'); if 
  const rows = RESTORE.map(([k, n, min]) => { const v = Math.round(g.cond[k] ?? 100); return `<div class="rs ${v >= min ? 'ok' : ''}"><span>${nm(n)}</span><i><i style="width:${v}%"></i></i><b>${v}%</b></div>`; }).join('');
  const card = document.createElement('div'); card.className = 'oldLady'; card.innerHTML = `<div class="olImg"><img src="${ASSETS[VBY(OLD).spr]}" style="filter:${restoreDone() ? 'none' : `sepia(.6) brightness(${.55 + (g.cond.clean ?? 0) / 250}) saturate(.6)`}"></div><div class="olTxt"><small>${L2('عربية أبوك', 'YOUR FATHER\'S VAN')}</small><h3>${L2('العجوزة', 'The Old Lady')} ${restoreDone() ? '✨' : ''}</h3><p>${!started ? L2('مستنياك في ورشة الأسطى عبده.', 'Waiting for you at Usta Abdo\'s workshop.') : restoreDone() ? L2('رجعت تلمع زي أول يوم. الفصل الأخير مفتوح.', 'She shines like day one. The final chapter is open.') : L2('رجّعها زي ما كانت — صلّح كل حاجة في الجراج.', 'Bring her back — fix everything in the garage.')}</p>${g.owned ? `<div class="rsg">${rows}</div>` : ""}${started && !restoreDone() ? `<button class="btn pri sm" id="olFix">🔧 ${L2('صلّحها في الجراج', 'Restore in the garage')}</button>` : ''}</div>`;
  path.parentNode.insertBefore(card, path); const b = $('#olFix'); if (b) b.onclick = () => { GV_ID = OLD; GT = 'maintenance'; show('garage'); };
- if (restoreDone() && !S.oldShine){ S.oldShine = true; save(true); setTimeout(() => dialogue([L('abdo','بص عليها… العجوزة رجعت!','Look at her… the Old Lady is back!'), L('dad','"…كنت عارف إنك هترجّعها."','"…I knew you\'d bring her back."')]), 400); } };
+ if (restoreDone() && !S.oldShine){ S.oldShine = true; save(true); setTimeout(() => dialogue([L('abdo','بص عليها… زوبه رجعت!','Look at her… Zouba is back!'), L('dad','"…كنت عارف إنك هترجّعها."','"…I knew you\'d bring her back."')]), 400); } };
 { const st = document.createElement('style'); st.textContent = `
 .tcard{position:fixed;inset:0;z-index:99;display:grid;place-items:center;background:radial-gradient(ellipse at center,#121a2c 0%,#000 75%);opacity:0;transition:opacity .6s}.tcard.on{opacity:1}.tcard.out{opacity:0}
 .tbar{position:absolute;left:0;right:0;height:12vh;background:#000}.tbar.t{top:0}.tbar.b{bottom:0}
@@ -5256,7 +5256,7 @@ function workshop(vid, opts, done){ opts = opts || {}; const g = GV(vid), seq = 
 /* ---------------- story hooks ---------------- */
 restoreDone = function(){ return !!S.oldRestored; };
 const _src48 = storyResultCard;
-storyResultCard = function(ch, ok, stars, best, pay, promos){ if (ch.id === 's1' && ok && !S.oldRestored){ dialogue([L('abdo','يلا يا ابني، شمّر. هنرجّعها بإيدينا.','Roll up your sleeves, son. We\'ll bring her back with our own hands.')], () => workshop(OLD, {all:true}, () => { S.oldRestored = true; S.oldShine = true; save(true); dialogue([L('abdo','بص عليها… العجوزة رجعت!','Look at her… the Old Lady is back!'), L('dad','"…كنت عارف إنك هترجّعها."','"…I knew you\'d bring her back."')], () => _src48(ch, ok, stars, best, pay, promos)); })); return; } _src48(ch, ok, stars, best, pay, promos); };
+storyResultCard = function(ch, ok, stars, best, pay, promos){ if (ch.id === 's1' && ok && !S.oldRestored){ dialogue([L('abdo','يلا يا ابني، شمّر. هنرجّعها بإيدينا.','Roll up your sleeves, son. We\'ll bring her back with our own hands.')], () => workshop(OLD, {all:true}, () => { S.oldRestored = true; S.oldShine = true; save(true); dialogue([L('abdo','بص عليها… زوبه رجعت!','Look at her… Zouba is back!'), L('dad','"…كنت عارف إنك هترجّعها."','"…I knew you\'d bring her back."')], () => _src48(ch, ok, stars, best, pay, promos)); })); return; } _src48(ch, ok, stars, best, pay, promos); };
 const _sc48 = setupChapter;
 setupChapter = function(ch){ _sc48(ch); const S2 = STORYRUN; if (!S2) return;
  if (ch.id === 's7') setTimeout(() => gameChecklist(() => comms([L('pax','…ممتاز. نبدأ.','…excellent. Let\'s begin.')])), 400);
@@ -5273,7 +5273,7 @@ useItem = function(id){ if (id !== 'spare') return _ui48(id); const car = G.car,
  mgSteps = ['🛞']; mgIdx = 0; gameWheels(G.test ? (G.V.id) : G.vid, () => { bag.spare--; car.wh[i].flat = false; car.wh[i].r = car.wh[i].r0; toastUI('🛞 ' + L2('الكاوتش اتغير', 'Tyre changed'), 'good'); save(); if (typeof renderTrunk === 'function') renderTrunk(); }, i); };
 /* ---------------- Old Lady card: open the workshop ---------------- */
 const _rsp48 = renderStoryPage;
-renderStoryPage = function(){ _rsp48(); const b = $('#olFix'); if (b) b.onclick = () => workshop(OLD, {}, () => renderCareer()); const card = $('#s-career .oldLady .olTxt'); if (card && S.oldRestored && !$('#olWash')){ card.insertAdjacentHTML('beforeend', `<button class="btn sm" id="olWash">🧽 ${L2('ورشة العجوزة', 'Old Lady workshop')}</button>`); $('#olWash').onclick = () => workshop(OLD, {}, () => renderCareer()); } };
+renderStoryPage = function(){ _rsp48(); const b = $('#olFix'); if (b) b.onclick = () => workshop(OLD, {}, () => renderCareer()); const card = $('#s-career .oldLady .olTxt'); if (card && S.oldRestored && !$('#olWash')){ card.insertAdjacentHTML('beforeend', `<button class="btn sm" id="olWash">🧽 ${L2('ورشة زوبه', 'Zouba\'s workshop')}</button>`); $('#olWash').onclick = () => workshop(OLD, {}, () => renderCareer()); } };
 /* ---------------- A/C: no unit → no panel ---------------- */
 let acHint = 0;
 ACT.ac = () => { if (G.mode === 'play' && !hasAC()){ $('#acP').classList.remove('on'); if (performance.now() - acHint > 15000){ acHint = performance.now(); toastUI('🪟 ' + L2('مفيش تكييف — اضغط على أي شباك في العربية عشان تفتحه', 'No A/C — tap a window on your vehicle to roll it down'), 'gold', null, 3); } return; } $('#acP').classList.toggle('on'); $('#radioP').classList.remove('on'); $('#cruiseP').classList.remove('on'); };
@@ -5316,6 +5316,135 @@ update = function(dt){ _upd48(dt); if (G.mode !== 'play' || !G.car) return; if (
 .fuelg{display:flex;flex-direction:column;align-items:center;gap:1rem;padding:2rem}.ftank{position:relative;width:7rem;height:18rem;border-radius:1rem;border:3px solid #6b7686;background:#0b0f15;overflow:hidden}.flev{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(0deg,#c48a12,#ffd36b)}.fzone{position:absolute;left:0;right:0;top:-2%;height:12%;border-top:2px dashed #3ddc84;border-bottom:2px dashed #3ddc84;background:rgba(61,220,132,.15)}.fhold{font-size:1.2rem;padding:1rem 2rem;user-select:none;touch-action:none}.fl{color:#c8d0dc}
 .chk{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;padding:2rem}.ci{position:relative;height:8rem;border-radius:1rem;background:linear-gradient(180deg,#1d2638,#121826);border:1px solid #384356;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.4rem;color:#dfe6ef}.ci i{font-style:normal;font-size:2.6rem}.ci b{position:absolute;top:.5rem;inset-inline-end:.7rem;color:#3ddc84;opacity:0;font-size:1.4rem;transform:scale(2);transition:.25s}.ci.ok{border-color:#3ddc84;box-shadow:0 0 1rem rgba(61,220,132,.25)}.ci.ok b{opacity:1;transform:scale(1)}
 @media (max-width:700px){.bay{grid-template-columns:repeat(2,1fr)}.chk{grid-template-columns:repeat(2,1fr)}}`; document.head.appendChild(st); }
+
+/* ======================= legacy.js ======================= */
+"use strict";
+/* =====================================================================
+   OGRAAA v49 — "زوبه | Zouba" — the legacy update
+   · Your father's van is Zouba (no model names anywhere in the story)
+   · After Chapter 1's workshop she's ~90% mechanically sound
+   · Legacy meter, father's tapes, cliff-hangers, Abdo's to-do list
+     (tyres → A/C → a second van) that gates the story
+   · Story maps only show what the chapter needs; free roam opens after
+     half the story
+   · Cinematic grading, vignette, film grain and mood lighting in story
+   · Police checkpoints: random but sensible places, a properly parked
+     patrol car with real light-bar strobes and light spill
+   · Interactive wash / bodywork / engine / wheels everywhere: garage
+     maintenance, roadside workshop and fuel-station wash
+   ===================================================================== */
+/* ---------------- Zouba ---------------- */
+{ const V = VBY(OLD); if (V) V.name = ['زوبه', 'Zouba']; }
+const RENAME = [[/هايس أبوك/g, 'زوبه'], [/الهايس دي/g, 'زوبه دي'], [/العجوزة/g, 'زوبه'], [/the Old Lady/g, 'Zouba'], [/The Old Lady/g, 'Zouba'], [/Your father's HiAce/g, 'Zouba, your father\'s van'], [/This van… was it the late usta's\?!/g, 'This is Zouba… the late usta\'s van?!'], [/هايس الشركة/g, 'عربية الشركة'], [/company HiAce/g, 'company van'], [/1994 HiAce/g, 'van'], [/HiAce/g, 'van']];
+const fixT = s => typeof s === 'string' ? RENAME.reduce((a, [r, b]) => a.replace(r, b), s) : s;
+const fixL = l => { if (!l) return l; if (l.ar) l.ar = fixT(l.ar); if (l.en) l.en = fixT(l.en); return l; };
+STORY.forEach(ch => { ch.title = ch.title.map(fixT); ch.sub = ch.sub.map(fixT); [ch.intro, ch.win, ch.lose].forEach(a => a && a.forEach(fixL)); ch.beats.forEach(b => b[1].forEach(fixL)); });
+for (const k in DESTS) DESTS[k] = DESTS[k].map(fixT);
+/* more natural, grounded dialogue for the opening chapters */
+const CH = id => STORY.find(s => s.id === id);
+CH('s1').intro = [L('abdo','اتأخرت كتير يا ابني… زوبه مستنياك هنا من يوم الدفنة.','You took your time, son… Zouba has waited here since the funeral.'), L('you','كنت فاكرها اتباعت.','I thought she\'d been sold.'), L('abdo','اتعرض عليا فيها كذا مرة. مارضيتش. أبوك وصّاني عليها.','I had offers. I refused. Your father made me promise.'), L('abdo','الموتور بيقطع والفرامل ضعيفة. سوق بالراحة لحد الورشة — هي على الشارع الرئيسي، مش بعيد.','The engine stutters and the brakes are weak. Drive gently to the workshop — it\'s on the main road, not far.')];
+CH('s1').win = [L('abdo','وصلت. شايف؟ لسه فيها روح.','She made it. See? There\'s still life in her.'), L('abdo','شمّر. هنشتغل فيها سوا.','Roll up your sleeves. We\'ll work on her together.')];
+CH('s2').intro = [L('hagg','إنت ابن عم صلاح؟ الله يرحمه… كان أنضف سواق على الخط.','You\'re Uncle Salah\'s son? God rest him… the most honest driver on this line.'), L('hagg','الخط اتلمّ عليه شركة سيد بعد ما مات. الناس نسيت.','Sayed\'s company took over the line after he died. People forgot.'), L('you','مش هيفضلوا ناسيين.','They won\'t forget for long.'), L('hagg','وصّل ٨ ركاب النهارده. نشوف الناس هتقول إيه.','Carry eight passengers today. Let\'s see what people say.')];
+/* ---------------- 90% mechanically sound after the story workshop ---------------- */
+const _ws49 = workshop;
+workshop = function(vid, opts, done){ _ws49(vid, opts, () => { if (opts && opts.all && vid === OLD && !S.oldRestored){ const c = GV(OLD).cond; Object.assign(c, {engine:90, tyres:90, brakes:90, susp:90, oil:100, body:95, clean:100}); save(true); } done && done(); }); };
+/* ---------------- Abdo's to-do list: care & growth gates the story ---------------- */
+const TASKS = [
+ {id:'tyres', after:'s2', gate:'s3', t:['كاوتش جديد لزوبه','New tyres for Zouba'], d:['أبوك كان بيقول: الكاوتش هو اللي شايل الناس.','Your father used to say: the tyres carry the people.'], ok:() => upl(OLD, 'tires') >= 1, go:() => { GV_ID = OLD; GT = 'performance'; show('garage'); }, r:300},
+ {id:'ac', after:'s4', gate:'s5', t:['ركّب تكييف لزوبه','Fit A/C to Zouba'], d:['الصيف جاي، والناس مش هتركب فرن.','Summer\'s coming — nobody wants to ride in an oven.'], ok:() => upl(OLD, 'ac') >= 1, go:() => { GV_ID = OLD; GT = 'performance'; show('garage'); }, r:500},
+ {id:'fleet', after:'s6', gate:'s7', t:['اشتري عربية تانية للخط','Buy a second van for the line'], d:['الخط محتاج عربيتين عشان ياخد الوقت ده تاني.','The line needs two vans to win back the schedule.'], ok:() => VEHS.filter(v => GV(v.id).owned && v.id !== OLD).length >= 1, go:() => { show('showroom'); }, r:800}];
+STORY.forEach((ch, i) => { const task = TASKS.find(t => t.gate === ch.id), base = ch.unlock; ch.unlock = () => base() && (!task || task.ok()); ch.task = task; });
+STORY.forEach(ch => { ch.node = ch.node || 'c0'; });
+STORY.find(s => s.id === 's10').unlock = () => !!(CR().story || {}).s9 && restoreDone();
+/* ---------------- father's tapes & teasers ---------------- */
+const TAPES = {s1:['"لو بتسمع ده، يبقى لقيت زوبه. خلي بالك منها."','"If you\'re hearing this, you found Zouba. Look after her."'], s2:['"الراكب مش فلوس يا ابني. الراكب أمانة."','"A passenger isn\'t money, son. A passenger is a trust."'], s3:['"في يوم هتشيل حد في أصعب لحظة في حياته. ساعتها افتكرني."','"One day you\'ll carry someone through the hardest moment of their life. Remember me then."'], s4:['"اللي بيسابق على الناس… عمره ما بيكسبهم."','"Whoever races for people… never wins them."'], s5:['"الليل طويل، بس الصبح دايماً بييجي."','"The night is long, but morning always comes."'], s6:['"الرزق الحلال ليه طعم تاني."','"Honest money has a different taste."'], s7:['"الشغل الحلو بيتشاف من غير ما تقول."','"Good work is seen without being announced."'], s8:['"العاصفة بتعدي. المهم تفضل ماسك الدركسيون."','"Storms pass. Just keep your hands on the wheel."'], s9:['"افرح للناس من قلبك… الفرح بيرجع."','"Be glad for people from your heart… joy comes back."'], s10:['"أنا فخور بيك يا ابني. خلي بالك من زوبه… ومن نفسك."','"I\'m proud of you, son. Look after Zouba… and yourself."']};
+const TEASE = {s1:['هل الناس لسه فاكرين أبوك؟','Do people still remember your father?'], s2:['تليفون في نص الليل… ومحدش غيرك قريب.','A phone call in the night… and no one else is close.'], s3:['سيد مش هيسيب الخط بسهولة.','Sayed won\'t give up the line easily.'], s4:['التانك فاضي… والمطر مش هيقف.','The tank is empty… and the rain won\'t stop.'], s5:['شنطة منسية… وفلوس تكفي زوبه سنة.','A forgotten bag… enough cash for a year of Zouba.'], s6:['مفتش الهيئة جاي — والعقد على المحك.','The authority inspector is coming — the contract is on the line.'], s7:['الصحراوي… والرملة طالعة.','The desert road… and the sand is rising.'], s8:['فرح كريم — وإنت السواق.','Karim\'s wedding — and you\'re driving.'], s9:['آخر رحلة للحاج… على خط أبوك.','Hagg\'s last ride… on your father\'s line.'], s10:['الحكاية لسه مكمّلة…','The story continues…']};
+const _src49 = storyResultCard;
+storyResultCard = function(ch, ok, stars, best, pay, promos){ _src49(ch, ok, stars, best, pay, promos); const box = document.querySelector('.dlyM .sres'); if (!box || !ok) return;
+ const tape = TAPES[ch.id], te = TEASE[ch.id], task = TASKS.find(t => t.after === ch.id && !t.ok()); const rows = box.querySelector('.srows') || box;
+ if (tape) rows.insertAdjacentHTML('beforeend', `<div class="tape">📼 <i>${L2(tape[0], tape[1])}</i></div>`); if (task) rows.insertAdjacentHTML('beforeend', `<div>🧰 ${L2('مهمة جديدة: ', 'New task: ')}<b>${nm(task.t)}</b></div>`); if (te) rows.insertAdjacentHTML('beforeend', `<div class="tease">🎬 ${L2('الجاي: ', 'Next: ')}<i>${nm(te)}</i></div>`); };
+/* ---------------- legacy meter ---------------- */
+function legacy(){ const c = CR(), st = c.story || {}, done = STORY.filter(s => st[s.id]).length, g = GV(OLD), care = g.owned ? (['clean','body','engine','tyres','brakes'].reduce((a, k) => a + (g.cond[k] ?? 100), 0) / 5) : 0, tasks = TASKS.filter(t => t.ok()).length, stars = Object.values(c.storyStars || {}).reduce((a, b) => a + b, 0);
+ return Math.round(clamp(done * 6 + care * .2 + tasks * 4 + stars * .8, 0, 100)); }
+const LEG_T = [[0, ['منسي', 'Forgotten']], [20, ['فاكرينه', 'Remembered']], [45, ['محترم', 'Respected']], [70, ['أسطورة الخط', 'Legend of the line']], [92, ['إرث خالد', 'Eternal legacy']]];
+/* ---------------- story page: legacy, tapes, tasks, cinematic look ---------------- */
+const _rsp49 = renderStoryPage;
+renderStoryPage = function(){ _rsp49(); const page = $('#s-career .sjpage'); if (!page) return; page.classList.add('cine'); const hl = page.querySelector('.sjhl'), lg = legacy(), tier = LEG_T.filter(t => lg >= t[0]).pop();
+ if (hl){ hl.querySelector('h2').textContent = L2('إرث أبوك', 'Your Father\'s Legacy'); hl.querySelector('p').textContent = L2('زوبه، الخط، والناس اللي لسه فاكرينه.', 'Zouba, the line, and the people who still remember him.'); hl.insertAdjacentHTML('beforeend', `<div class="legacy"><b>${nm(tier[1])}</b><div class="lgbar"><i style="width:${lg}%"></i></div><small>${lg}/100</small></div>`); }
+ const ol = page.querySelector('.oldLady .olTxt'); if (ol){ const h3 = ol.querySelector('h3'); if (h3) h3.innerHTML = L2('زوبه', 'Zouba') + (restoreDone() ? ' ✨' : ''); const sm = ol.querySelector('small'); if (sm) sm.textContent = L2('عربية أبوك', 'YOUR FATHER\'S VAN'); const tapes = STORY.filter(s => (CR().story || {})[s.id] && TAPES[s.id]);
+  if (tapes.length) ol.insertAdjacentHTML('beforeend', ` <button class="btn sm" id="tapesB">📼 ${L2('شرايط أبوك', 'Father\'s tapes')} (${tapes.length})</button>`); const tb = $('#tapesB'); if (tb) tb.onclick = () => dialogue(tapes.map(s => L('dad', TAPES[s.id][0], TAPES[s.id][1]))); }
+ // Abdo's list
+ const open = TASKS.filter(t => CR().story && CR().story[t.after]); if (open.length){ const box = document.createElement('div'); box.className = 'tasks'; box.innerHTML = `<h4>🧰 ${L2('قايمة الأسطى عبده', 'Abdo\'s list')}</h4>${open.map(t => `<div class="tk ${t.ok() ? 'ok' : ''}"><i>${t.ok() ? '✅' : '⬜'}</i><div><b>${nm(t.t)}</b><small>${nm(t.d)}</small></div>${t.ok() ? `<em>+${money(t.r)}</em>` : `<button class="btn sm pri" data-tk="${t.id}">${L2('روح', 'Go')}</button>`}</div>`).join('')}`; const path = page.querySelector('.sjpath'); path.parentNode.insertBefore(box, path); box.querySelectorAll('[data-tk]').forEach(b => b.onclick = () => TASKS.find(t => t.id === b.dataset.tk).go());
+  open.forEach(t => { S.taskPaid = S.taskPaid || {}; if (t.ok() && !S.taskPaid[t.id]){ S.taskPaid[t.id] = 1; ledger(t.r, '🧰 ' + nm(t.t), 'cash'); save(true); toastUI('🧰 ' + nm(t.t) + ' ✓ +' + money(t.r), 'good'); } }); }
+ // lock reasons for task-gated chapters
+ page.querySelectorAll('.sjc').forEach((el, i) => { const ch = STORY[i]; if (!ch || !ch.task || ch.task.ok() || !(CR().story || {})[STORY[i - 1] && STORY[i - 1].id]) return; const sm = el.querySelector('.sjgo small'); if (sm) sm.textContent = '🧰 ' + nm(ch.task.t); }); };
+/* ---------------- story maps: only what the chapter needs ---------------- */
+const _sc49 = setupChapter;
+setupChapter = function(ch){ _sc49(ch); const S2 = STORYRUN; if (!S2 || !G.car) return; const idx = STORY.findIndex(s => s.id === ch.id), md = ch.mode || {};
+ const keepPoi = p => (md.express === 'abdo' && p.type === 'shop') || (md.lowfuel && p.type === 'fuel');
+ if (idx <= 3 || md.express){ W.poi = (W.poi || []).filter(keepPoi); W.cps = []; W.rests = []; if (md.express) W.radars = []; }
+ if (typeof buildTrack === 'function') buildTrack(); cineOn(ch); };
+/* ---------------- cinematic look in story ---------------- */
+const MOOD = {s1:'sepia(.28) contrast(1.08) saturate(.8) brightness(.97)', s2:'sepia(.12) contrast(1.06) saturate(.95)', s3:'contrast(1.12) saturate(1.05)', s4:'contrast(1.1) saturate(1.1)', s5:'contrast(1.12) saturate(.85) hue-rotate(-8deg)', s6:'sepia(.18) contrast(1.08) saturate(.9)', s7:'contrast(1.05) saturate(1.02)', s8:'sepia(.35) contrast(1.06) saturate(.75)', s9:'sepia(.15) contrast(1.05) saturate(1.1) brightness(1.03)', s10:'sepia(.22) contrast(1.06) saturate(1.05) brightness(1.02)'};
+function cineOn(ch){ let c = $('#cine'); if (!c){ c = document.createElement('div'); c.id = 'cine'; c.innerHTML = '<i class="ct"></i><i class="cb"></i><i class="cv"></i><i class="cg"></i><i class="cm"></i>'; document.body.appendChild(c); } c.classList.add('on'); if (!(typeof PERF !== 'undefined' && PERF.low)) $('#game').style.filter = MOOD[ch.id] || 'contrast(1.06)'; }
+function cineOff(){ const c = $('#cine'); if (c) c.classList.remove('on'); $('#game').style.filter = ''; }
+function cineMood(col, a){ const m = $('#cine .cm'); if (!m) return; m.style.background = `radial-gradient(ellipse at center, transparent 40%, ${col} 100%)`; m.style.opacity = a; }
+const _end49 = endRun; endRun = function(r){ const was = !!STORYRUN; _end49(r); if (was) cineOff(); };
+const _st49 = storyTick;
+storyTick = function(dt){ _st49(dt); const S2 = STORYRUN; if (!S2 || G.mode !== 'play') return; const lab = S2.labour; if (lab != null) cineMood(`rgba(255,40,70,${.25 + .35 * clamp((lab - 50) / 50, 0, 1)})`, lab > 50 ? .5 + .4 * Math.sin(performance.now() / (lab > 80 ? 160 : 400)) : 0);
+ else if (G.T.hits > (S2.h2 || 0)){ S2.h2 = G.T.hits; cineMood('rgba(255,60,40,.55)', 1); setTimeout(() => cineMood('rgba(0,0,0,0)', 0), 500); }
+ const b = S2.ch.beats[S2.beat - 1]; if (b && b[1].some(l => l.who === 'dad') && S2.lastDad !== S2.beat){ S2.lastDad = S2.beat; cineMood('rgba(232,194,122,.45)', 1); setTimeout(() => cineMood('rgba(0,0,0,0)', 0), 4500); } };
+if (typeof toMenu === 'function'){ const _tm49 = toMenu; toMenu = function(...a){ cineOff(); return _tm49.apply(this, a); }; }
+/* ---------------- free roam unlocks after half the story ---------------- */
+const storyPct = () => STORY.filter(s => (CR().story || {})[s.id]).length / STORY.length;
+const freeLocked = () => storyPct() < .5 && !(typeof isDev === 'function' && isDev());
+const _rr49 = renderRoutes;
+renderRoutes = function(){ _rr49(); const host = $('#s-routes'); if (!host) return; host.classList.toggle('rlock', freeLocked()); const n = host.querySelector('.rlockNote'); if (n) n.remove();
+ if (freeLocked()){ const done = STORY.filter(s => (CR().story || {})[s.id]).length; const note = document.createElement('div'); note.className = 'rlockNote'; note.innerHTML = `🔒 ${L2('القيادة الحرة بتفتح لما تخلص نص القصة', 'Free driving unlocks when you finish half the story')} <b>${fmt(done)}/${fmt(Math.ceil(STORY.length / 2))}</b>`; const cta = host.querySelector('.ctaStory'); (cta ? cta.after(note) : host.prepend(note)); } };
+const _play49 = play;
+play = function(route, opt){ if (freeLocked() && !(opt && (opt.test || opt.career)) && !STORYRUN && !(opt && opt.vid === OLD && STORY.some(s => s.vid === OLD && s.route === route.id))){ toastUI('🔒 ' + L2('كمّل القصة الأول — القيادة الحرة بتفتح بعد نصها', 'Continue the story first — free driving opens halfway through'), 'gold'); CTAB = 'story'; show('career'); return; } return _play49(route, opt); };
+/* ---------------- police checkpoints: random, sensible spots ---------------- */
+const _sr49 = startRoute;
+startRoute = function(r, o){ _sr49(r, o); if (!W.cps || !W.cps.length || STORYRUN) return; const L0 = W.len, ok = x => { if (x < L0 * .12 || x > L0 * .9) return false; if (W.stops.some(s => Math.abs(s.x - x) < 55)) return false; if ((W.lights || []).some(l => Math.abs(l.x - x) < 70)) return false; if ((W.poi || []).some(p => Math.abs(p.x - x) < 45)) return false; if ((W.radars || []).some(p => Math.abs(p.x - x) < 40)) return false; if (Math.abs(terrH(x + 14) - terrH(x - 20)) > .7) return false; if ((W.holes || []).some(h => Math.abs(h.x - x) < 25)) return false; return true; };
+ const placed = []; for (const c of W.cps){ let x = null; for (let k = 0; k < 60 && x == null; k++){ const cand = L0 * (.15 + Math.random() * .72); if (ok(cand) && placed.every(p => Math.abs(p - cand) > 220)) x = Math.round(cand); } if (x != null){ c.x = x; placed.push(x); } }
+ W.props = (W.props || []).filter(p => !W.cps.some(c => p.x > c.x - 6 && p.x < c.x + 17)); if (typeof buildTrack === 'function') buildTrack(); };
+/* the parked patrol car: on the pavement at kerb level, wheels on the ground, real light-bar strobes */
+drawKerbProps = function(){ G._kp = G.time; const [x0, x1] = viewX();
+ for (const p of W.props){ if (!p.front || p.x < x0 - 6 || p.x > x1 + 6) continue; const base = terrH(p.x) + 1.52, hM = (PROP_H[p.k] || 1) * .9, im = IMG[p.k]; if (G.tod !== 'night') castShadow(im, sx(p.x) - im.width / im.height * hM * PPM / 2, sy(base), im.width / im.height * hM * PPM, hM * PPM, .3); drawSprite(p.k, p.x, base, hM); }
+ const night = G.tod === 'night' ? 1 : G.tod === 'sunset' ? .7 : .45, t = G.time;
+ for (const c of W.cps){ if (c.x < x0 - 25 || c.x > x1 + 25) continue; const im = IMG.ai22, M = META.ai22, L = 4.9, s = L * PPM / im.width, w = im.width * s, h = im.height * s, cx = c.x + 10, base = terrH(cx) + 1.52, X = sx(cx), wb = Math.max(...M.wheels.map(q => q[1] + q[2])), Y = sy(base) - (wb - im.height) * s;
+  ctx.save(); ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.beginPath(); ctx.ellipse(X, sy(base) + 1, w * .45, PPM * .12, 0, 0, 7); ctx.fill(); ctx.restore(); ctx.drawImage(im, X - w / 2, Y - h, w, h);
+  // light bar strobes: double-flash red/blue, spill on the car, road and wall
+  const ph = (t * 2.2) % 1, red = ph < .5 && (ph % .25) < .12, blue = ph >= .5 && (ph % .25) < .12, lx = X - w * .05, ly = Y - h * .97;
+  ctx.save(); ctx.globalCompositeOperation = 'lighter'; for (const [on, col, dx] of [[red, '255,40,50', -w * .08], [blue, '50,120,255', w * .08]]){ if (!on) continue; let g = ctx.createRadialGradient(lx + dx, ly, 0, lx + dx, ly, PPM * 2.4); g.addColorStop(0, `rgba(${col},${.95 * night + .3})`); g.addColorStop(.25, `rgba(${col},${.35 * night})`); g.addColorStop(1, `rgba(${col},0)`); ctx.fillStyle = g; ctx.fillRect(lx + dx - PPM * 2.4, ly - PPM * 2.4, PPM * 4.8, PPM * 4.8);
+   g = ctx.createRadialGradient(X + dx * 4, sy(base) - PPM * 2, 0, X + dx * 4, sy(base) - PPM * 2, PPM * 7); g.addColorStop(0, `rgba(${col},${.22 * night})`); g.addColorStop(1, `rgba(${col},0)`); ctx.fillStyle = g; ctx.fillRect(X - PPM * 9, sy(base) - PPM * 9, PPM * 18, PPM * 10);
+   ctx.save(); ctx.translate(X, sy(terrH(c.x)) + 2); ctx.scale(1, .18); g = ctx.createRadialGradient(0, 0, 0, 0, 0, PPM * 6); g.addColorStop(0, `rgba(${col},${.3 * night})`); g.addColorStop(1, `rgba(${col},0)`); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, PPM * 6, 0, 7); ctx.fill(); ctx.restore(); } ctx.restore();
+  // traffic cones guiding into the stop bay
+  for (let i = 0; i < 4; i++){ const cx2 = c.x - 22 + i * 3.2, by = sy(terrH(cx2) + 1.32), cs = PPM * .42; ctx.fillStyle = '#ff6a10'; ctx.beginPath(); ctx.moveTo(sx(cx2), by - cs); ctx.lineTo(sx(cx2) + cs * .32, by); ctx.lineTo(sx(cx2) - cs * .32, by); ctx.closePath(); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillRect(sx(cx2) - cs * .15, by - cs * .55, cs * .3, cs * .12); }
+  const lx2 = c.x - 4; ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.beginPath(); ctx.moveTo(sx(lx2), sy(terrH(lx2) + 1.4)); ctx.lineTo(sx(lx2 + .35), sy(terrH(lx2 + .35) + 1.4)); ctx.lineTo(sx(lx2 + .35), sy(terrH(lx2 + .35) - .2)); ctx.lineTo(sx(lx2), sy(terrH(lx2) - .2)); ctx.fill(); } };
+const _dw49 = drawWorld; drawWorld = function(){ _dw49(); if (G._kp !== G.time && G.mode === 'play') drawKerbProps(); };
+/* ---------------- interactive repairs everywhere ---------------- */
+const FIXGAME = {clean:'wash', body:'dents', engine:'parts', tyres:'wheels', brakes:'wheels'};
+document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('#s-garage [data-fix]'); if (!b || b.dataset.mg === '1') return; const k = b.dataset.fix, gm = FIXGAME[k]; if (!gm) return; const V = VBY(GV_ID), g = GV(GV_ID), cost = repairCost(V, k, g); if (cost <= 0 || S.money < cost) return;
+ e.stopImmediatePropagation(); e.preventDefault(); mgSteps = [{wash:'🧽', dents:'🔨', parts:'🔧', wheels:'🛞'}[gm]]; mgIdx = 0; const fin = () => { b.dataset.mg = '1'; b.click(); };
+ if (gm === 'wash') gameWash(GV_ID, fin); if (gm === 'dents') gameDents(GV_ID, fin); if (gm === 'parts') gameParts(GV_ID, fin); if (gm === 'wheels') gameWheels(GV_ID, fin); }, true);
+const _svc49 = svcOptions;
+svcOptions = function(type){ const o = _svc49(type); if (G.test) return o; for (const it of o){ const en = (it.n && it.n[1]) || ''; const f0 = it.fx; if (/Car wash/i.test(en)) it.fx = () => { mgSteps = ['🧽']; mgIdx = 0; gameWash(G.vid, () => { f0(); }); }; if (/Full bodywork/i.test(en)) it.fx = () => { mgSteps = ['🔨']; mgIdx = 0; gameDents(G.vid, () => { f0(); }); }; } return o; };
+/* ---------------- daily streak: keep its own save slot (don't overwrite daily tasks) ---------------- */
+dailyCheck = function(){ if (S.daily && S.daily.claimed && !S.daily.day){ S.dstreak = {last:S.daily.last, streak:S.daily.streak, claimed:S.daily.claimed}; delete S.daily; } const D = S.dstreak = S.dstreak || {last:'', streak:0, claimed:''}, d = today(); if (D.claimed === d) return; const y = new Date(Date.now() - 864e5).toISOString().slice(0, 10); D.streak = D.last === y ? D.streak + 1 : 1; D.last = d; D.claimed = d; const day = ((D.streak - 1) % 7) + 1, prize = [150, 200, 300, 400, 500, 700, 1500][day - 1]; ledger(prize, L2('جايزة يومية', 'Daily reward'), 'cash'); save(true);
+ const m = document.createElement('div'); m.className = 'dlyM on'; m.innerHTML = `<div class="dly"><div class="dlyt">🔥 ${L2('سلسلة الأيام', 'Daily streak')} · ${fmt(D.streak)}</div><div class="dlyd">${[1,2,3,4,5,6,7].map(i => `<div class="${i < day ? 'got' : i === day ? 'now' : ''}"><b>${i === 7 ? '🎁' : '💰'}</b><span>${L2('يوم', 'Day')} ${fmt(i)}</span><em>${money([150,200,300,400,500,700,1500][i - 1])}</em></div>`).join('')}</div><p>${L2('زوبه مستنياك… ارجع بكرة.', 'Zouba is waiting… come back tomorrow.')}</p><button class="btn pri">${L2('استلم', 'Claim')} +${money(prize)}</button></div>`; document.body.appendChild(m); m.querySelector('button').onclick = () => m.remove(); };
+{ const st = document.createElement('style'); st.textContent = `
+#cine{position:fixed;inset:0;z-index:2;pointer-events:none;opacity:0;transition:opacity 1.2s}#cine.on{opacity:1}
+#cine .ct,#cine .cb{position:absolute;left:0;right:0;height:3.2vh;background:linear-gradient(#000,#000c)}#cine .ct{top:0}#cine .cb{bottom:0}
+#cine .cv{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 55%,transparent 55%,rgba(0,0,0,.55) 100%)}
+#cine .cg{position:absolute;inset:-50%;opacity:.07;background-image:repeating-radial-gradient(circle at 17% 32%,#fff 0 1px,transparent 1px 3px),repeating-radial-gradient(circle at 73% 61%,#000 0 1px,transparent 1px 4px);animation:grain 1.2s steps(6) infinite}@keyframes grain{0%{transform:translate(0,0)}25%{transform:translate(-3%,2%)}50%{transform:translate(2%,-3%)}75%{transform:translate(-2%,-1%)}100%{transform:translate(1%,3%)}}
+#cine .cm{position:absolute;inset:0;opacity:0;transition:opacity .6s,background .6s}
+.sjpage.cine{position:relative}.sjpage.cine:before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;background:radial-gradient(ellipse at 50% 30%,transparent 50%,rgba(0,0,0,.5)),linear-gradient(100deg,transparent 30%,rgba(255,220,150,.05) 45%,transparent 60%);background-size:100% 100%,250% 100%;animation:sweep 9s linear infinite}@keyframes sweep{from{background-position:0 0,120% 0}to{background-position:0 0,-120% 0}}
+.legacy{margin-top:.6rem;display:flex;align-items:center;gap:.6rem}.legacy b{color:#e8c27a;min-width:7rem}.lgbar{flex:1;height:.55rem;border-radius:1rem;background:rgba(255,255,255,.1);overflow:hidden}.lgbar i{display:block;height:100%;background:linear-gradient(90deg,#8a5a1c,#e8c27a,#fff2c9);box-shadow:0 0 1rem #e8c27a}.legacy small{color:var(--mut)}
+.tasks{border-radius:1.1rem;padding:.8rem 1rem;margin-bottom:1rem;background:linear-gradient(120deg,#1a2335,#1f1a10);border:1px solid rgba(232,194,122,.35)}.tasks h4{margin:0 0 .5rem;color:#e8c27a}.tk{display:flex;align-items:center;gap:.7rem;padding:.45rem 0;border-top:1px solid rgba(255,255,255,.06)}.tk>div{flex:1;display:flex;flex-direction:column}.tk small{color:var(--mut)}.tk em{font-style:normal;color:#3ddc84}.tk.ok b{text-decoration:line-through;opacity:.7}
+.tape{font-style:italic;color:#e8c27a!important;background:rgba(232,194,122,.08)!important}.tease{color:#c9d4e5!important}
+#s-routes.rlock .card,#s-routes.rlock .tabs,#s-routes.rlock .rgrid,#s-routes.rlock [data-r]{filter:grayscale(.85) brightness(.5);pointer-events:none}
+.rlockNote{margin:0 0 .8rem;padding:.7rem 1rem;border-radius:.9rem;background:rgba(10,14,24,.85);border:1px dashed rgba(245,178,27,.6);color:#ffe08a;font-weight:700;text-align:center}`; document.head.appendChild(st); }
 
 /* ======================= atlas-loader.js ======================= */
 /* =====================================================================
