@@ -5924,4 +5924,50 @@ update = function(dt){ _upd53(dt); if (G.mode !== 'play' || !G.car || G.paused |
   for (const h of W.holes){ if ((px - h) * (w.x - h) <= 0 && px !== w.x){ bodyKick(car, w, -clamp(.25 + sp * .05, .25, 1.1)); w.hole53 = .12; if (car === G.car) cam.shake = Math.max(cam.shake || 0, clamp(sp * .01, .03, .18)); } }
   if (w.hole53 > 0){ w.hole53 -= dt; if (w.hole53 <= 0) bodyKick(car, w, clamp(.3 + sp * .06, .3, 1.3)); } } };
 </script>
+<script>
+"use strict";
+/* =====================================================================
+   OGRAAA v54
+   · Suspension absorbs the road: small bumps move the WHEELS (each with
+     its own fast spring), the body barely notices; only speed bumps,
+     potholes, braking and acceleration move the body
+   · Windows: cells come from the real glass mask (passenger panes) plus
+     the driver's door glass; all window effects are clipped to glass
+     pixels only — never over pillars, frames or bodywork
+   ===================================================================== */
+/* ---------------- wheel-level suspension ---------------- */
+function wheelKick(w, v){ w.sv = (w.sv || 0) + v; }
+bodyKick = (function(prev){ return function(c, w, v){ wheelKick(w, v * 2.2); if (Math.abs(v) > .5) prev(c, w, v * .45); }; })(bodyKick);
+const _upd54 = update;
+update = function(dt){ _upd54(dt); if (G.mode !== 'play' || !G.car || dt <= 0) return; const car = G.car, k = Math.pow(2 * Math.PI * 7.5, 2), cdmp = 2 * .32 * Math.sqrt(k);
+ for (const w of car.wh){ let sd = w.sd || 0, sv = w.sv || 0; const steps = 3, h = Math.min(dt, .05) / steps; for (let i = 0; i < steps; i++){ const a = -k * sd - cdmp * sv; sv += a * h; sd += sv * h; } if (sd > .1){ sd = .1; sv = Math.min(sv, 0); } if (sd < -.04){ sd = -.04; sv = Math.max(sv, 0); } w.sd = sd; w.sv = sv; } };
+/* draw the wheel lifted by its own spring travel (wheel-well vehicles) */
+drawVehicle = (function(prev){ return function(car, opt){ const M = META[car.spr]; if (!M || !M.wf || !car.player) return prev(car, opt); const keep = car.wh.map(w => w.y); car.wh.forEach(w => { w.y += (w.sd || 0); }); try{ prev(car, opt); } finally { car.wh.forEach((w, i) => { w.y = keep[i]; }); } }; })(drawVehicle);
+/* ---------------- windows from the real glass ---------------- */
+const WC2 = {}, GM2 = {};
+function winCells2(V){ if (WC2[V.id]) return WC2[V.id]; const K = cabinMask(V), w = K.w, h = K.h, d = K.c.getContext('2d').getImageData(0, 0, w, h).data, cells = []; let x0 = -1, gap = 0;
+ const colSpan = x => { let t = -1, b = -1; for (let y = 0; y < h; y++) if (d[(y * w + x) * 4 + 3] > 100){ if (t < 0) t = y; b = y; } return [t, b]; };
+ for (let x = 0; x <= w; x++){ const [t] = x < w ? colSpan(x) : [-1]; if (t >= 0){ if (x0 < 0) x0 = x; gap = 0; } else if (x0 >= 0 && ++gap > 2){ const x1 = x - gap; if (x1 - x0 > w * .03){ const ts = [], bs = []; for (let q = x0; q <= x1; q++){ const [tt, bb] = colSpan(q); if (tt >= 0){ ts.push(tt); bs.push(bb); } } ts.sort((a, b) => a - b); bs.sort((a, b) => a - b); cells.push({x0, x1, t:ts[ts.length >> 1], b:bs[bs.length >> 1], kind:'pax'}); } x0 = -1; gap = 0; } }
+ // driver's door glass: front glass pixels behind the windscreen slope
+ try{ const F = frontGlassMask(V), fd = F.getContext('2d').getImageData(0, 0, w, h).data, G2 = bodyGeo(V); let fx0 = w, fx1 = 0, ft = h, fb = 0; const xa = Math.round((DRV[V.id] || .8) * w * .97), xb = Math.min(w - 1, xa + Math.round(w * .12));
+  for (let x = xa; x < xb; x++){ let n = 0; for (let y = Math.round(G2.winTop); y <= G2.winBot; y++) if (fd[(y * w + x) * 4 + 3] > 100){ n++; ft = Math.min(ft, y); fb = Math.max(fb, y); } if (n > (G2.winBot - G2.winTop) * .5){ fx0 = Math.min(fx0, x); fx1 = Math.max(fx1, x); } }
+  if (fx1 - fx0 > w * .03) cells.push({x0:fx0, x1:fx1, t:ft, b:fb, kind:'drv'}); }catch(e){}
+ return WC2[V.id] = cells; }
+function glassMask2(V){ if (GM2[V.id]) return GM2[V.id]; const K = cabinMask(V), c = document.createElement('canvas'); c.width = K.w; c.height = K.h; const x = c.getContext('2d'); x.drawImage(K.c, 0, 0); try{ const F = frontGlassMask(V); const cells = winCells2(V).filter(q => q.kind === 'drv'); for (const q of cells){ x.save(); x.beginPath(); x.rect(q.x0, q.t, q.x1 - q.x0 + 1, q.b - q.t + 1); x.clip(); x.drawImage(F, 0, 0); x.restore(); } }catch(e){} return GM2[V.id] = c; }
+winCells = winCells2; for (const k in WCELL) delete WCELL[k];
+/* effects drawn into a layer, then trimmed to glass pixels only */
+drawGlass = function(car, opt){ const cells = winCells2(G.V); if (!cells.length) return; const src = car.cv || IMG[car.spr], k = PPM * car.g.s, cos = G.test ? {} : GV(G.vid).cos, TA = (COS.tint.find(q => q.id === cos.tint) || {a:0}).a, mask = glassMask2(G.V), w = mask.width, h = mask.height;
+ let raw = null; try{ const cc = cabinCanvas(G.V, cos, paxView()); raw = cc._raw || null; }catch(e){}
+ const L = drawGlass.L || (drawGlass.L = document.createElement('canvas')); if (L.width !== w || L.height !== h){ L.width = w; L.height = h; } const x = L.getContext('2d'); x.clearRect(0, 0, w, h); const t = performance.now() / 1000;
+ cells.forEach((c2, i) => { const o = WIN.open[i] || 0, H = c2.b - c2.t, W2 = c2.x1 - c2.x0 + 1, edge = c2.t + H * o;
+  if (o > .01){ x.save(); x.beginPath(); x.rect(c2.x0, c2.t, W2, edge - c2.t); x.clip(); if (raw) x.drawImage(raw, 0, 0); else { x.fillStyle = 'rgba(0,0,0,.05)'; x.fillRect(c2.x0, c2.t, W2, edge - c2.t); } const sh = x.createLinearGradient(0, c2.t, 0, c2.t + H * .2); sh.addColorStop(0, 'rgba(0,0,0,.5)'); sh.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = sh; x.fillRect(c2.x0, c2.t, W2, H * .2); x.restore(); }
+  x.save(); x.beginPath(); x.rect(c2.x0, edge, W2, c2.b - edge + 1); x.clip(); const tg = x.createLinearGradient(0, edge, 0, c2.b); tg.addColorStop(0, `rgba(150,185,215,${.2 + TA * .05})`); tg.addColorStop(1, `rgba(25,40,58,${.18 + TA * .05})`); x.fillStyle = tg; x.fillRect(c2.x0, edge, W2, c2.b - edge + 1);
+  const s0 = c2.x0 + W2 * ((.15 + i * .23 + t * .015) % 1), rg = x.createLinearGradient(s0, edge, s0 + H * .5, c2.b); rg.addColorStop(0, 'rgba(255,255,255,0)'); rg.addColorStop(.5, 'rgba(255,255,255,.26)'); rg.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = rg; x.fillRect(c2.x0, edge, W2, c2.b - edge + 1);
+  if (o > .01){ const eg = x.createLinearGradient(0, edge - 1, 0, edge + 2.5); eg.addColorStop(0, 'rgba(255,255,255,.95)'); eg.addColorStop(.5, 'rgba(200,220,235,.6)'); eg.addColorStop(1, 'rgba(60,70,80,.3)'); x.fillStyle = eg; x.fillRect(c2.x0, edge - 1, W2, 3.2); } x.restore(); });
+ x.globalCompositeOperation = 'destination-in'; x.drawImage(mask, 0, 0); x.globalCompositeOperation = 'source-over';
+ ctx.save(); ctx.translate(sx(car.x), sy(car.y + (opt && opt.lift || 0))); ctx.rotate(-car.a); ctx.scale(car.mirror ? -k : k, k); ctx.translate(-src.width / 2, -src.height / 2); ctx.drawImage(L, 0, 0); ctx.restore(); };
+/* window switch names follow the real panes: driver first, then passenger windows front→back */
+const _wp54 = winPanel;
+winPanel = function(){ const p = _wp54(); const cells = G.V ? winCells2(G.V) : []; p.querySelectorAll('.wsr').forEach(r => { const i = +r.dataset.w, c2 = cells[i]; if (!c2) return; const pax = cells.filter(q => q.kind === 'pax'), n = pax.length - pax.indexOf(c2); r.querySelector('span').textContent = c2.kind === 'drv' ? L2('السواق', 'Driver') : n === pax.length ? L2('ورا', 'Rear') : L2('شباك', 'Window') + ' ' + n; }); return p; };
+</script>
 </body></html>
