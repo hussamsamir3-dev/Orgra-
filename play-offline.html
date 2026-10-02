@@ -5469,4 +5469,24 @@ Object.assign(TX, {
  ambOk:['الإسعاف عدّت!', 'Ambulance passed!'],
  sideStop:['راكب: "المحطة الجايه يا أسطى!"', 'Passenger: "Drop next stop please, driver!"']});
 </script>
+<script>
+"use strict";
+/* =====================================================================
+   OGRAAA v47 — story destinations are real places: Chapter 1 ends at
+   Usta Abdo's actual workshop building (not at a bus stop), the
+   hospital run ends at the hospital building; bus stops along the way
+   are just bus stops.
+   ===================================================================== */
+const _sc47 = setupChapter;
+setupChapter = function(ch){ const md = ch.mode || {}; const saveStops = md.stops; if (md.express === 'abdo') md.stops = 0; _sc47(ch); md.stops = saveStops; const S2 = STORYRUN; if (!S2 || !G.car || !md.express) return;
+ const car = G.car, ahead = x => x > car.x + 180; let place = null, label = null;
+ if (md.express === 'abdo'){ const shops = (W.poi || []).filter(p => p.type === 'shop' && ahead(p.x)).sort((a, b) => a.x - b.x); if (shops.length) place = shops[0].x + 1; label = DESTS.abdo; }
+ if (md.express === 'hospital'){ const h = (W.deco || []).filter(d => /Hosp/i.test(d.k) && ahead(d.x)).sort((a, b) => a.x - b.x); if (h.length) place = h[0].x + 1; label = DESTS.hospital; }
+ if (place != null){ const first = W.stops[0], dest = {x:place, name:label, i:1, waiting:[], served:false, dest:true}; W.stops = [Object.assign(first, {served:true, waiting:[]}), dest]; G.nextIdx = 1; G.onboard.forEach(p => p.dest = 1); if (typeof refreshTrack === 'function') refreshTrack(); }
+ else { const last = W.stops[W.stops.length - 1]; last.dest = true; } };
+/* the destination is drawn as a destination, not as a bus stop */
+const _dw47 = drawWorld;
+drawWorld = function(){ _dw47(); const S2 = STORYRUN; if (!S2 || !S2.express) return; const st = W.stops[W.stops.length - 1]; if (!st) return; const X = sx(st.x), Y = sy(terrH(st.x) + 1.6); if (X < -200 || X > VW + 200) return; const t = performance.now() / 1000;
+ ctx.save(); ctx.fillStyle = 'rgba(245,178,27,.25)'; ctx.fillRect(X - PPM * 1.5, sy(terrH(st.x)) - 2, PPM * 3, 4); ctx.restore(); };
+</script>
 </body></html>

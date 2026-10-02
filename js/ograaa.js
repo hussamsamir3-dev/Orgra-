@@ -5144,6 +5144,26 @@ Object.assign(TX, {
  ambOk:['الإسعاف عدّت!', 'Ambulance passed!'],
  sideStop:['راكب: "المحطة الجايه يا أسطى!"', 'Passenger: "Drop next stop please, driver!"']});
 
+/* ======================= story-places.js ======================= */
+"use strict";
+/* =====================================================================
+   OGRAAA v47 — story destinations are real places: Chapter 1 ends at
+   Usta Abdo's actual workshop building (not at a bus stop), the
+   hospital run ends at the hospital building; bus stops along the way
+   are just bus stops.
+   ===================================================================== */
+const _sc47 = setupChapter;
+setupChapter = function(ch){ const md = ch.mode || {}; const saveStops = md.stops; if (md.express === 'abdo') md.stops = 0; _sc47(ch); md.stops = saveStops; const S2 = STORYRUN; if (!S2 || !G.car || !md.express) return;
+ const car = G.car, ahead = x => x > car.x + 180; let place = null, label = null;
+ if (md.express === 'abdo'){ const shops = (W.poi || []).filter(p => p.type === 'shop' && ahead(p.x)).sort((a, b) => a.x - b.x); if (shops.length) place = shops[0].x + 1; label = DESTS.abdo; }
+ if (md.express === 'hospital'){ const h = (W.deco || []).filter(d => /Hosp/i.test(d.k) && ahead(d.x)).sort((a, b) => a.x - b.x); if (h.length) place = h[0].x + 1; label = DESTS.hospital; }
+ if (place != null){ const first = W.stops[0], dest = {x:place, name:label, i:1, waiting:[], served:false, dest:true}; W.stops = [Object.assign(first, {served:true, waiting:[]}), dest]; G.nextIdx = 1; G.onboard.forEach(p => p.dest = 1); if (typeof refreshTrack === 'function') refreshTrack(); }
+ else { const last = W.stops[W.stops.length - 1]; last.dest = true; } };
+/* the destination is drawn as a destination, not as a bus stop */
+const _dw47 = drawWorld;
+drawWorld = function(){ _dw47(); const S2 = STORYRUN; if (!S2 || !S2.express) return; const st = W.stops[W.stops.length - 1]; if (!st) return; const X = sx(st.x), Y = sy(terrH(st.x) + 1.6); if (X < -200 || X > VW + 200) return; const t = performance.now() / 1000;
+ ctx.save(); ctx.fillStyle = 'rgba(245,178,27,.25)'; ctx.fillRect(X - PPM * 1.5, sy(terrH(st.x)) - 2, PPM * 3, 4); ctx.restore(); };
+
 /* ======================= atlas-loader.js ======================= */
 /* =====================================================================
    Ograaa — atlas loader: loads a handful of texture atlases and one audio
@@ -5154,7 +5174,7 @@ Object.assign(TX, {
  const urls = {};
  for (const k in MANIFEST.files){ MANIFEST.files[k] = new URL(MANIFEST.files[k], document.baseURI).href; ASSETS[k] = MANIFEST.files[k]; }
  for (const a of MANIFEST.atlas) for (const k in a.f) Object.defineProperty(ASSETS, k, {enumerable:true, configurable:true, get(){ if (urls[k]) return urls[k]; const c = IMG[k]; if (!c || !c.width) return ''; try{ return urls[k] = c.toDataURL('image/webp', .92); }catch(e){ return ''; } }});
- loadImages = function(cb){ const files = Object.keys(MANIFEST.files).filter(k => k !== 'music'), total = MANIFEST.atlas.length + files.length; let n = 0; const tick = () => { n++; const b = $('#ldBar'); if (b) b.style.width = (n / total * 100) + '%'; if (n === total) cb(); };
+ loadImages = function(cb){ const files = Object.keys(MANIFEST.files).filter(k => k !== 'music'), total = MANIFEST.atlas.length + files.length; let n = 0; const tick = () => { n++; const b = $('#ldBar'); if (b) b.style.width = (n / total * 100) + '%'; if (n === total){ window.__ogLoaded = true; cb(); } };
   files.forEach(k => { const im = new Image(); im.onload = im.onerror = tick; im.src = MANIFEST.files[k] + (MANIFEST.v ? '?v=' + MANIFEST.v : ''); IMG[k] = im; });
   MANIFEST.atlas.forEach(a => { const im = new Image(); im.onload = () => { for (const k in a.f){ const [x, y, w, h] = a.f[k], c = document.createElement('canvas'); c.width = w; c.height = h; c.getContext('2d').drawImage(im, x, y, w, h, 0, 0, w, h); IMG[k] = c; } tick(); }; im.onerror = tick; im.src = a.src + (MANIFEST.v ? '?v=' + MANIFEST.v : ''); }); };
  SND.load = function(){ if (this.loading || !AU.ctx) return; this.loading = true; const x = new XMLHttpRequest(); x.open('GET', MANIFEST.sfx.src + (MANIFEST.v ? '?v=' + MANIFEST.v : '')); x.responseType = 'arraybuffer';
