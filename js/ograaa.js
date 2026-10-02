@@ -4703,6 +4703,80 @@ renderCareer = function(){ const want = CTAB; if (want === 'story') CTAB = 'jour
 .schap.open{border-color:rgba(245,178,27,.7);box-shadow:0 0 1.4rem rgba(245,178,27,.15)}.schap.done{border-color:rgba(124,252,154,.5)}.schap.lock{opacity:.55;filter:grayscale(.4)}
 .snum{font:900 2rem Lalezar,serif;color:var(--gold);width:2.4rem;text-align:center}.sbody{flex:1;display:flex;flex-direction:column;gap:.15rem}.sbody b{font-size:.98rem}.sbody span{font-size:.8rem;color:var(--mut)}.sbody small{font-size:.75rem;color:var(--gold2)}`; document.head.appendChild(st); }
 
+/* ======================= cluster.js ======================= */
+"use strict";
+/* =====================================================================
+   OGRAAA v40 — new instrument cluster
+   calibrated needles (speedo 0–160, tach 0–6000, fuel E–F, temp C–H),
+   one organised LCD: tell-tales · gear · digital speed · trip/range ·
+   cruise · speed-limit roundel. Nothing drawn outside its own zone.
+   ===================================================================== */
+const DASH = {
+ spd:{px:328, py:342, a0:207.7, a1:-24, max:160, L:188},
+ tach:{px:1100, py:346, a0:205, a1:-26.7, max:6, L:188},
+ lcd:{x:574, y:178, w:283, h:267},
+ fuel:{px:163, py:208, a0:128, a1:44, L:104},
+ temp:{px:158, py:208, a0:139, a1:43, L:104}};
+function fitCanvas(el, imW, imH){ const W2 = el.clientWidth, H2 = el.clientHeight; if (!W2 || !H2) return null; const d = Math.min(2, window.devicePixelRatio || 1) * (typeof PERF !== 'undefined' && PERF.low ? .75 : 1); if (el.width !== Math.round(W2 * d) || el.height !== Math.round(H2 * d)){ el.width = Math.round(W2 * d); el.height = Math.round(H2 * d); }
+ const x = el.getContext('2d'); x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, el.width, el.height); const s = Math.min(el.width / imW, el.height / imH), ox = (el.width - imW * s) / 2, oy = el.height - imH * s; x.setTransform(s, 0, 0, s, ox, oy); return x; }
+function needle(x, px, py, ang, L, lit){ const r = ang * Math.PI / 180, dx = Math.cos(r), dy = -Math.sin(r);
+ x.save(); x.lineCap = 'round'; x.shadowColor = 'rgba(255,90,40,.85)'; x.shadowBlur = lit ? 14 : 8;
+ const g = x.createLinearGradient(px - dx * L * .18, py - dy * L * .18, px + dx * L, py + dy * L); g.addColorStop(0, '#7a1406'); g.addColorStop(.25, '#ff4a1c'); g.addColorStop(1, '#ffb36b');
+ x.strokeStyle = g; x.lineWidth = L * .05; x.beginPath(); x.moveTo(px - dx * L * .18, py - dy * L * .18); x.lineTo(px + dx * L * .82, py + dy * L * .82); x.stroke();
+ x.lineWidth = L * .028; x.beginPath(); x.moveTo(px + dx * L * .8, py + dy * L * .8); x.lineTo(px + dx * L, py + dy * L); x.stroke(); x.restore();
+ // centre cap over the needle (matches the knob in the artwork)
+ const cg = x.createRadialGradient(px - L * .05, py - L * .06, L * .02, px, py, L * .2); cg.addColorStop(0, '#4a4d52'); cg.addColorStop(.6, '#16181b'); cg.addColorStop(1, '#050506'); x.fillStyle = cg; x.beginPath(); x.arc(px, py, L * .19, 0, 7); x.fill(); x.strokeStyle = 'rgba(255,255,255,.12)'; x.lineWidth = 2; x.stroke(); }
+const ang = (G2, v) => G2.a0 + (G2.a1 - G2.a0) * clamp(v, 0, 1);
+const NEED = {spd:0, rpm:0, fuel:0, temp:0};
+function lamp(x, cx, cy, s, col, draw){ x.save(); x.translate(cx, cy); x.shadowColor = col; x.shadowBlur = 10; x.strokeStyle = x.fillStyle = col; x.lineWidth = s * .12; x.lineCap = x.lineJoin = 'round'; draw(x, s); x.restore(); }
+const LAMPS2 = {
+ abs:(x, s) => { x.beginPath(); x.arc(0, 0, s * .42, 0, 7); x.stroke(); x.font = `800 ${s * .34}px "Readex Pro",sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('ABS', 0, s * .02); },
+ tc:(x, s) => { x.font = `800 ${s * .38}px "Readex Pro",sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('TCS', 0, 0); },
+ park:(x, s) => { x.beginPath(); x.arc(0, 0, s * .42, 0, 7); x.stroke(); x.font = `900 ${s * .46}px "Readex Pro",sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('P', 0, s * .03); },
+ head:(x, s) => { x.beginPath(); x.moveTo(-s * .05, -s * .3); x.quadraticCurveTo(s * .42, -s * .3, s * .42, 0); x.quadraticCurveTo(s * .42, s * .3, -s * .05, s * .3); x.closePath(); x.stroke(); for (let i = -1; i <= 1; i++){ x.beginPath(); x.moveTo(-s * .14, i * s * .17); x.lineTo(-s * .44, i * s * .17); x.stroke(); } },
+ eng:(x, s) => { x.strokeRect(-s * .32, -s * .18, s * .58, s * .38); x.beginPath(); x.moveTo(-s * .12, -s * .18); x.lineTo(-s * .12, -s * .32); x.lineTo(s * .1, -s * .32); x.moveTo(s * .26, -s * .05); x.lineTo(s * .42, -s * .05); x.lineTo(s * .42, s * .1); x.stroke(); },
+ door:(x, s) => { x.beginPath(); x.moveTo(-s * .3, s * .35); x.lineTo(-s * .3, -s * .35); x.lineTo(s * .18, -s * .35); x.lineTo(s * .32, -s * .05); x.lineTo(s * .32, s * .35); x.closePath(); x.stroke(); x.fillRect(s * .05, 0, s * .14, s * .06); },
+ fuel:(x, s) => { x.strokeRect(-s * .3, -s * .3, s * .38, s * .62); x.beginPath(); x.moveTo(s * .08, -s * .12); x.lineTo(s * .3, -s * .12); x.lineTo(s * .3, s * .2); x.stroke(); x.fillRect(-s * .22, -s * .22, s * .22, s * .14); },
+ temp:(x, s) => { x.beginPath(); x.moveTo(0, -s * .38); x.lineTo(0, s * .15); x.stroke(); x.beginPath(); x.arc(0, s * .22, s * .1, 0, 7); x.fill(); x.beginPath(); x.moveTo(-s * .35, s * .38); x.quadraticCurveTo(-s * .17, s * .28, 0, s * .38); x.quadraticCurveTo(s * .17, s * .48, s * .35, s * .38); x.stroke(); }};
+drawCluster = function(){ const car = G.car; if (!car) return; const el = $('#cluster'); if (!el) return; if (car.absT > 0) car.absT -= .016; if (car.tcT > 0) car.tcT -= .016;
+ const sp = speedOf(car) * 3.6, rpm = G.engOn ? clamp(car.rpm, 0, 1.05) * 6 : 0, k = .25; NEED.spd += (sp - NEED.spd) * k; NEED.rpm += (rpm - NEED.rpm) * k;
+ const x = fitCanvas(el, META.dashC.w, META.dashC.h); if (!x) return; x.drawImage(IMG.dashC, 0, 0);
+ const D = DASH, lit = G.tod !== 'day' || G.car.headOn;
+ // speed-limit pin on the speedo ring
+ const lim = curLimit(car.x); if (lim){ const a = ang(D.spd, lim / D.spd.max) * Math.PI / 180, R = 214; x.save(); x.translate(D.spd.px + Math.cos(a) * R, D.spd.py - Math.sin(a) * R); x.rotate(-a + Math.PI / 2); x.fillStyle = sp > lim + 3 ? '#ff3030' : '#ff6a3d'; x.shadowColor = '#ff3030'; x.shadowBlur = 8; x.beginPath(); x.moveTo(0, -10); x.lineTo(8, 6); x.lineTo(-8, 6); x.closePath(); x.fill(); x.restore(); }
+ // redline glow
+ if (NEED.rpm > 5.2){ x.save(); x.globalCompositeOperation = 'lighter'; const a0 = ang(D.tach, 4.6 / 6) * Math.PI / 180, a1 = D.tach.a1 * Math.PI / 180; x.strokeStyle = `rgba(255,40,30,${.25 + .25 * Math.sin(performance.now() / 70)})`; x.lineWidth = 16; x.beginPath(); x.arc(D.tach.px, D.tach.py, 205, -a0, -a1); x.stroke(); x.restore(); }
+ needle(x, D.spd.px, D.spd.py, ang(D.spd, NEED.spd / D.spd.max), D.spd.L, lit); needle(x, D.tach.px, D.tach.py, ang(D.tach, NEED.rpm / D.tach.max), D.tach.L, lit);
+ // ---------------- LCD ----------------
+ const L2c = D.lcd; x.save(); x.beginPath(); x.rect(L2c.x, L2c.y, L2c.w, L2c.h); x.clip();
+ const bg = x.createLinearGradient(0, L2c.y, 0, L2c.y + L2c.h); bg.addColorStop(0, '#0b1426'); bg.addColorStop(1, '#060b16'); x.fillStyle = bg; x.fillRect(L2c.x, L2c.y, L2c.w, L2c.h);
+ const X0 = L2c.x, Y0 = L2c.y, W = L2c.w, H = L2c.h, font = (wt, sz) => `${wt} ${sz}px "Readex Pro", system-ui, sans-serif`;
+ // row 1 — tell-tales (only the active ones, centred), else the clock
+ const on = []; if (car.absT > 0) on.push(['abs', '#ffb020']); if (car.tcT > 0) on.push(['tc', '#ffb020']); if (G.pbrake) on.push(['park', '#ff3b3b']); if (G.doorOpen) on.push(['door', '#ff3b3b']); if (car.headOn) on.push(['head', '#3ddc84']);
+ if (!G.test && GV(G.vid).cond.engine < 40) on.push(['eng', '#ffb020']); if (G.fuel < G.fuelMax * .12) on.push(['fuel', '#ffb020']); if (G.temp > 104) on.push(['temp', '#ff3b3b']);
+ const ty = Y0 + H * .1, ls = H * .12; if (on.length){ const gap = Math.min(W * .15, (W - 16) / on.length); on.forEach(([k2, col], i) => lamp(x, X0 + W / 2 + (i - (on.length - 1) / 2) * gap, ty, ls, col, LAMPS2[k2])); }
+ else { const mins = Math.floor((G.clock ?? (8 * 60 + G.time / 6)) % 1440); x.fillStyle = 'rgba(190,210,235,.55)'; x.font = font(600, H * .075); x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(`${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`, X0 + W / 2, ty); }
+ x.fillStyle = 'rgba(120,150,190,.25)'; x.fillRect(X0 + W * .06, Y0 + H * .19, W * .88, 1.5);
+ // row 2 — gear (left box) and big digital speed (right)
+ const gs = gearState(), gTxt = gs === 'D' ? 'D' + (car.gear || 1) : gs; x.strokeStyle = 'rgba(255,190,80,.6)'; x.lineWidth = 2; x.strokeRect(X0 + W * .06, Y0 + H * .25, W * .26, H * .3);
+ x.fillStyle = gs === 'R' ? '#ff6a5c' : gs === 'N' || gs === 'P' ? '#9fd0ff' : '#ffcf6b'; x.font = font(800, H * .17); x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(gTxt, X0 + W * .19, Y0 + H * .405);
+ x.fillStyle = '#ffffff'; x.font = font(800, H * .27); x.textAlign = 'right'; x.fillText(String(Math.round(sp)), X0 + W * .8, Y0 + H * .41); x.fillStyle = 'rgba(190,210,235,.7)'; x.font = font(600, H * .065); x.textAlign = 'left'; x.fillText('km/h', X0 + W * .815, Y0 + H * .47);
+ x.fillStyle = 'rgba(120,150,190,.25)'; x.fillRect(X0 + W * .06, Y0 + H * .6, W * .88, 1.5);
+ // row 3 — trip & range (left), cruise / speed-limit roundel (right)
+ const range = G.V ? Math.round(G.fuel / (G.V.lp100 / 100) / (fuelFactor() || 1)) : 0; x.textAlign = 'left'; x.fillStyle = 'rgba(210,225,245,.9)'; x.font = font(600, H * .072);
+ const trip = (G.T && G.T.meters ? G.T.meters * kmPerM() : 0); const rows = [[L2('رحلة', 'TRIP'), trip.toFixed(1) + ' km'], [L2('المدى', 'RANGE'), range + ' km'], [L2('بنزين', 'FUEL'), (G.fuel || 0).toFixed(1) + ' L']];
+ rows.forEach(([lab, val], i) => { const yy = Y0 + H * (.69 + i * .11); x.fillStyle = 'rgba(150,175,205,.75)'; x.textAlign = 'left'; x.fillText(lab, X0 + W * .07, yy); x.fillStyle = i === 2 && G.fuel < G.fuelMax * .12 ? '#ffb020' : 'rgba(225,235,250,.95)'; x.textAlign = 'right'; x.direction = 'ltr'; x.fillText(val, X0 + W * .6, yy); });
+ if (lim){ const cx2 = X0 + W * .8, cy2 = Y0 + H * .8, r = H * .11; x.fillStyle = '#fff'; x.beginPath(); x.arc(cx2, cy2, r, 0, 7); x.fill(); x.strokeStyle = '#e3262e'; x.lineWidth = r * .22; x.beginPath(); x.arc(cx2, cy2, r * .89, 0, 7); x.stroke(); x.fillStyle = '#111'; x.font = font(800, r * .9); x.textAlign = 'center'; x.fillText(String(lim), cx2, cy2 + 1); }
+ if (G.cruise){ x.fillStyle = '#3ddc84'; x.font = font(700, H * .07); x.textAlign = 'right'; x.fillText(`CC ${Math.round(G.cruise * 3.6)}`, X0 + W * .66, Y0 + H * .91); }
+ x.restore();
+ // ---------------- fuel & temperature gauges ----------------
+ NEED.fuel += ((G.fuel / G.fuelMax) - NEED.fuel) * .08; NEED.temp += (clamp((G.temp - 50) / 70, 0, 1) - NEED.temp) * .08;
+ for (const [id, im, key, val, warn] of [['#fuelG', 'dashF', 'fuel', NEED.fuel, NEED.fuel < .12], ['#tempG', 'dashT', 'temp', NEED.temp, G.temp > 104]]){ const e = $(id); if (!e) continue; const gx = fitCanvas(e, META[im].w, META[im].h); if (!gx) continue; gx.drawImage(IMG[im], 0, 0); const D2 = DASH[key];
+  if (warn){ gx.save(); gx.globalCompositeOperation = 'lighter'; const pulse = .45 + .35 * Math.sin(performance.now() / 180); const rg = gx.createRadialGradient(D2.px, D2.py - 80, 2, D2.px, D2.py - 80, 34); rg.addColorStop(0, key === 'temp' ? `rgba(255,50,40,${pulse})` : `rgba(255,170,30,${pulse})`); rg.addColorStop(1, 'rgba(0,0,0,0)'); gx.fillStyle = rg; gx.fillRect(D2.px - 40, D2.py - 120, 80, 80); gx.restore(); }
+  needle(gx, D2.px, D2.py, ang(D2, val), D2.L, lit); } };
+/* hide anything the old cluster drew around it (separate lamp strips etc.) */
+{ const st = document.createElement('style'); st.textContent = '#cluster{image-rendering:auto}'; document.head.appendChild(st); }
+
 /* ======================= atlas-loader.js ======================= */
 /* =====================================================================
    Ograaa — atlas loader: loads a handful of texture atlases and one audio
