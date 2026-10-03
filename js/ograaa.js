@@ -4508,7 +4508,7 @@ cleanImages = function(){ _ci37();
 drawVehicle = (function(prev){ return function(car, opt){ const M = META[car.spr]; if (!M || !M.wf) return prev(car, opt); _dv26(car, opt);
  opt = opt || {}; const lift = opt.lift || 0, sc = opt.scale || 1, src = car.cv || IMG[car.spr], k = PPM * car.g.s * sc, mk = car.mirror ? -k : k, wr = car.whRim ?? car.rim, im = rimImg(wr, car.player ? car.rimc : null), q = WQ(wr), ca = Math.cos(car.a), sa = Math.sin(car.a), s = car.g.s;
  ctx.save(); ctx.translate(sx(car.x), sy(car.y + lift)); ctx.rotate(-car.a); ctx.scale(mk, k); ctx.translate(-src.width / 2, -src.height / 2); if (opt.dim && S.set.gfx !== 'low') ctx.filter = 'brightness(.86) saturate(.85)';
- M.wheels.forEach(([cx, cy, r], i) => { const w = car.wh[i]; if (!w) return; const dx = w.x - car.x, dy = w.y - car.y, ly = -dx * sa + dy * ca, py = clamp(src.height / 2 - ly / s, cy - r * .3, cy), R = r * q;
+ M.wheels.forEach(([cx, cy, r], i) => { const w = car.wh[i]; if (!w) return; const dx = w.x - car.x, dy = w.y - car.y, ly = -dx * sa + dy * ca, py = clamp(src.height / 2 - ly / s, cy - r * .14, cy + r * .02), R = r * q;
   ctx.save(); ctx.translate(cx, py); if (w.flat) ctx.scale(1, .86); ctx.rotate(car.mirror ? -w.rot : w.rot); ctx.drawImage(im, -R, -R, R * 2, R * 2); ctx.restore(); });
  ctx.restore(); }; })(drawVehicle);
 
@@ -5785,6 +5785,39 @@ function draw59(){ const hz = horizon(), P = skyPal(), night = G.tod === 'night'
  const g = ctx.createLinearGradient(0, base - H * .35, 0, base + VH * .08); g.addColorStop(0, rgb(P.haze, 0)); g.addColorStop(.55, rgb(P.haze, night ? .18 : .38)); g.addColorStop(1, night ? '#12151c' : mix(W.biome.ground, '#8a8070', .55)); ctx.fillStyle = g; ctx.fillRect(0, base - H * .35, VW, VH);
  const sky = ctx.createLinearGradient(0, hz - VH * .05, 0, base); sky.addColorStop(0, rgb(P.haze, 0)); sky.addColorStop(1, rgb(P.haze, night ? .04 : .1)); ctx.fillStyle = sky; ctx.fillRect(0, hz - VH * .05, VW, base - hz + VH * .05); }
 addEventListener('resize', () => PANO59.clear());
+
+/* ======================= stance-combo-cc.js ======================= */
+"use strict";
+/* =====================================================================
+   OGRAAA v60 — design ride height · louder (still muffled) engines ·
+   fair combo · cruise speed on the dashboard screen
+   ===================================================================== */
+/* ---------------- ride height = the vehicle's own design ----------------
+   the spring is preloaded so that, at rest, every wheel sits exactly where the
+   artwork puts it (tyre on the road, body at its real height); self-levelling
+   only trims a few centimetres; wheels may tuck at most ~14% of their radius
+   into the arch on compression */
+softSusp = (function(prev){ return function(c, len){ prev(c, len); if (!c) return; const sagNew = 9.8 / Math.pow(2 * Math.PI * c.f, 2), sagDef = 9.8 / Math.pow(2 * Math.PI * (c.f0 || 1.6), 2); c.pre = sagNew - sagDef; for (const w of c.wh) w.pre = c.pre; }; })(softSusp);
+/* ---------------- engine +50% ---------------- */
+{ const _e = AU.engine.bind(AU); AU.engine = function(on, rpm, load, speed, big){ _e(on, rpm, load, speed, big); const e = this.eng, c = this.ctx; if (!e || !c) return; const heavy = G.V && G.V.cls !== 'micro', t = c.currentTime + .02; e.out.gain.cancelScheduledValues(t); e.out.gain.setTargetAtTime(on ? ((heavy ? .085 : .07) + load * .05) * 1.5 : 0, t, .45); }; }
+/* ---------------- combo: judged on smooth driving, not on noise ----------------
+   acceleration is averaged over ~0.4 s, speeding needs 2 s over the limit (+10),
+   "airborne" needs all wheels off the ground for 0.3 s; a slip costs one step,
+   only a crash or a really harsh moment resets it */
+v7fun = function(dt){ const car = G.car, F = G.fun || (G.fun = {combo:1, calm:0, seen:new Set(), vip:new Set()}); if (dt <= 0) return;
+ const accNow = (car.vx - (F.pv ?? car.vx)) / dt; F.pv = car.vx; F.acc = (F.acc || 0) + (accNow - (F.acc || 0)) * Math.min(1, dt / .4); const a = Math.abs(F.acc);
+ const over = speedOf(car) * 3.6 > (curLimit(car.x) || 60) + 10; F.overT = over ? (F.overT || 0) + dt : 0; F.airT = car.wh.every(w => !w.ground) ? (F.airT || 0) + dt : 0;
+ const crash = G.T.hits > (F.hits ?? G.T.hits); F.hits = G.T.hits; const slip = a > 3.6 || F.overT > 2 || F.airT > .3, severe = crash || a > 6.5;
+ F.cool = Math.max(0, (F.cool || 0) - dt);
+ if (G.onboard.length && !slip){ F.calm += dt; F.combo = Math.min(2, 1 + Math.floor(F.calm / 15) * .1); }
+ else if ((slip || severe) && F.cool <= 0){ if (severe){ if (F.combo > 1.15) toastUI(L2('ضاع الكومبو!', 'Combo lost!'), 'bad', null, 1.5); F.calm = 0; F.combo = 1; } else if (F.combo > 1){ F.calm = Math.max(0, F.calm - 15); F.combo = Math.max(1, Math.round((F.combo - .1) * 10) / 10); toastUI(L2('الكومبو نزل خطوة — سوق بهدوء', 'Combo down a step — drive smoothly'), 'gold', null, 1.4); } F.cool = 2.5; }
+ const cc = $('#cCombo'); if (cc){ cc.style.display = F.combo > 1 ? '' : 'none'; cc.textContent = '🔥 ×' + F.combo.toFixed(1); }
+ for (const p of G.onboard){ if (!F.seen.has(p)){ F.seen.add(p); if (Math.random() < .08){ p.vip = true; F.vip.add(p); toastUI('⭐ ' + L2('راكب VIP ركب — خليه مبسوط!', 'A VIP boarded — keep them comfortable!'), 'gold', null, 3); } } }
+ for (const p of [...F.vip]){ if (!G.onboard.includes(p)){ F.vip.delete(p); if (G.comfort > 70){ const b = Math.round(G.route.fare * 2 * F.combo); G.T.tips += b; floatTxt(car.x, car.y + 3, '⭐ +' + fmt(b), '#FFD24A'); AU.levelUp(); } else toastUI(L2('الـVIP مكانش مبسوط', 'The VIP wasn\'t happy'), 'bad'); } } };
+/* ---------------- cruise speed on the dashboard screen (top-left corner, never over other data) ---------------- */
+{ const _dc = drawCluster; drawCluster = function(){ _dc(); const el = $('#cluster'), car = G.car; if (!el || !car || !G.cruise || !el.width) return; const x = el.getContext('2d'), s = Math.min(el.width / META.dashC.w, el.height / META.dashC.h), ox = (el.width - META.dashC.w * s) / 2, oy = el.height - META.dashC.h * s; x.setTransform(s, 0, 0, s, ox, oy);
+  const L3 = DASH.lcd, X0 = L3.x + L3.w * .455, Y0 = L3.y + L3.h * .785, w = L3.w * .235, h = L3.h * .13; x.save(); x.fillStyle = 'rgba(61,220,132,.16)'; x.strokeStyle = '#3ddc84'; x.lineWidth = 2; x.beginPath(); x.roundRect ? x.roundRect(X0, Y0, w, h, 8) : x.rect(X0, Y0, w, h); x.fill(); x.stroke();
+  x.fillStyle = '#3ddc84'; x.font = `800 ${h * .62}px "Readex Pro", system-ui, sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(`CC ${Math.round(G.cruise * 3.6)}`, X0 + w / 2, Y0 + h * .54); x.restore(); x.setTransform(1, 0, 0, 1, 0, 0); }; }
 
 /* ======================= atlas-loader.js ======================= */
 /* =====================================================================
