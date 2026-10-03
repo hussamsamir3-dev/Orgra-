@@ -5752,6 +5752,40 @@ AU.engine = function(on, rpm, load, speed, big){ _eng58(on, rpm, load, speed, bi
  const isBig = G.V && G.V.cls !== 'micro'; if (!hum58){ const len = c.sampleRate * 3, b = c.createBuffer(1, len, c.sampleRate), d = b.getChannelData(0); let l = 0; for (let i = 0; i < len; i++){ l = (l + .02 * (Math.random() * 2 - 1)) / 1.02; d[i] = l * 3.5; } const s = c.createBufferSource(); s.buffer = b; s.loop = true; const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 140; const g = c.createGain(); g.gain.value = 0; s.connect(lp).connect(g).connect(AU.sfxG); s.start(); hum58 = {g, lp}; }
  const k2 = clamp((speed || 0) / 25, 0, 1.2); hum58.g.gain.setTargetAtTime(on && isBig && !G.paused ? .03 + .03 * k2 : 0, t, .6); hum58.lp.frequency.setTargetAtTime(110 + k2 * 70, t, .6); };
 
+/* ======================= muffled-air-sky.js ======================= */
+"use strict";
+/* =====================================================================
+   OGRAAA v59 — muffled engines · true air-suspension buses · smooth
+   skyline
+   ===================================================================== */
+/* ---------------- engine: muffled, warm, no hiss ---------------- */
+const _eng59 = AU.engine.bind(AU);
+AU.engine = function(on, rpm, load, speed, big){ _eng59(on, rpm, load, speed, big); const e = this.eng, c = this.ctx; if (!e || !c) return; const t = c.currentTime + .02, P = (typeof ENGP !== 'undefined' && G.V && ENGP[G.V.id]) || {lp:660, g:1}, heavy = G.V && G.V.cls !== 'micro';
+ if (!e._muff){ e._muff = 1; try{ e.o1.type = 'sine'; e.o2.type = 'triangle'; e.lfo.type = 'sine'; e.lfoG.gain.value = .22; const m = c.createBiquadFilter(); m.type = 'lowshelf'; m.frequency.value = 160; m.gain.value = 5; e.lp.disconnect(); e.lp.connect(m); m.connect(e.out); e.muff = m; }catch(x){} }
+ // no hiss: the noise layer is gone; a low cut-off keeps it muffled like hearing it from inside the cabin
+ e.ng.gain.cancelScheduledValues(t); e.ng.gain.setTargetAtTime(0, t, .2);
+ e.lp.frequency.cancelScheduledValues(t); e.lp.frequency.setTargetAtTime((heavy ? 170 : 220) + load * (heavy ? 120 : 160) + rpm * (heavy ? 90 : 130), t, .35); if (e.lp.Q) e.lp.Q.value = .4;
+ e.out.gain.cancelScheduledValues(t); e.out.gain.setTargetAtTime(on ? (heavy ? .085 : .07) + load * .05 : 0, t, .45); };
+/* ---------------- buses: air suspension you can feel ----------------
+   low body frequency, light damping, generous travel: the weight settles
+   slowly into braking, rises slowly off it, and rolls over bumps */
+softSusp = (function(prev){ return function(c, len){ prev(c, len); if (!c || len <= 6.2) return; const n = c.wh.length, m = c.base, up = c === G.car && !G.test ? upl(G.vid, 'susp') : 0;
+  c.f = (len > 11 ? .68 : len > 9 ? .72 : .82) * (1 + .04 * up); c.zeta = (len > 9 ? .22 : .25) + .03 * up; c.travel = len > 9 ? .3 : .26;
+  c.k = (m / n) * Math.pow(2 * Math.PI * c.f, 2); c.cd = 2 * c.zeta * Math.sqrt(c.k * m / n); c.kb = c.k * 7;
+  const sagNew = 9.8 / Math.pow(2 * Math.PI * c.f, 2), sagDef = 9.8 / Math.pow(2 * Math.PI * (c.f0 || 1.6), 2), clr = c === G.car && G.V ? clearance(G.V) : .35; c.pre = sagNew - sagDef + .015 - clr * .3; for (const w of c.wh) w.pre = c.pre; }; })(softSusp);
+/* let heavy bodies pitch further before levelling, and take speed bumps with a slow heave */
+{ const _bk = bodyKick; bodyKick = function(c, w, v){ _bk(c, w, v); if (c.L > 6.2 && Math.abs(v) > .7){ c.vy += v * .25; } }; }
+/* ---------------- skyline: pre-scaled strips, smooth sub-pixel scrolling ---------------- */
+const PANO59 = new Map();
+function panoStrip(k, H){ const im = panoTint(k, 0); if (!im) return null; const key = k + '|' + Math.round(H) + '|' + (im._tk || G.tod); let c = PANO59.get(key); if (c) return c; const w = Math.round(im.width / im.height * H); c = document.createElement('canvas'); c.width = Math.max(1, Math.round(w * DPR)); c.height = Math.max(1, Math.round(H * DPR)); const x = c.getContext('2d'); x.imageSmoothingQuality = 'high'; x.drawImage(im, 0, 0, c.width, c.height); c.cw = w; c.ch = H; if (PANO59.size > 24) PANO59.clear(); PANO59.set(key, c); return c; }
+drawLayers = (function(prev){ return function(){ const r = W.route; if (r && r.sky){ const saved = SKY15[r.biome]; SKY15[r.biome] = r.sky; try{ draw59(); } finally { SKY15[r.biome] = saved; } } else draw59(); }; })(drawLayers);
+function draw59(){ const hz = horizon(), P = skyPal(), night = G.tod === 'night', keys = SKY15[W.route.biome] || SKY15.city, H = VH * .23, base = hz + VH * .12, f = .045;
+ const strips = keys.map(k => panoStrip(k, H)).filter(Boolean); if (!strips.length) return; const total = strips.reduce((a, s) => a + s.cw, 0);
+ let x0 = -((cam.x * PPM * f) % total); if (x0 > 0) x0 -= total; let x = x0, i = 0; while (x < VW){ const s = strips[i % strips.length]; ctx.drawImage(s, x, base - H, s.cw + .6, H); x += s.cw; i++; }
+ const g = ctx.createLinearGradient(0, base - H * .35, 0, base + VH * .08); g.addColorStop(0, rgb(P.haze, 0)); g.addColorStop(.55, rgb(P.haze, night ? .18 : .38)); g.addColorStop(1, night ? '#12151c' : mix(W.biome.ground, '#8a8070', .55)); ctx.fillStyle = g; ctx.fillRect(0, base - H * .35, VW, VH);
+ const sky = ctx.createLinearGradient(0, hz - VH * .05, 0, base); sky.addColorStop(0, rgb(P.haze, 0)); sky.addColorStop(1, rgb(P.haze, night ? .04 : .1)); ctx.fillStyle = sky; ctx.fillRect(0, hz - VH * .05, VW, base - hz + VH * .05); }
+addEventListener('resize', () => PANO59.clear());
+
 /* ======================= atlas-loader.js ======================= */
 /* =====================================================================
    Ograaa — atlas loader: loads a handful of texture atlases and one audio
