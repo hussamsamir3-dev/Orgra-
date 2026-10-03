@@ -466,7 +466,7 @@ function resize(){
  const s = Math.min(VW / 1280, VH / 720); document.documentElement.style.fontSize = (16 * clamp(Math.pow(s, .55), .6, 1.9)) + 'px';
  document.body.classList.toggle('portrait', VH > VW * 1.05); calcPPM();
 }
-function calcPPM(){ const L = G.car ? G.car.L : 5.4; const vw = L * 1.85 + 25, vh = 15 + L * .25; PPM = Math.min(VW / vw, VH / vh) * cam.zoom; if (VH > VW) PPM = VW / (L * 1.9 + 7) * cam.zoom; }
+function calcPPM(){ const L = G.car ? G.car.L : 5.4; const vw = (L * 1.85 + 25) / .7, vh = (15 + L * .25) / .7; PPM = Math.min(VW / vw, VH / vh) * cam.zoom; if (VH > VW) PPM = VW / (L * 1.9 + 7) * cam.zoom; }
 window.addEventListener('resize', resize);
 const SX0 = () => VW * (G.mode === 'attract' ? .5 : .33), SY0 = () => VH * (VH > VW ? .56 : VH < 560 ? .55 : .66);
 const sx = x => (x - cam.x) * PPM + SX0(), sy = y => SY0() - (y - cam.y) * PPM;
@@ -5396,7 +5396,7 @@ storyTick = function(dt){ _st49(dt); const S2 = STORYRUN; if (!S2 || G.mode !== 
  const b = S2.ch.beats[S2.beat - 1]; if (b && b[1].some(l => l.who === 'dad') && S2.lastDad !== S2.beat){ S2.lastDad = S2.beat; cineMood('rgba(232,194,122,.45)', 1); setTimeout(() => cineMood('rgba(0,0,0,0)', 0), 4500); } };
 if (typeof toMenu === 'function'){ const _tm49 = toMenu; toMenu = function(...a){ cineOff(); return _tm49.apply(this, a); }; }
 /* ---------------- free roam unlocks after half the story ---------------- */
-const storyPct = () => STORY.filter(s => (CR().story || {})[s.id]).length / STORY.length;
+const storyPct = () => STORY.slice(0, 10).filter(s => (CR().story || {})[s.id]).length / 10;
 const freeLocked = () => storyPct() < .5 && !(typeof isDev === 'function' && isDev());
 const _rr49 = renderRoutes;
 renderRoutes = function(){ _rr49(); const host = $('#s-routes'); if (!host) return; host.classList.toggle('rlock', freeLocked()); const n = host.querySelector('.rlockNote'); if (n) n.remove();
@@ -5633,13 +5633,14 @@ winCells = winCells2; for (const k in WCELL) delete WCELL[k];
 /* effects drawn into a layer, then trimmed to glass pixels only */
 drawGlass = function(car, opt){ const cells = winCells2(G.V); if (!cells.length) return; const src = car.cv || IMG[car.spr], k = PPM * car.g.s, cos = G.test ? {} : GV(G.vid).cos, TA = (COS.tint.find(q => q.id === cos.tint) || {a:0}).a, mask = glassMask2(G.V), w = mask.width, h = mask.height;
  let raw = null; try{ const cc = cabinCanvas(G.V, cos, paxView()); raw = cc._raw || null; }catch(e){}
- const L = drawGlass.L || (drawGlass.L = document.createElement('canvas')); if (L.width !== w || L.height !== h){ L.width = w; L.height = h; } const x = L.getContext('2d'); x.clearRect(0, 0, w, h); const t = performance.now() / 1000;
+ const L = drawGlass.L || (drawGlass.L = document.createElement('canvas')), gkey = G.vid + '|' + TA + '|' + G.onboard.length + '|' + cells.map((_, i) => Math.round((WIN.open[i] || 0) * 60)).join(','); const fresh = L.width === w && L.height === h && drawGlass.key === gkey; if (L.width !== w || L.height !== h){ L.width = w; L.height = h; } const x = L.getContext('2d'); const t = 0;
+ if (!fresh){ drawGlass.key = gkey; x.clearRect(0, 0, w, h);
  cells.forEach((c2, i) => { const o = WIN.open[i] || 0, H = c2.b - c2.t, W2 = c2.x1 - c2.x0 + 1, edge = c2.t + H * o;
   if (o > .01){ x.save(); x.beginPath(); x.rect(c2.x0, c2.t, W2, edge - c2.t); x.clip(); if (raw) x.drawImage(raw, 0, 0); else { x.fillStyle = 'rgba(0,0,0,.05)'; x.fillRect(c2.x0, c2.t, W2, edge - c2.t); } const sh = x.createLinearGradient(0, c2.t, 0, c2.t + H * .2); sh.addColorStop(0, 'rgba(0,0,0,.5)'); sh.addColorStop(1, 'rgba(0,0,0,0)'); x.fillStyle = sh; x.fillRect(c2.x0, c2.t, W2, H * .2); x.restore(); }
   x.save(); x.beginPath(); x.rect(c2.x0, edge, W2, c2.b - edge + 1); x.clip(); const tg = x.createLinearGradient(0, edge, 0, c2.b); tg.addColorStop(0, `rgba(150,185,215,${.2 + TA * .05})`); tg.addColorStop(1, `rgba(25,40,58,${.18 + TA * .05})`); x.fillStyle = tg; x.fillRect(c2.x0, edge, W2, c2.b - edge + 1);
   const s0 = c2.x0 + W2 * ((.15 + i * .23 + t * .015) % 1), rg = x.createLinearGradient(s0, edge, s0 + H * .5, c2.b); rg.addColorStop(0, 'rgba(255,255,255,0)'); rg.addColorStop(.5, 'rgba(255,255,255,.26)'); rg.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = rg; x.fillRect(c2.x0, edge, W2, c2.b - edge + 1);
   if (o > .01){ const eg = x.createLinearGradient(0, edge - 1, 0, edge + 2.5); eg.addColorStop(0, 'rgba(255,255,255,.95)'); eg.addColorStop(.5, 'rgba(200,220,235,.6)'); eg.addColorStop(1, 'rgba(60,70,80,.3)'); x.fillStyle = eg; x.fillRect(c2.x0, edge - 1, W2, 3.2); } x.restore(); });
- x.globalCompositeOperation = 'destination-in'; x.drawImage(mask, 0, 0); x.globalCompositeOperation = 'source-over';
+ x.globalCompositeOperation = 'destination-in'; x.drawImage(mask, 0, 0); x.globalCompositeOperation = 'source-over'; }
  ctx.save(); ctx.translate(sx(car.x), sy(car.y + (opt && opt.lift || 0))); ctx.rotate(-car.a); ctx.scale(car.mirror ? -k : k, k); ctx.translate(-src.width / 2, -src.height / 2); ctx.drawImage(L, 0, 0); ctx.restore(); };
 /* window switch names follow the real panes: driver first, then passenger windows front→back */
 const _wp54 = winPanel;
@@ -5818,6 +5819,106 @@ v7fun = function(dt){ const car = G.car, F = G.fun || (G.fun = {combo:1, calm:0,
 { const _dc = drawCluster; drawCluster = function(){ _dc(); const el = $('#cluster'), car = G.car; if (!el || !car || !G.cruise || !el.width) return; const x = el.getContext('2d'), s = Math.min(el.width / META.dashC.w, el.height / META.dashC.h), ox = (el.width - META.dashC.w * s) / 2, oy = el.height - META.dashC.h * s; x.setTransform(s, 0, 0, s, ox, oy);
   const L3 = DASH.lcd, X0 = L3.x + L3.w * .455, Y0 = L3.y + L3.h * .785, w = L3.w * .235, h = L3.h * .13; x.save(); x.fillStyle = 'rgba(61,220,132,.16)'; x.strokeStyle = '#3ddc84'; x.lineWidth = 2; x.beginPath(); x.roundRect ? x.roundRect(X0, Y0, w, h, 8) : x.rect(X0, Y0, w, h); x.fill(); x.stroke();
   x.fillStyle = '#3ddc84'; x.font = `800 ${h * .62}px "Readex Pro", system-ui, sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(`CC ${Math.round(G.cruise * 3.6)}`, X0 + w / 2, Y0 + h * .54); x.restore(); x.setTransform(1, 0, 0, 1, 0, 0); }; }
+
+/* ======================= story-part2.js ======================= */
+"use strict";
+/* =====================================================================
+   OGRAAA v61 — more story, smoother frames
+   · "Previously…" recap before every chapter
+   · 5 side stories (funny / tense) between chapters
+   · Part II: three new chapters after The Promise (sabotage, flood,
+     Sayed's fall) — the story keeps going
+   · performance: cached glass layer, one pre-rendered skyline band
+   ===================================================================== */
+Object.assign(DESTS, {market:['سوق الخميس','Thursday market'], hall:['قاعة الأفراح','Wedding hall'], uni:['الجامعة','The university'], stadium:['الاستاد','The stadium']});
+/* ---------------- side stories ---------------- */
+const SIDE = [
+ {id:'x1', side:true, after:'s2', vid:OLD, own:true, route:'m1', tod:'day', cls:'micro', title:['حكاية · المعزة','Side story · The Goat'], sub:['عم سيد الفلاح ومعزته "بطة" رايحين السوق','Uncle Sayyid the farmer and his goat "Batta" are off to market'], reward:400,
+  mode:{express:'market', group:[{t:'p6', h:1.66}], meter:{icon:'🐐', ar:'عصبية بطة', en:'Batta\'s nerves', rate:55, fail:L('pax','مااااااء! (بطة نطّت من الشباك… ورجعت تاني)','Maaaaa! (Batta jumped out the window… and back in)')}, goat:true}, goal:{comfort:45},
+  intro:[L('pax','يا أسطى، ينفع بطة تركب؟ هي هادية والله… أغلب الوقت.','Driver, can Batta ride? She\'s calm, I swear… mostly.'), L('you','ينفع… بس لو أكلت الكرسي هتدفعه.','She can… but if she eats a seat, you pay for it.'), L('pax','دي بتحب الأغاني. شغّل الراديو بس.','She loves music. Just put the radio on.')],
+  beats:[[.3, [L('pax','مااااء! (بطة شافت عربية فول)','Maaaa! (Batta saw a foul cart)')]], [.6, [L('pax','بالراحة على المطبات… بطة حامل!','Easy on the bumps… Batta\'s expecting!')]], [.85, [L('pax','وصلنا! بطة بتقولك شكراً… بطريقتها.','We\'re here! Batta says thanks… in her own way.')]]],
+  win:[L('pax','خد دي يا أسطى… جبنة من لبن بطة. أحسن من الفلوس.','Take this, driver… cheese from Batta\'s milk. Better than money.')], lose:[L('pax','بطة زعلانة منك. مش هتنسى.','Batta is upset with you. She won\'t forget.')]},
+ {id:'x2', side:true, after:'s3', vid:OLD, own:true, route:'m3', tod:'sunset', cls:'micro', title:['حكاية · العريس المتأخر','Side story · The Late Groom'], sub:['الفرح بدأ… والعريس لسه في زوبه','The wedding has started… and the groom is still in Zouba'], reward:700,
+  mode:{express:'hall', group:[{t:'p2', h:1.75}, {t:'p1', h:1.72}], meter:{icon:'👰', ar:'صبر العروسة', en:'Bride\'s patience', rate:58, fail:L('pax','(تليفون) العروسة قالت: لو مجيتش في عشر دقايق، هتتجوز المأذون!','(phone) The bride says: ten minutes, or she marries the registrar!')}}, goal:{},
+  intro:[L('pax','(العريس) البدلة اتقطعت والعربية عطلت والكوافير اتأخر… يوم جميل!','(groom) My suit ripped, my car died, the barber was late… lovely day!'), L('pax','(صاحبه) اطمن يا عريس، زوبه عمرها ما أخّرت حد.','(best man) Relax, groom, Zouba has never made anyone late.'), L('you','اربطوا الحزام… وامسكوا الطرحة.','Seatbelts on… and hold the veil.')],
+  beats:[[.4, [L('pax','(تليفون من أبو العروسة) إنت فين يا ابني؟! المعازيم أكلوا التورتة!','(bride\'s father on the phone) Where are you?! The guests ate the cake!')]], [.75, [L('pax','(العريس) سامع الزغاريد! قرّبنا!','(groom) I hear the zaghareet! We\'re close!')]]],
+  win:[L('pax','(أبو العروسة) أهلاً بالعريس… وأهلاً بالسواق اللي أنقذ الفرح!','(bride\'s father) Welcome, groom… and welcome to the driver who saved the wedding!')], lose:[L('pax','(العريس) هي زعلانة… بس اتجوزنا. الحمد لله.','(groom) She\'s upset… but we\'re married. Thank God.')]},
+ {id:'x3', side:true, after:'s4', vid:OLD, own:true, route:'m10', tod:'night', cls:'micro', title:['حكاية · ليلة الماتش','Side story · Match Night'], sub:['جمهور الأهلي والزمالك… في عربية واحدة','Ahly and Zamalek fans… in one van'], reward:600,
+  mode:{express:'stadium', group:[{t:'p1', h:1.7}, {t:'p2', h:1.74}, {t:'p4', h:1.72}, {t:'p5', h:1.7}, {t:'p1', h:1.68}, {t:'p2', h:1.75}], fans:true}, goal:{comfort:55},
+  intro:[L('pax','(أهلاوي) النهارده هنكسب ٣-٠!','(Ahly fan) Tonight we win 3-0!'), L('pax','(زملكاوي) ٣-٠ لينا إحنا يا حبيبي!','(Zamalek fan) 3-0 to US, my friend!'), L('you','الراديو هيشغّل التعليق… واللي يزعق ينزل.','The radio plays the commentary… whoever shouts walks.')],
+  beats:[[.35, [L('pax','جووووول!! (الراديو) — العربية كلها بتتهز!','GOOOAL!! (radio) — the whole van is shaking!')]], [.7, [L('pax','(الاتنين مع بعض) بس الأسطى ده محترم بجد.','(both together) But this driver is genuinely decent.')]]],
+  win:[L('pax','(الجمهورين) تعالى اتفرج معانا يا أسطى! التذكرة علينا!','(both sides) Come watch with us, driver! Ticket\'s on us!')], lose:[L('pax','(خناقة في الكنبة الورانية) …خلاص نازلين هنا!','(a fight on the back bench) …fine, we\'re getting off here!')]},
+ {id:'x4', side:true, after:'s5', vid:OLD, own:true, route:'m3', tod:'day', cls:'micro', title:['حكاية · الحماة','Side story · The Mother-in-Law'], sub:['أم كريم بعتت أمها معاك… وهي مابتعجبهاش حاجة','Om Karim sent her mother with you… and nothing pleases her'], reward:800,
+  mode:{express:'market', group:[{t:'p3', h:1.58, vip:true}], critic:true}, goal:{comfort:70},
+  intro:[L('omk','ماما هتركب معاك للسوق. هي… دقيقة شوية.','Mum will ride with you to the market. She\'s… a little particular.'), L('pax','(الحماة) العربية دي ريحتها كاوتش. والكرسي ده مش نضيف. وإنت لابس إيه؟','(mother-in-law) This van smells of tyres. This seat isn\'t clean. And what are you wearing?'), L('you','…أهلاً يا حاجة. نورتي زوبه.','…Welcome, Hajja. You honour Zouba.')],
+  beats:[[.5, [L('pax','(الحماة) جوز بنتي بيسوق أحسن منك… وهو مابيعرفش يسوق.','(mother-in-law) My son-in-law drives better than you… and he can\'t drive.')]], [.85, [L('pax','(الحماة) …يعني، مش وحش أوي.','(mother-in-law) …well, not too bad.')]]],
+  win:[L('pax','(الحماة) قول لأبوك الله يرحمه… إنه ربّى راجل.','(mother-in-law) Tell your late father… he raised a real man.'), L('omk','ماما قالت كده؟! دي ما قالتهاش لكريم لحد النهارده!','Mum said that?! She has never said it to Karim!')], lose:[L('pax','(الحماة) زي ما توقعت.','(mother-in-law) Just as I expected.')]},
+ {id:'x5', side:true, after:'s6', vid:OLD, own:true, route:'m3', tod:'day', cls:'micro', title:['حكاية · يوم الامتحان','Side story · Exam Morning'], sub:['طلبة الثانوية العامة… واللجنة بتقفل ٩ بالظبط','High-school students… and the exam hall shuts at 9 sharp'], reward:600,
+  mode:{express:'uni', group:[{t:'p4', h:1.66}, {t:'p5', h:1.62}, {t:'p4', h:1.7}, {t:'p2', h:1.68}, {t:'p5', h:1.6}], meter:{icon:'⏰', ar:'اللجنة بتقفل', en:'Hall closing', rate:60, fail:L('pax','(بيجروا) لحقنا بالعافية… الأبواب كانت بتتقفل!','(running) Just made it… the doors were closing!')}}, goal:{},
+  intro:[L('pax','يا عمو بسرعة! امتحان الفيزيا… وأنا نسيت الآلة الحاسبة!','Uncle, hurry! Physics exam… and I forgot my calculator!'), L('pax','وأنا نسيت أذاكر!','And I forgot to study!'), L('you','وأنا نسيت أفطر. يلا بينا.','And I forgot breakfast. Let\'s go.')],
+  beats:[[.5, [L('pax','(بيراجعوا بصوت عالي) قانون نيوتن التاني… القوة بتساوي… عمو بالراحة على الفرامل!','(revising aloud) Newton\'s second law… force equals… uncle, easy on the brakes!')]]],
+  win:[L('pax','لو نجحت هاجي أركب معاك كل يوم يا عمو!','If I pass, I\'ll ride with you every day, uncle!'), L('dad','"العلم نور يا ابني… وإنت وصّلت النور."','"Learning is light, son… and you delivered the light."')], lose:[L('pax','دخلنا متأخرين… بس المراقب طيب.','We got in late… but the invigilator was kind.')]}];
+/* ---------------- Part II ---------------- */
+const PART2 = [
+ {id:'s11', vid:OLD, own:true, route:'m1', tod:'night', cls:'micro', title:['الفصل ١١ · تخريب','Chapter 11 · Sabotage'], sub:['حد لعب في فرامل زوبه بالليل','Someone tampered with Zouba\'s brakes in the night'], reward:3000,
+  mode:{express:'abdo', sabotage:true}, goal:{},
+  intro:[L('abdo','(تليفون الساعة ٣ الفجر) متركبش زوبه! لقيت خرطوم الفرامل مقطوع نصه!','(phone, 3 a.m.) Don\'t drive Zouba! The brake line is half cut!'), L('you','مين يعمل كده؟','Who would do this?'), L('mona','الكاميرا جنب الموقف جابت عربية الشركة المنافسة… بس مش سيد. حد تاني.','The camera by the terminal caught the rival company\'s car… not Sayed. Someone else.'), L('abdo','هاتها الورشة بالراحة. الفرامل نصها. استخدم الموتور يهدّيك.','Bring her to the workshop slowly. Half the brakes. Let the engine slow you down.')],
+  beats:[[.4, [L('you','(دوّست فرامل… مفيش رد تقريباً)','(I press the brake… almost nothing)')]], [.8, [L('abdo','شايفك! خلّيك يمين… أنا فاتحلك الباب.','I see you! Keep right… I\'ve opened the gate.')]]],
+  win:[L('abdo','وصلت بيها سليمة… أبوك كان هيبقى فخور.','You brought her in safe… your father would be proud.'), L('mona','واللي عمل كده… اسمه طلع في الكاميرا: مدير شركة سيد الجديد.','And whoever did it… the camera named him: Sayed\'s new manager.')], lose:[L('abdo','الحمد لله إنك سليم. العربية بتتصلّح… إنت لأ.','Thank God you\'re safe. A van can be fixed… you can\'t.')]},
+ {id:'s12', vid:OLD, own:true, route:'m5', tod:'night', weather:'rain', cls:'micro', title:['الفصل ١٢ · السيول','Chapter 12 · The Flood'], sub:['الشوارع غرقت والناس محبوسة','The streets have flooded and people are stranded'], reward:3500,
+  mode:{}, goal:{deliver:8},
+  intro:[L('mona','الإسعاف مش عارف يدخل الحتة دي. الميه وصلت للركبة.','The ambulances can\'t get in. The water is knee-deep.'), L('hagg','زوبه عالية وتقيلة… هي الوحيدة اللي تقدر تدخل. بس بالراحة.','Zouba is high and heavy… she\'s the only one who can get in. But slowly.'), L('you','هلم الناس محطة محطة.','I\'ll collect people stop by stop.')],
+  beats:[[.4, [L('pax','(ست ومعاها عيالها) ربنا يبعتلك يا ابني… مستنيين من ٣ ساعات.','(a mother and her kids) God bless you, son… we\'ve waited three hours.')]], [.8, [L('sayed','(على الطريق، أتوبيسه واقف في الميه) …ممكن تاخد ركابي معاك؟','(on the road, his bus stuck in the water) …could you take my passengers too?')]]],
+  win:[L('mona','الأخبار بتتكلم عن "زوبه". صورتها في كل حتة!','The news is all about "Zouba". Her photo is everywhere!')], lose:[L('hagg','عملت اللي تقدر عليه. ده كفاية.','You did what you could. That\'s enough.')]},
+ {id:'s13', vid:'coachN', route:'c1', tod:'sunset', weather:'sand', cls:'coach', title:['الفصل ١٣ · سقوط السبّاق','Chapter 13 · The Racer\'s Fall'], sub:['أتوبيس سيد عطل في الصحرا… والركاب معاه','Sayed\'s coach broke down in the desert… with passengers'], reward:5000,
+  mode:{puncture:.55}, goal:{deliver:12},
+  intro:[L('sayed','(لاسلكي، صوته مكسور) أنا عارف إني ماستاهلش… بس عندي ٤٠ راكب في الصحرا والشمس بتغيب.','(radio, voice breaking) I know I don\'t deserve it… but I have 40 passengers in the desert and the sun is setting.'), L('hagg','زوبه ماتقدرش تشيلهم. خد أتوبيس السفر الجديد — وروح.','Zouba can\'t carry them. Take the new coach — go.'), L('you','مش عشانه. عشان الناس.','Not for him. For the people.')],
+  beats:[[.3, [L('sayed','(واقف على جنب الطريق، بيشاور) هنا! إحنا هنا!','(at the roadside, waving) Here! We\'re here!')]], [.75, [L('sayed','أبوك كان بيقول: الخط مش ملك حد… الخط ملك الناس. دلوقتي فهمت.','Your father used to say: the line belongs to no one… it belongs to the people. Now I understand.')]]],
+  win:[L('sayed','عايز أشتغل معاكم. من تحت. سواق عادي.','I want to work with you. From the bottom. Just a driver.'), L('hagg','أهلاً بيك يا سيد… في عيلة صلاح.','Welcome, Sayed… to Salah\'s family.'), L('dad','"اللي بيسامح… بيكسب مرتين."','"Whoever forgives… wins twice."')], lose:[L('mona','الإسعاف وصلت قبلك… بس كله بخير.','The ambulance got there first… but everyone is fine.')]}];
+PART2.forEach(ch => STORY.push(Object.assign({beats:[], win:[], lose:[], goal:{}, node:'c0'}, ch)));
+STORY.forEach((ch, i) => { if (['s11','s12','s13'].includes(ch.id)) ch.unlock = () => !!(CR().story || {})[STORY[i - 1].id]; });
+SIDE.forEach(ch => { Object.assign(ch, {beats:ch.beats || [], node:'c0'}); ch.unlock = () => !!(CR().story || {})[ch.after]; });
+Object.assign(TAPES, {s11:['"اللي يأذيك… سيبه لربنا. وإنت خلي بالك من نفسك."','"Whoever harms you… leave him to God. And look after yourself."'], s12:['"لما الدنيا تغرق… كون إنت المركب."','"When the world floods… be the boat."'], s13:['"اللي بيسامح… بيكسب مرتين."','"Whoever forgives… wins twice."']});
+Object.assign(TEASE, {s10:['حد مش عايز زوبه ترجع الخط…','Someone doesn\'t want Zouba back on the line…'], s11:['السما بتمطر… والمدينة بتغرق.','The sky opens… and the city floods.'], s12:['لاسلكي من الصحرا… صوت تعرفه كويس.','A radio call from the desert… a voice you know well.'], s13:['الحكاية مكمّلة… ترقّب الجزء التالت.','The story goes on… watch for Part III.']});
+/* ---------------- "Previously…" recap ---------------- */
+const RECAP = {s2:['زوبه رجعت تتنفس… في ورشة الأسطى عبده.','Zouba breathes again… in Usta Abdo\'s workshop.'], s3:['الناس افتكرت أبوك على الخط.','The people remembered your father on the line.'], s4:['صلاح الصغير اتولد… وزوبه وصّلت أمه.','Little Salah was born… and Zouba carried his mother.'], s5:['هزمت سيد… بس هو مابينساش.','You beat Sayed… but he never forgets.'], s6:['ليلة المطر خلصت… والعمال روّحوا.','The rainy night ended… the workers got home.'], s7:['اخترت في موضوع الشنطة… والقرار ليه تمن.','You made your choice about the bag… and every choice has a price.'], s8:['العقد بقى بتاعكم… وجه الأتوبيس الأول.','The contract is yours… the first bus arrived.'], s9:['عدّيت العاصفة.','You made it through the storm.'], s10:['فرح كريم كان أحلى فرح.','Karim\'s wedding was the best ever.'], s11:['بقيت شريك… بس حد مش مبسوط.','You became a partner… but someone isn\'t happy.'], s12:['حد خرّب زوبه… وإنت رجّعتها.','Someone sabotaged Zouba… and you brought her home.'], s13:['المدينة غرقت… وزوبه بقت حكاية في التلفزيون.','The city flooded… and Zouba made the TV news.']};
+const _tc61 = titleCard;
+titleCard = function(ch, done){ const rc = RECAP[ch.id]; if (!rc || ch.side) return _tc61(ch, done); const m = document.createElement('div'); m.className = 'tcard recap'; m.innerHTML = `<div class="tbar t"></div><div class="tbar b"></div><div class="tin"><small>${L2('في الحلقة اللي فاتت…', 'PREVIOUSLY…')}</small><p class="rc">${nm(rc)}</p></div>`; document.body.appendChild(m); requestAnimationFrame(() => m.classList.add('on')); setTimeout(() => { m.classList.add('out'); setTimeout(() => { m.remove(); _tc61(ch, done); }, 500); }, 2300); };
+/* ---------------- chapter mechanics for the new stories ---------------- */
+const _sc61 = setupChapter;
+setupChapter = function(ch){ _sc61(ch); const S2 = STORYRUN, md = ch.mode || {}; if (!S2 || !G.car) return; const last = W.stops.length - 1;
+ if (md.group){ G.onboard = md.group.map(p => Object.assign({dest:last}, p)); }
+ if (md.meter){ S2.meter = 6; S2.meterRate = md.meter.rate / Math.max(40, (W.stops[last].x - G.car.x) / 8.5); }
+ if (md.sabotage && !G.test){ GV(OLD).cond.brakes = Math.min(GV(OLD).cond.brakes, 22); S2.sab = true; }
+ if (md.fans){ S2.fans = true; } if (md.goat) S2.goat = true; if (md.critic) S2.critic = true; };
+const _st61 = storyTick;
+storyTick = function(dt){ _st61(dt); const S2 = STORYRUN; if (!S2 || G.mode !== 'play' || G.paused) return; const md = S2.ch.mode || {}, car = G.car, sp = speedOf(car);
+ if (S2.meter != null){ S2.meter += dt * S2.meterRate * (sp < 3 ? 1.3 : 1) + (LOCK && LOCK.on ? dt * 3 : 0); if (S2.meter >= 100 && !S2.meterOut){ S2.meterOut = true; comms([md.meter.fail]); } const h = $('#storyHud'); if (h && !h.querySelector('.mtr')) h.insertAdjacentHTML('beforeend', `<span class="mtr"></span>`); const el = h && h.querySelector('.mtr'); if (el){ const v = Math.min(100, Math.round(S2.meter)); el.className = 'mtr' + (v > 75 ? ' warn' : ''); el.innerHTML = `${md.meter.icon} ${L2(md.meter.ar, md.meter.en)} <i class="lbar"><i style="width:${v}%"></i></i>`; } }
+ if (S2.goat && Math.random() < dt * .08){ AU.tone && AU.tone(520, .25, 'sawtooth', .02); if (Math.random() < .5) comms([L('pax', pick(['مااااء!','ماااااء… (بطة بتاكل الستارة)']), pick(['Maaaa!','Maaaa… (Batta is eating the curtain)']))]); }
+ if (S2.goat && LOCK && LOCK.on){ G.comfort = Math.max(0, G.comfort - dt * 6); }
+ if (S2.fans){ const radio = typeof radioAudible === 'function' && radioAudible(); G.comfort = clamp(G.comfort + dt * (radio ? .8 : -.9), 0, 100); if (!radio && Math.random() < dt * .05) comms([L('pax','شغّل التعليق يا أسطى! الماتش بدأ!','Put the commentary on, driver! The match started!')]); }
+ if (S2.critic){ S2.cT = (S2.cT || 0) - dt; if (S2.cT <= 0 && (LOCK && LOCK.on || sp * 3.6 > (curLimit(car.x) || 60) + 5 || (car.impacts && car.impacts.length))){ S2.cT = 7; comms([L('pax', pick(['الطريق مليان مطبات ولا إنت اللي بتدوّرها؟','بالراحة! الطقم ده كان بتاع جوزي الله يرحمه.','إنت بتسوق ولا بترقص؟']), pick(['Is the road full of bumps, or do you look for them?','Easy! This suit belonged to my late husband.','Are you driving or dancing?']))]); } }
+ if (S2.sab && LOCK && LOCK.on && !S2.sabT){ S2.sabT = 1; comms([L('you','(الفرامل مش ماسكة!) …يا رب.','(the brakes won\'t bite!) …please, God.')]); } };
+/* side stories don't "unlock the next chapter" in their result card */
+const _src61 = storyResultCard;
+storyResultCard = function(ch, ok, stars, best, pay, promos){ _src61(ch, ok, stars, best, pay, promos); if (!ch.side) return; const box = document.querySelector('.dlyM .sres'); if (!box) return; box.querySelectorAll('.srows div').forEach(d => { if (/🔓|👑/.test(d.textContent)) d.remove(); }); const nx = box.querySelector('[data-nx]'); if (nx) nx.remove(); };
+/* ---------------- story page: side stories shelf ---------------- */
+const _rsp61 = renderStoryPage;
+renderStoryPage = function(){ _rsp61(); const page = $('#s-career .sjpage'); if (!page) return; const c = CR(); c.story = c.story || {}; const open = SIDE.filter(s => s.unlock());
+ const box = document.createElement('div'); box.className = 'sides'; box.innerHTML = `<h4>🎭 ${L2('حكايات جانبية', 'Side stories')} <small>${fmt(SIDE.filter(s => c.story[s.id]).length)}/${fmt(SIDE.length)}</small></h4><div class="sdg">${SIDE.map(s => { const on = s.unlock(), done = c.story[s.id]; return `<div class="sdc ${done ? 'done' : on ? 'open' : 'lock'}"><b>${nm(s.title).replace(/^.*?·\s*/, '')}</b><span>${nm(s.sub)}</span>${on ? `<button class="btn sm ${done ? '' : 'pri'}" data-sd="${s.id}">${done ? '↺' : '▶'} ${done ? L2('تاني', 'Again') : L2('العب', 'Play')}</button>` : `<em>🔒 ${L2('بعد ', 'After ')}${nm(STORY.find(q => q.id === s.after).title).replace(/^.*?·\s*/, '')}</em>`}</div>`; }).join('')}</div>`;
+ const path = page.querySelector('.sjpath'); path.after(box); box.querySelectorAll('[data-sd]').forEach(b => b.onclick = () => startChapter(SIDE.find(s => s.id === b.dataset.sd))); };
+/* ---------------- performance: one pre-rendered skyline band ---------------- */
+let BAND = null;
+draw59 = function(){ const hz = horizon(), P = skyPal(), night = G.tod === 'night', keys = SKY15[W.route.biome] || SKY15.city, H = Math.round(VH * .23), base = hz + VH * .12, f = .045, key = keys.join(',') + '|' + H + '|' + G.tod + '|' + DPR;
+ if (!BAND || BAND.key !== key){ const strips = keys.map(k => panoStrip(k, H)).filter(Boolean); if (!strips.length) return; const total = Math.round(strips.reduce((a, s) => a + s.cw, 0)), c = document.createElement('canvas'); c.width = Math.round(total * DPR); c.height = Math.round(H * DPR); const x = c.getContext('2d'); let xx = 0; for (const s of strips){ x.drawImage(s, Math.round(xx * DPR), 0, Math.round(s.cw * DPR) + 1, c.height); xx += s.cw; } BAND = {key, c, total}; }
+ const T = BAND.total; let x0 = -((cam.x * PPM * f) % T); if (x0 > 0) x0 -= T; for (let x = x0; x < VW; x += T) ctx.drawImage(BAND.c, x, base - H, T, H);
+ const g = ctx.createLinearGradient(0, base - H * .35, 0, base + VH * .08); g.addColorStop(0, rgb(P.haze, 0)); g.addColorStop(.55, rgb(P.haze, night ? .18 : .38)); g.addColorStop(1, night ? '#12151c' : mix(W.biome.ground, '#8a8070', .55)); ctx.fillStyle = g; ctx.fillRect(0, base - H * .35, VW, VH);
+ const sky = ctx.createLinearGradient(0, hz - VH * .05, 0, base); sky.addColorStop(0, rgb(P.haze, 0)); sky.addColorStop(1, rgb(P.haze, night ? .04 : .1)); ctx.fillStyle = sky; ctx.fillRect(0, hz - VH * .05, VW, base - hz + VH * .05); };
+addEventListener('resize', () => { BAND = null; });
+{ const st = document.createElement('style'); st.textContent = `
+.tcard.recap .tin small{letter-spacing:.35em;color:#9fb4d0}.tcard.recap .rc{font:700 clamp(1.2rem,3vw,1.9rem) 'Readex Pro',sans-serif;color:#f1e4c4;max-width:70vw;margin:.6rem auto 0;line-height:1.6}
+.sides{border-radius:1.1rem;padding:.8rem 1rem;margin-top:1rem;background:linear-gradient(120deg,#20162a,#121a2c);border:1px solid rgba(180,140,255,.35)}.sides h4{margin:0 0 .6rem;color:#cdb6ff}.sides h4 small{color:var(--mut);font-weight:400}
+.sdg{display:grid;grid-template-columns:repeat(auto-fill,minmax(15rem,1fr));gap:.6rem}.sdc{display:flex;flex-direction:column;gap:.3rem;padding:.7rem;border-radius:.9rem;background:rgba(5,8,18,.55);border:1px solid var(--line)}.sdc b{font-size:.95rem}.sdc span{font-size:.78rem;color:#c3cede}.sdc em{font-style:normal;font-size:.72rem;color:var(--mut)}.sdc.open{border-color:rgba(205,182,255,.6)}.sdc.done{border-color:rgba(124,252,154,.35)}.sdc.lock{opacity:.55}.sdc .btn{align-self:flex-start}`; document.head.appendChild(st); }
 
 /* ======================= atlas-loader.js ======================= */
 /* =====================================================================
