@@ -4122,9 +4122,9 @@ for (const k in LAMPS){ const m = META[k]; if (!m) continue; const [[hx, hy], [t
 const _upd30 = update;
 update = function(dt){ _upd30(dt); if (G.mode !== 'play' || !G.car || dt <= 0) return; const all = [G.car, ...G.ai.filter(a => Math.abs(a.x - G.car.x) < 80)];
  for (const c of all){ if (!c.wh || c.wh.length < 2) continue; const xs = c.wh.map(w => w.x), x0 = Math.min(...xs), x1 = Math.max(...xs); if (x1 - x0 < .5) continue;
-  const slope = Math.atan2(terrH(x1) - terrH(x0), x1 - x0), diff = c.a - slope, big = c.L > 5.8, lim = big ? .06 : .09;
+  const slope = Math.atan2(terrH(x1) - terrH(x0), x1 - x0), diff = c.a - slope, big = c.L > 5.8, lim = big ? .085 : .09;
   // progressive pitch stiffness beyond a small free range (air-suspension levelling / anti-dive geometry), plus pitch damping
-  if (Math.abs(diff) > lim) c.w -= (diff - Math.sign(diff) * lim) * (big ? 28 : 20) * dt;
+  if (Math.abs(diff) > lim) c.w -= (diff - Math.sign(diff) * lim) * (big ? 20 : 20) * dt;
   c.w *= 1 - Math.min(.5, dt * (big ? 1.0 : .7)); }
  tickDamageFX(dt); };
 /* ---------------- heavy-crash damage keeps smoking / sparking from the broken spot ---------------- */
@@ -5710,6 +5710,27 @@ softSusp = function(c, len){ if (!c) return; if (c.f0 == null) c.f0 = c.f; const
 const _sr56 = startRoute; startRoute = function(r, o){ _sr56(r, o); if (G.car && G.V) softSusp(G.car, G.V.len); };
 /* road texture: wheels only (no body heave), speed bumps: modest body nod */
 bodyKick = function(c, w, v){ wheelKick(w, v * 2); if (Math.abs(v) > .7){ const lever = clamp((w.ax || 0) / (c.L / 2), -1, 1); c.vy += v * .35; c.w += v * .18 * lever * (c.mirror ? -1 : 1); } };
+
+/* ======================= tyres-stance-2.js ======================= */
+"use strict";
+/* =====================================================================
+   OGRAAA v57 — bigger tyres (+30%), lower stance (−30% ground
+   clearance), freer bus suspension; same rules for every vehicle
+   ===================================================================== */
+for (const k in TYRE_D) TYRE_D[k] = +(TYRE_D[k] * 1.3).toFixed(3);
+/* ground clearance measured from each vehicle's artwork: tyre contact line → lowest body point between the axles */
+const CLR = {};
+function clearance(V){ if (CLR[V.id] != null) return CLR[V.id]; const M = META[V.spr], im = IMG[V.spr]; if (!M || !im || !im.width) return CLR[V.id] = .25; const c = document.createElement('canvas'); c.width = im.width; c.height = im.height; const x = c.getContext('2d'); x.drawImage(im, 0, 0); const d = x.getImageData(0, 0, c.width, c.height).data, W = c.width, H = c.height;
+ const xs = M.wheels.map(w => w[0]).sort((a, b) => a - b), xa = xs[0] + M.wheels[0][2] * 1.3, xb = xs[xs.length - 1] - M.wheels[0][2] * 1.3, bots = [];
+ for (let px = Math.round(xa); px < xb; px += 3){ for (let py = H - 1; py > 0; py--) if (d[(py * W + px) * 4 + 3] > 150){ bots.push(py); break; } } bots.sort((a, b) => a - b); const sill = bots.length ? bots[bots.length >> 1] : H * .85, ground = Math.max(...M.wheels.map(w => w[1] + w[2]));
+ return CLR[V.id] = Math.max(.08, (ground - sill) * V.len / M.w); }
+softSusp = (function(prev){ return function(c, len){ prev(c, len); if (!c) return; const isPlayer = c === G.car, V = isPlayer ? G.V : null;
+  // freer movement: a touch more travel and slightly lighter damping on everything heavy
+  if (len > 6.2){ c.zeta *= .84; c.travel += .05; } else { c.zeta *= .92; c.travel += .03; } const n = c.wh.length; c.cd = 2 * c.zeta * Math.sqrt(c.k * c.base / n);
+  // lower stance: drop the body by 30% of its ground clearance
+  const clr = V ? clearance(V) : len > 9 ? .38 : len > 6 ? .3 : .22; c.pre -= clr * .3; for (const w of c.wh) w.pre = c.pre; }; })(softSusp);
+/* rebuild the wheel arches for the new tyre size */
+for (const v of VEHS){ const M = META[v.spr]; if (M) M._ty = 0; }
 
 /* ======================= atlas-loader.js ======================= */
 /* =====================================================================
