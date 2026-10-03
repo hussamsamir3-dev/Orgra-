@@ -5732,6 +5732,26 @@ softSusp = (function(prev){ return function(c, len){ prev(c, len); if (!c) retur
 /* rebuild the wheel arches for the new tyre size */
 for (const v of VEHS){ const M = META[v.spr]; if (M) M._ty = 0; }
 
+/* ======================= calm-audio.js ======================= */
+"use strict";
+/* =====================================================================
+   OGRAAA v58 — no more whistle
+   · turbo whistle oscillator removed for good (it was still leaking
+     through on buses and coaches)
+   · speed wind no longer a resonant band (that sang like a whistle at
+     highway speed): now a soft low-passed rush
+   · in its place: a calm, deep cabin hum on buses/coaches that rises
+     gently with speed — the relaxed drone of a real coach
+   ===================================================================== */
+let hum58 = null;
+const _eng58 = AU.engine.bind(AU);
+AU.engine = function(on, rpm, load, speed, big){ _eng58(on, rpm, load, speed, big); const e = this.eng, c = this.ctx; if (!e || !c) return; const t = c.currentTime;
+ if (e.tb && !e._noWhistle){ e._noWhistle = 1; try{ e.tbg.gain.cancelScheduledValues(0); e.tbg.gain.value = 0; e.tbg.disconnect(); e.tb.stop(); }catch(x){} }
+ if (e.wf){ if (e.wf.type !== 'lowpass'){ e.wf.type = 'lowpass'; e.wf.Q.value = .5; } const k = clamp((speed || 0) / 30, 0, 1.4); e.wf.frequency.cancelScheduledValues(t); e.wf.frequency.setTargetAtTime(200 + k * 330, t, .4); e.wg.gain.cancelScheduledValues(t); e.wg.gain.setTargetAtTime(G.paused ? 0 : .07 * Math.pow(k, 1.5), t, .45); }
+ // calm cabin hum for big vehicles
+ const isBig = G.V && G.V.cls !== 'micro'; if (!hum58){ const len = c.sampleRate * 3, b = c.createBuffer(1, len, c.sampleRate), d = b.getChannelData(0); let l = 0; for (let i = 0; i < len; i++){ l = (l + .02 * (Math.random() * 2 - 1)) / 1.02; d[i] = l * 3.5; } const s = c.createBufferSource(); s.buffer = b; s.loop = true; const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 140; const g = c.createGain(); g.gain.value = 0; s.connect(lp).connect(g).connect(AU.sfxG); s.start(); hum58 = {g, lp}; }
+ const k2 = clamp((speed || 0) / 25, 0, 1.2); hum58.g.gain.setTargetAtTime(on && isBig && !G.paused ? .03 + .03 * k2 : 0, t, .6); hum58.lp.frequency.setTargetAtTime(110 + k2 * 70, t, .6); };
+
 /* ======================= atlas-loader.js ======================= */
 /* =====================================================================
    Ograaa — atlas loader: loads a handful of texture atlases and one audio
